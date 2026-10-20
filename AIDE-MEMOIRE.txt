@@ -1,0 +1,43 @@
+AIDE-MEMOIRE REAPACK - TODOROKI
+===============================
+
+OU RANGER LES FICHIERS
+  Scripts/           -> scripts .lua
+  Python Utilities/  -> scripts .py
+  FX/                -> effets .jsfx
+  Jamais a la racine du depot (sinon ignores).
+  Ne pas mettre de .txt dans ces dossiers (ReaPack les prendrait pour des paquets).
+
+NOM DES FICHIERS
+  Lua    : Mon Script.lua
+  Python : Mon_Outil.py
+  JSFX   : Mon Effet.jsfx   (l'extension .jsfx est obligatoire)
+  Eviter : / \ : * ? " < > |
+
+EN-TETE A METTRE TOUT EN HAUT
+  Lua  -> commentaire --
+  Py   -> commentaire #
+  JSFX -> commentaire //  (avant la ligne desc:)
+
+  -- @description Nom affiche dans ReaPack
+  -- @author Todoroki
+  -- @version 1.0
+  -- @changelog
+  --   Ce qui a change
+  -- @about
+  --   Petite description
+
+  Python externe (pas un script REAPER) : ajouter
+  # @provides
+  #   [nomain] .
+
+  JSFX avec un fichier .jsfx-inc : ajouter
+  // @provides
+  //   mon_fichier.jsfx-inc
+
+MISE A JOUR
+  1. Pull origin
+  2. Augmenter @version (1.0 -> 1.1) + remplir @changelog
+  3. Commit + Push
+  4. Coche verte dans Actions, puis Pull origin
+  5. REAPER : ReaPack > Synchronize packages
