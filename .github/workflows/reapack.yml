@@ -8,12 +8,13 @@ jobs:
   index:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
+      - run: sudo apt-get update && sudo apt-get install -y pandoc
       - run: gem install reapack-index
       - run: |
           git config user.name "github-actions"
