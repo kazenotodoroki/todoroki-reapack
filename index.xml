@@ -1,5 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Todoroki" commit="5a726cbac863bb80e9aeb298a821e6b83c501ee6">
+<index version="1" name="Todoroki" commit="1c6331afc4eea14bc64748bc6c201c857f395690">
+  <category name="FX">
+    <reapack name="RefLab.jsfx" type="effect" desc="RefLab - Referencing multi-pistes (spectre, LUFS, match loudness, boucles)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 RefLab\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Comparaison mix / references dans REAPER, en JSFX (compatible REAPER portable).\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab 4 references, chargees depuis {\f1 <REAPER>/Data/references}\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Spectre mix + reference superposes, courbe d'ecart, vitesse de mesure reglable\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab LUFS momentary / short-term / integre (BS.1770), match loudness automatique\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Boucle par reference (glisser sur la forme d'onde)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Tous les reglages assignables en MIDI (Param > Learn) ou via les actions "RefLab - ..."\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 A placer dans le Monitoring FX. Le paquet {\b Todoroki Companion} ajoute l'ouverture du dossier des references et la mise a jour automatique de la liste.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.2" author="Todoroki" time="2026-10-20T16:29:59Z">
+        <changelog><![CDATA[- Vitesse de mesure du spectre reglable : rapide, moyen, lent, tres lent, moyenne infinie
+- Bouton VITESSE, clic droit / touche R : remise a zero de la moyenne
+- Deux nouveaux parametres assignables : vitesse suivante, reset moyenne spectre
+- Fonctionne avec le Todoroki Companion (dossier references, actualisation)]]></changelog>
+        <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/FX/RefLab.jsfx</source>
+      </version>
+    </reapack>
+  </category>
   <category name="Python Utilities">
     <reapack name="Todoroki_FXLIST_FX_lua_Creator.py" type="script" desc="FX Lua Creator">
       <metadata>
@@ -220,6 +247,72 @@
         <source file="Todoroki_ChordMachineGun_core.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun_core.lua</source>
         <source file="Todoroki_ChordMachineGun LISEZMOI.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20LISEZMOI.md</source>
         <source file="LICENSE.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/LICENSE.md</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="Scripts/RefLab">
+    <reapack name="Todoroki_Companion_Module_RefLab.lua" type="script" desc="RefLab - actions et module Companion">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 RefLab - actions et module Companion\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 A installer avec les paquets {\b RefLab} (JSFX) et {\b Todoroki Companion}.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Actions "RefLab - ..." : a assigner a des touches ou a un controleur MIDI\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Module Companion : ouvre {\f1 <REAPER>/Data/references} et tient la liste des fichiers a jour dans le plugin\sa180\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.2" author="Todoroki" time="2026-10-20T16:29:59Z">
+        <changelog><![CDATA[- Actions pour tous les reglages de RefLab (assignables clavier / MIDI)
+- Nouvelles actions : vitesse du spectre suivante, reset de la moyenne du spectre
+- Module pour le Todoroki Companion (dossier references, liste mise a jour en direct)]]></changelog>
+        <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/Todoroki_Companion_Module_RefLab.lua</source>
+        <source main="main" file="RefLab - Actualiser la liste des references.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Actualiser%20la%20liste%20des%20references.lua</source>
+        <source main="main" file="RefLab - Basculer MIX-REF.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Basculer%20MIX-REF.lua</source>
+        <source main="main" file="RefLab - Basculer boucle.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Basculer%20boucle.lua</source>
+        <source main="main" file="RefLab - Ecouter MIX.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Ecouter%20MIX.lua</source>
+        <source main="main" file="RefLab - Ecouter REF.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Ecouter%20REF.lua</source>
+        <source main="main" file="RefLab - Lecture independante on-off.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Lecture%20independante%20on-off.lua</source>
+        <source main="main" file="RefLab - Match loudness mode suivant.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Match%20loudness%20mode%20suivant.lua</source>
+        <source main="main" file="RefLab - Ouvrir le dossier references.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Ouvrir%20le%20dossier%20references.lua</source>
+        <source main="main" file="RefLab - Reference 1.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Reference%201.lua</source>
+        <source main="main" file="RefLab - Reference 2.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Reference%202.lua</source>
+        <source main="main" file="RefLab - Reference 3.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Reference%203.lua</source>
+        <source main="main" file="RefLab - Reference 4.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Reference%204.lua</source>
+        <source main="main" file="RefLab - Reference precedente.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Reference%20precedente.lua</source>
+        <source main="main" file="RefLab - Reference suivante.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Reference%20suivante.lua</source>
+        <source main="main" file="RefLab - Reset loudness integre.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Reset%20loudness%20integre.lua</source>
+        <source main="main" file="RefLab - Spectre reset moyenne.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Spectre%20reset%20moyenne.lua</source>
+        <source main="main" file="RefLab - Spectre vitesse suivante.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Spectre%20vitesse%20suivante.lua</source>
+        <source file="RefLab LISEZMOI.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20LISEZMOI.md</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="Scripts/Todoroki Companion">
+    <reapack name="Todoroki Companion.lua" type="script" desc="Todoroki Companion (service d'arriere-plan partage)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 Todoroki Companion\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Service d'arriere-plan unique, partage par les scripts et JSFX Todoroki. Il charge des {\b modules} ({\f1 Todoroki_Companion_Module_*.lua}) installes par les autres paquets du depot, et offre une {\b API Lua} aux scripts.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Lancer l'action {\b Todoroki Companion} (relancer = arreter)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Todoroki Companion - Autostart (on-off)} : demarrage avec REAPER\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Compatible REAPER portable (chemins relatifs au dossier REAPER)\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Documentation developpeur : {\f1 Todoroki Companion LISEZMOI.md}.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-10-20T16:29:59Z">
+        <changelog><![CDATA[Premiere version : service partage, modules, API Lua, autostart.]]></changelog>
+        <source main="main">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/Todoroki%20Companion/Todoroki%20Companion.lua</source>
+        <source main="main" file="Todoroki Companion - Autostart (on-off).lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/Todoroki%20Companion/Todoroki%20Companion%20-%20Autostart%20(on-off).lua</source>
+        <source main="main" file="Todoroki Companion - Etat et modules.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/Todoroki%20Companion/Todoroki%20Companion%20-%20Etat%20et%20modules.lua</source>
+        <source file="Todoroki_Companion_API.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/Todoroki%20Companion/Todoroki_Companion_API.lua</source>
+        <source file="Todoroki Companion LISEZMOI.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/Todoroki%20Companion/Todoroki%20Companion%20LISEZMOI.md</source>
       </version>
     </reapack>
   </category>
