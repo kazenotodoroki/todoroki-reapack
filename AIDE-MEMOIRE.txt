@@ -41,3 +41,10 @@ MISE A JOUR
   3. Commit + Push
   4. Coche verte dans Actions, puis Pull origin
   5. REAPER : ReaPack > Synchronize packages
+
+TODOROKI COMPANION (service partage)
+  Un nouvel outil qui a besoin d'un script de fond ne lance pas le sien :
+  il ajoute un module  Todoroki_Companion_Module_<Nom>.lua  dans son dossier
+  et le declare dans son @provides (sans [main]).
+  Modele, API Lua et convention gmem :
+    Scripts/Todoroki Companion/Todoroki Companion LISEZMOI.md

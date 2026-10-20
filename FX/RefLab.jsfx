@@ -1,0 +1,1053 @@
+// @description RefLab - referencing multi-pistes (spectre, LUFS, match loudness, boucles)
+// @author Todoroki
+// @version 1.2
+// @changelog
+//   - Vitesse de mesure du spectre reglable : rapide, moyen, lent, tres lent, moyenne infinie
+//   - Bouton VITESSE, clic droit / touche R : remise a zero de la moyenne
+//   - Deux nouveaux parametres assignables : vitesse suivante, reset moyenne spectre
+//   - Fonctionne avec le Todoroki Companion (dossier references, actualisation)
+// @about
+//   # RefLab
+//
+//   Comparaison mix / references dans REAPER, en JSFX (compatible REAPER portable).
+//
+//   - 4 references, chargees depuis `<REAPER>/Data/references`
+//   - Spectre mix + reference superposes, courbe d'ecart, vitesse de mesure reglable
+//   - LUFS momentary / short-term / integre (BS.1770), match loudness automatique
+//   - Boucle par reference (glisser sur la forme d'onde)
+//   - Tous les reglages assignables en MIDI (Param > Learn) ou via les actions "RefLab - ..."
+//
+//   A placer dans le Monitoring FX. Le paquet **Todoroki Companion** ajoute
+//   l'ouverture du dossier des references et la mise a jour automatique de la liste.
+desc:RefLab - Referencing multi-pistes (spectre, LUFS, match loudness, boucles)
+//tags: analysis reference loudness LUFS spectrum
+
+slider1:0<0,1,1{MIX,REF}>-Ecoute
+slider2:1<1,4,1>-Reference selectionnee
+slider3:1<0,2,1{Off,Mix integre,Mix short-term}>-Match loudness
+slider4:0<-24,24,0.1>-Trim reference (dB)
+slider5:3<0,6,0.5>-Pente spectre (dB/oct)
+slider6:2<0,3,1{1/24,1/12,1/6,1/3}>-Lissage spectre (oct)
+slider7:1<0,1,1{Non,Oui}>-Retour au debut de boucle au Play
+slider8:0<0,1,1{Non,Oui}>-Lecture independante
+slider9:0<0,1,1>-[Bouton] Bascule MIX/REF
+slider10:0<0,1,1>-[Bouton] Reference suivante
+slider11:0<0,1,1>-[Bouton] Reference precedente
+slider12:0<0,1,1>-[Bouton] Bascule boucle
+slider13:0<0,1,1>-[Bouton] Reset loudness integre
+slider14:0<0,1,1>-[Bouton] Mode match suivant
+slider15:1<0,4,1{Rapide,Moyen,Lent,Tres lent,Moyenne infinie}>-Vitesse spectre
+slider17:0<0,1,1>-[Bouton] Vitesse spectre suivante
+slider18:0<0,1,1>-[Bouton] Reset moyenne spectre
+slider16:/references:none:-enum
+
+in_pin:Left
+in_pin:Right
+out_pin:Left
+out_pin:Right
+
+options:maxmem=33554432 gmem=RefLab
+
+@init
+ext_noinit = 1;
+gfx_ext_retina = 1;
+
+// ---------- memoire ----------
+N = 8192; NH = 4096; HN = 800;
+R_START=1000; R_LEN=1010; R_SR=1020; R_READY=1030; R_KEY=1040; R_POS=1050;
+R_IFULL=1060; R_IEFF=1070; R_BLKS=1080; R_BLKN=1090; R_SBL=1100; R_LOOPON=1110;
+R_LS=1120; R_LE=1130; R_PEND=1140; R_ERR=1150; R_TRUNC=1160; R_FRAMES=1170;
+R_RECALC=1180; R_PROG=1190; R_ACT=900; R_REQ=910;
+MRING=1200; MHIST=1300; RRING=3000; RHIST=3100;
+PEAK=8192; WIN=16384; SMIX=24576; SREF=28672; CMIX=32768; CREF=36872;
+PXM=40976; PXR=45080;
+FMIX=65536; FREF=131072; RMIX=196608; RREF=204800;
+BLK=262144; BLKCAP=65536; SCR=327680; SCRN=65536; AUD=393216;
+AUDCAP = __memtop() - AUD;
+ABSG = 10^((-70 + 0.691) / 10);
+
+// ---------- couleurs ----------
+ACR = 1.0; ACG = 0.46; ACB = 0.12;       // accent (reference)
+MXR = 0.56; MXG = 0.78; MXB = 1.0;       // mix
+
+// ---------- K-weighting (BS.1770) ----------
+function kcoef(fs) local(f0, G, Q, K, Vh, Vb, a0)
+(
+  f0 = 1681.974450955533; G = 3.999843853973347; Q = 0.7071752369554196;
+  K = tan($pi * f0 / fs); Vh = 10^(G / 20); Vb = Vh^0.4996667741545416;
+  a0 = 1 + K / Q + K * K;
+  c_b0 = (Vh + Vb * K / Q + K * K) / a0;
+  c_b1 = 2 * (K * K - Vh) / a0;
+  c_b2 = (Vh - Vb * K / Q + K * K) / a0;
+  c_a1 = 2 * (K * K - 1) / a0;
+  c_a2 = (1 - K / Q + K * K) / a0;
+  f0 = 38.13547087602444; Q = 0.5003270373238773;
+  K = tan($pi * f0 / fs);
+  a0 = 1 + K / Q + K * K;
+  c_h1 = 2 * (K * K - 1) / a0;
+  c_h2 = (1 - K / Q + K * K) / a0;
+);
+
+function ldb(e) ( e > 0.000000000001 ? -0.691 + 10 * log10(e) : -200; );
+
+// ---------- loudness meter (instance) ----------
+function km_init(rg, hs) instance(ring hist wp filled acc cnt z1 z2 z3 z4 z5 z6 z7 z8 mom st)
+(
+  ring = rg; hist = hs; wp = 0; filled = 0; acc = 0; cnt = 0;
+  z1 = z2 = z3 = z4 = z5 = z6 = z7 = z8 = 0; mom = 0; st = 0;
+  memset(ring, 0, 32); memset(hist, 0, 2 * HN);
+);
+function km_reset() instance(hist) ( memset(hist, 0, 2 * HN); );
+function km_proc(l, r, useh) instance(ring hist wp filled acc cnt z1 z2 z3 z4 z5 z6 z7 z8 mom st) local(t, u, i, s, lb, bin)
+(
+  t = kb0 * l + z1; z1 = kb1 * l - ka1 * t + z2; z2 = kb2 * l - ka2 * t;
+  u = t + z3; z3 = -2 * t - ha1 * u + z4; z4 = t - ha2 * u;
+  acc += u * u;
+  t = kb0 * r + z5; z5 = kb1 * r - ka1 * t + z6; z6 = kb2 * r - ka2 * t;
+  u = t + z7; z7 = -2 * t - ha1 * u + z8; z8 = t - ha2 * u;
+  acc += u * u;
+  cnt += 1;
+  cnt >= sb_mix ? (
+    ring[wp] = acc / cnt; wp = (wp + 1) % 30; filled < 30 ? filled += 1;
+    acc = 0; cnt = 0;
+    s = 0; i = 0;
+    loop(min(filled, 4), s += ring[(wp + 29 - i) % 30]; i += 1; );
+    mom = s / min(filled, 4);
+    s = 0; i = 0;
+    loop(30, s += ring[i]; i += 1; );
+    st = s / filled;
+    (useh && filled >= 4) ? (
+      lb = -0.691 + 10 * log10(mom + 0.00000000000000000001);
+      lb > -70 ? (
+        bin = min(floor((lb + 70) * 10), HN - 1);
+        hist[bin] += 1; hist[HN + bin] += mom;
+      );
+    );
+  );
+);
+function km_integ() instance(hist) local(i, sum, n, rel, rb)
+(
+  sum = 0; n = 0; i = 0;
+  loop(HN, n += hist[i]; sum += hist[HN + i]; i += 1; );
+  n > 0 ? (
+    rel = -0.691 + 10 * log10(sum / n) - 10;
+    rb = max(0, ceil((rel + 70) * 10));
+    sum = 0; n = 0; i = rb;
+    loop(HN - rb, n += hist[i]; sum += hist[HN + i]; i += 1; );
+    n > 0 ? -0.691 + 10 * log10(sum / n) : -200;
+  ) : -200;
+);
+
+// ---------- integrated loudness d'une region de reference ----------
+function integ(k, f0, f1) local(sb, base, s0, s1, j, e, sum, n, rel)
+(
+  sb = R_SBL[k]; base = BLK + R_BLKS[k];
+  s0 = ceil(f0 / sb); s1 = min(floor(f1 / sb), R_BLKN[k]);
+  sum = 0; n = 0; j = s0;
+  while (j + 4 <= s1) (
+    e = (base[j] + base[j + 1] + base[j + 2] + base[j + 3]) * 0.25;
+    e > ABSG ? ( sum += e; n += 1; );
+    j += 1;
+  );
+  n > 0 ? (
+    rel = max(ABSG, sum / n * 0.1);
+    sum = 0; n = 0; j = s0;
+    while (j + 4 <= s1) (
+      e = (base[j] + base[j + 1] + base[j + 2] + base[j + 3]) * 0.25;
+      e > rel ? ( sum += e; n += 1; );
+      j += 1;
+    );
+    n > 0 ? -0.691 + 10 * log10(sum / n) : -200;
+  ) : -200;
+);
+
+// ---------- acces sliders ----------
+function sfile(k) ( k == 0 ? #sf0 : k == 1 ? #sf1 : k == 2 ? #sf2 : #sf3; );
+
+// ---------- bornes de lecture (boucle ou fichier entier) ----------
+function bnds(k) local(lo)
+(
+  lo = R_LOOPON[k] && (R_LE[k] - R_LS[k]) >= 0.25;
+  b_ls = lo ? floor(R_LS[k] * R_SR[k]) : 0;
+  b_le = lo ? min(floor(R_LE[k] * R_SR[k]), R_LEN[k]) : R_LEN[k];
+  b_le <= b_ls + 16 ? ( b_ls = 0; b_le = R_LEN[k]; );
+);
+
+// ---------- stockage : 2 echantillons 24 bits par case ----------
+function unp(v) local(q)
+(
+  q = floor(v / 16777216);
+  uL = q / 4194304 - 2;
+  uR = (v - q * 16777216) / 4194304 - 2;
+);
+function herm(xm1, x0, x1, x2, t) local(c1, c2, c3)
+(
+  c1 = 0.5 * (x1 - xm1);
+  c2 = xm1 - 2.5 * x0 + 2 * x1 - 0.5 * x2;
+  c3 = 0.5 * (x2 - xm1) + 1.5 * (x0 - x1);
+  ((c3 * t + c2) * t + c1) * t + x0;
+);
+
+// ---------- defragmentation memoire ----------
+function compact() local(j, best, bs, lastS, w, wb)
+(
+  w = 0; wb = 0; lastS = -1;
+  loop(4,
+    best = -1; bs = 1000000000000; j = 0;
+    loop(4,
+      (R_LEN[j] > 0 && R_START[j] > lastS && R_START[j] < bs) ? ( best = j; bs = R_START[j]; );
+      j += 1;
+    );
+    best >= 0 ? (
+      lastS = R_START[best];
+      R_START[best] != w ? memcpy(AUD + w, AUD + R_START[best], R_LEN[best]);
+      (R_BLKS[best] != wb && R_BLKN[best] > 0) ? memcpy(BLK + wb, BLK + R_BLKS[best], R_BLKN[best]);
+      R_START[best] = w; R_BLKS[best] = wb;
+      w += R_LEN[best]; wb += R_BLKN[best];
+    );
+  );
+  aud_used = w; blk_used = wb;
+);
+
+// ---------- chargement par morceaux ----------
+function load_frames(nf) local(i, p, dst, xl, xr, ql, qr, t, u, bi, v)
+(
+  p = SCR; dst = AUD + R_START[ld_slot] + ld_w; i = 0;
+  loop(nf,
+    xl = p[0]; xr = ld_nch > 1 ? p[1] : xl;
+    ql = min(max(floor((xl + 2) * 4194304 + 0.5), 0), 16777215);
+    qr = min(max(floor((xr + 2) * 4194304 + 0.5), 0), 16777215);
+    dst[i] = ql * 16777216 + qr;
+    t = lb0 * xl + lz1; lz1 = lb1 * xl - la1 * t + lz2; lz2 = lb2 * xl - la2 * t;
+    u = t + lz3; lz3 = -2 * t - lh1 * u + lz4; lz4 = t - lh2 * u; lacc += u * u;
+    t = lb0 * xr + lz5; lz5 = lb1 * xr - la1 * t + lz6; lz6 = lb2 * xr - la2 * t;
+    u = t + lz7; lz7 = -2 * t - lh1 * u + lz8; lz8 = t - lh2 * u; lacc += u * u;
+    lcnt += 1;
+    lcnt >= ld_sb ? (
+      blk_used + ld_bn < BLKCAP ? ( BLK[blk_used + ld_bn] = lacc / lcnt; ld_bn += 1; );
+      lacc = 0; lcnt = 0;
+    );
+    bi = ld_pk + min(floor((ld_w + i) * ld_pks), 2047);
+    v = max(abs(xl), abs(xr)); v > bi[0] ? bi[0] = v;
+    p += ld_nch; i += 1;
+  );
+  ld_w += nf;
+);
+
+function finish_load() local(k)
+(
+  k = ld_slot;
+  file_close(ld_h);
+  R_LEN[k] = ld_w; R_BLKN[k] = ld_bn;
+  aud_used += ld_w; blk_used += ld_bn;
+  ld_slot = -1;
+  ld_w > ld_sr * 0.5 ? (
+    R_IFULL[k] = integ(k, 0, ld_w);
+    R_LE[k] > ld_w / R_SR[k] ? R_LE[k] = ld_w / R_SR[k];
+    (R_LE[k] - R_LS[k]) < 0.25 ? R_LOOPON[k] = 0;
+    R_POS[k] = R_LOOPON[k] ? floor(R_LS[k] * R_SR[k]) : 0;
+    R_RECALC[k] = 1; R_READY[k] = 1;
+  ) : (
+    R_LEN[k] = 0; R_ERR[k] = 1;
+  );
+);
+
+// ---------- (de)serialisation d'une chaine via file_var (file_string n'est pas fiable en @serialize) ----------
+function ser_str(str) local(len, i, ch)
+(
+  s_rd ? (
+    len = 0; file_var(0, len); strcpy(str, ""); i = 0;
+    loop(min(max(len, 0), 1024),
+      ch = 0; file_var(0, ch); sprintf(#sch, "%c", ch); strcat(str, #sch); i += 1;
+    );
+  ) : (
+    len = strlen(str); file_var(0, len); i = 0;
+    loop(len, ch = str_getchar(str, i); ch < 0 ? ch += 256; file_var(0, ch); i += 1; );
+  );
+);
+
+// ---------- commandes (boutons assignables / actions REAPER) ----------
+function do_cmd(c) local(jj, ss, dn, kk)
+(
+  c == 1 ? ( slider1 = slider1 >= 0.5 ? 0 : 1; sliderchange(slider1); ) :
+  (c == 2 || c == 3) ? (
+    jj = 1; dn = 0;
+    loop(4,
+      !dn ? (
+        ss = (sel_req + (c == 2 ? jj : 4 - jj)) % 4;
+        R_ACT[ss] ? ( dn = 1; slider2 = ss + 1; sliderchange(slider2); );
+        jj += 1;
+      );
+    );
+  ) :
+  c == 4 ? (
+    kk = sel_req;
+    (R_LE[kk] - R_LS[kk]) >= 0.25 ? ( R_LOOPON[kk] = !R_LOOPON[kk]; R_RECALC[kk] = 1; );
+  ) :
+  c == 5 ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); ) :
+  c == 6 ? ( mix_reset = 1; ) :
+  c == 7 ? ( slider3 = (floor(slider3 + 0.5) + 1) % 3; sliderchange(slider3); ) :
+  c == 8 ? ( slider15 = (floor(slider15 + 0.5) + 1) % 5; sliderchange(slider15); spec_reset = 1; ) :
+  c == 9 ? ( spec_reset = 1; ) :
+  (c >= 11 && c <= 14) ? ( slider2 = c - 10; sliderchange(slider2); ) :
+  c == 20 ? ( slider1 = 0; sliderchange(slider1); ) :
+  c == 21 ? ( slider1 = 1; sliderchange(slider1); );
+);
+
+// ---------- init (premiere fois seulement) ----------
+!inited ? (
+  inited = 1;
+  memset(900, 0, 7100);
+  k = 0;
+  loop(4, R_KEY[k] = -2; R_IFULL[k] = -200; R_IEFF[k] = -200; strcpy(sfile(k), ""); strcpy(20 + k, ""); k += 1; );
+  ld_slot = -1; sel_cur = 0; sel_req = 0; sel_env = 0; xf = slider1 >= 0.5;
+  rg = 1; rg_t = 1; g_db = 0; auto_g = 0;
+  aud_used = 0; blk_used = 0; mixS_sm = -200;
+  mixI = mixM = mixS = refM = refS = -200;
+  dbTop = -20; dbRange = 60;
+  i = 0; loop(N, WIN[i] = 0.5 - 0.5 * cos(2 * $pi * i / N); i += 1; );
+  memset(SMIX, 0, 8192);
+  rp = 0;
+);
+kcoef(srate);
+kb0 = c_b0; kb1 = c_b1; kb2 = c_b2; ka1 = c_a1; ka2 = c_a2; ha1 = c_h1; ha2 = c_h2;
+sb_mix = floor(0.1 * srate + 0.5);
+mixm.km_init(MRING, MHIST);
+refm.km_init(RRING, RHIST);
+xrate = 1 / (0.015 * srate);
+spnorm = 16 / (N * N);
+
+@slider
+slider9  >= 0.5 ? ( slider9  = 0; sliderchange(slider9);  do_cmd(1); );
+slider10 >= 0.5 ? ( slider10 = 0; sliderchange(slider10); do_cmd(2); );
+slider11 >= 0.5 ? ( slider11 = 0; sliderchange(slider11); do_cmd(3); );
+slider12 >= 0.5 ? ( slider12 = 0; sliderchange(slider12); do_cmd(4); );
+slider13 >= 0.5 ? ( slider13 = 0; sliderchange(slider13); do_cmd(6); );
+slider14 >= 0.5 ? ( slider14 = 0; sliderchange(slider14); do_cmd(7); );
+slider17 >= 0.5 ? ( slider17 = 0; sliderchange(slider17); do_cmd(8); );
+slider18 >= 0.5 ? ( slider18 = 0; sliderchange(slider18); do_cmd(9); );
+
+@block
+// commandes envoyees par les actions REAPER (scripts RefLab)
+gmem[2] != 0 ? ( gcmd = gmem[2]; gmem[2] = 0; do_cmd(gcmd); );
+
+// position du slot courant -> tableau
+cur_ready ? R_POS[sel_cur] = cur_pos;
+
+// ---- detection des changements de fichiers ----
+k = 0;
+loop(4,
+  key = R_ACT[k] ? R_REQ[k] : -1;
+  key != R_KEY[k] ? (
+    R_KEY[k] = key; R_PEND[k] = 1; R_READY[k] = 0;
+    ld_slot == k ? ( file_close(ld_h); ld_slot = -1; );
+    k == sel_cur ? cur_ready = 0;
+  );
+  k += 1;
+);
+
+// ---- demarrage d'un chargement ----
+ld_slot < 0 ? (
+  found = -1; k = 0;
+  loop(4, (found < 0 && R_PEND[k]) ? found = k; k += 1; );
+  found >= 0 ? (
+    k = found;
+    R_PEND[k] = 0; R_LEN[k] = 0; R_BLKN[k] = 0; R_READY[k] = 0;
+    R_ERR[k] = 0; R_TRUNC[k] = 0; R_PROG[k] = 0;
+    R_IFULL[k] = -200; R_IEFF[k] = -200;
+    compact();
+    R_KEY[k] >= 0 ? (
+      ld_h = file_open(sfile(k));
+      strcmp(sfile(k), 20 + k) != 0 ? (
+        R_LOOPON[k] = 0; R_LS[k] = 0; R_LE[k] = 0; strcpy(20 + k, sfile(k));
+      );
+      ok = 0;
+      ld_h >= 0 ? (
+        ld_nch = 0; ld_sr = 0;
+        file_riff(ld_h, ld_nch, ld_sr);
+        (ld_nch > 0 && ld_sr > 0) ? (
+          ld_fr = floor(file_avail(ld_h) / ld_nch);
+          ld_alloc = min(ld_fr, AUDCAP - aud_used);
+          ld_alloc > ld_sr * 0.5 ? (
+            ok = 1;
+            ld_slot = k; ld_w = 0; ld_bn = 0; lacc = 0; lcnt = 0;
+            lz1 = lz2 = lz3 = lz4 = lz5 = lz6 = lz7 = lz8 = 0;
+            R_START[k] = aud_used; R_SR[k] = ld_sr;
+            ld_sb = floor(0.1 * ld_sr + 0.5); R_SBL[k] = ld_sb;
+            R_BLKS[k] = blk_used; R_FRAMES[k] = ld_fr; R_TRUNC[k] = ld_alloc < ld_fr;
+            kcoef(ld_sr);
+            lb0 = c_b0; lb1 = c_b1; lb2 = c_b2; la1 = c_a1; la2 = c_a2; lh1 = c_h1; lh2 = c_h2;
+            ld_pk = PEAK + k * 2048; ld_pks = 2048 / ld_alloc;
+            memset(ld_pk, 0, 2048);
+          );
+        );
+        !ok ? file_close(ld_h);
+      );
+      !ok ? R_ERR[k] = 1;
+    ) : (
+      strcpy(20 + k, ""); R_LOOPON[k] = 0;
+    );
+  );
+);
+
+// ---- poursuite du chargement (budget limite par bloc) ----
+ld_slot >= 0 ? (
+  budget = (play_state & 1) ? samplesblock * 32 : samplesblock * 256;
+  ld_done = 0;
+  while (budget > 0 && !ld_done) (
+    nv = min(min(SCRN, budget), (ld_alloc - ld_w) * ld_nch);
+    nv = floor(nv / ld_nch) * ld_nch;
+    got = nv > 0 ? file_mem(ld_h, SCR, nv) : 0;
+    nf = floor(got / ld_nch);
+    nf > 0 ? load_frames(nf);
+    budget -= max(nv, 1);
+    (nv <= 0 || got < nv || ld_w >= ld_alloc) ? ld_done = 1;
+  );
+  R_PROG[ld_slot] = ld_w / ld_alloc;
+  ld_done ? finish_load();
+);
+
+// ---- deplacement de lecture demande par l'interface ----
+seek_flag ? (
+  seek_flag = 0;
+  R_READY[seek_slot] ? R_POS[seek_slot] = seek_pos;
+);
+
+// ---- loudness de la boucle ----
+k = 0;
+loop(4,
+  (R_RECALC[k] && R_READY[k]) ? (
+    R_RECALC[k] = 0;
+    (R_LOOPON[k] && (R_LE[k] - R_LS[k]) >= 0.5) ? (
+      R_IEFF[k] = integ(k, R_LS[k] * R_SR[k], R_LE[k] * R_SR[k]);
+      R_IEFF[k] < -70 ? R_IEFF[k] = R_IFULL[k];
+    ) : R_IEFF[k] = R_IFULL[k];
+    bnds(k);
+    (R_POS[k] < b_ls || R_POS[k] >= b_le) ? R_POS[k] = b_ls;
+  );
+  k += 1;
+);
+
+// ---- transport ----
+pnow = play_state & 1;
+(pnow && !was_play && slider7 >= 0.5) ? (
+  k = 0;
+  loop(4, (R_READY[k] && R_LOOPON[k]) ? ( bnds(k); R_POS[k] = b_ls; ); k += 1; );
+);
+was_play = pnow;
+playing = pnow || slider8 >= 0.5;
+
+// les references non selectionnees avancent en parallele
+playing ? (
+  k = 0;
+  loop(4,
+    (k != sel_cur && R_READY[k]) ? (
+      bnds(k);
+      p = R_POS[k] + R_SR[k] / srate * samplesblock;
+      p >= b_le ? p = b_ls + (p - b_le) - floor((p - b_le) / (b_le - b_ls)) * (b_le - b_ls);
+      p < b_ls ? p = b_ls;
+      R_POS[k] = floor(p);
+    );
+    k += 1;
+  );
+);
+
+// ---- mesures ----
+mix_reset ? ( mix_reset = 0; mixm.km_reset(); );
+mixI = mixm.km_integ();
+mixM = ldb(mixm.mom); mixS = ldb(mixm.st);
+refM = ldb(refm.mom); refS = ldb(refm.st);
+mixS > -70 ? (
+  mixS_sm < -150 ? mixS_sm = mixS : mixS_sm += (mixS - mixS_sm) * min(1, samplesblock / (srate * 2));
+);
+
+// ---- selection ----
+sel_req = min(max(floor(slider2 + 0.5) - 1, 0), 3);
+(sel_req != sel_cur && sel_env <= 0) ? sel_cur = sel_req;
+
+// ---- slot courant pour @sample ----
+k = sel_cur;
+cur_ready = R_READY[k] && R_LEN[k] > 64;
+cur_ready ? (
+  bnds(k);
+  cur_ls = b_ls; cur_le = b_le;
+  cur_base = AUD + R_START[k]; cur_len = R_LEN[k];
+  cur_step = R_SR[k] / srate;
+  cur_ifade = 1 / (0.004 * R_SR[k]);
+  cur_pos = R_POS[k];
+  (cur_pos < cur_ls || cur_pos >= cur_le) ? cur_pos = cur_ls;
+  cur_step == 1 ? cur_pos = floor(cur_pos);
+);
+
+// ---- gain auto (match loudness) ----
+mmode = floor(slider3 + 0.5);
+refI = cur_ready ? R_IEFF[sel_cur] : -200;
+tgt = mmode == 1 ? (mixI > -70 ? mixI : mixS_sm) : mmode == 2 ? mixS_sm : -200;
+mmode > 0 ? (
+  (tgt > -70 && refI > -70) ? auto_g = min(max(tgt - refI, -40), 12);
+) : auto_g = 0;
+g_db = auto_g + slider4;
+rg_t = 10^(g_db / 20);
+
+@sample
+l = spl0; r = spl1;
+mixm.km_proc(l, r, 1);
+rl = 0; rr = 0;
+(playing && cur_ready) ? (
+  pp = cur_pos;
+  cur_step == 1 ? (
+    unp(cur_base[pp]); rl = uL; rr = uR;
+  ) : (
+    hi1 = floor(pp); ht = pp - hi1;
+    hi0 = max(hi1 - 1, 0); hi2 = min(hi1 + 1, cur_len - 1); hi3 = min(hi1 + 2, cur_len - 1);
+    unp(cur_base[hi0]); hl0 = uL; hr0 = uR;
+    unp(cur_base[hi1]); hl1 = uL; hr1 = uR;
+    unp(cur_base[hi2]); hl2 = uL; hr2 = uR;
+    unp(cur_base[hi3]); hl3 = uL; hr3 = uR;
+    rl = herm(hl0, hl1, hl2, hl3, ht);
+    rr = herm(hr0, hr1, hr2, hr3, ht);
+  );
+  env = min(1, min((cur_le - pp) * cur_ifade, (pp - cur_ls) * cur_ifade));
+  env < 0 ? env = 0;
+  rl *= env; rr *= env;
+  cur_pos = pp + cur_step;
+  cur_pos >= cur_le ? cur_pos = cur_ls + (cur_pos - cur_le);
+);
+rg += (rg_t - rg) * 0.0007;
+sel_env = sel_req == sel_cur ? min(1, sel_env + xrate) : max(0, sel_env - xrate);
+gg = rg * sel_env;
+rl *= gg; rr *= gg;
+refm.km_proc(rl, rr, 0);
+RMIX[rp] = (l + r) * 0.5;
+RREF[rp] = (rl + rr) * 0.5;
+rp = (rp + 1) & 8191;
+xf = slider1 >= 0.5 ? min(1, xf + xrate) : max(0, xf - xrate);
+spl0 = l + (rl - l) * xf;
+spl1 = r + (rr - r) * xf;
+
+@serialize
+s_rd = file_avail(0) >= 0;
+s_k = 0;
+loop(4,
+  s_v = R_ACT[s_k]; file_var(0, s_v); R_ACT[s_k] = s_v;
+  ser_str(sfile(s_k));
+  s_rd ? R_REQ[s_k] += 1;
+  s_v = R_LOOPON[s_k]; file_var(0, s_v); R_LOOPON[s_k] = s_v;
+  s_v = R_LS[s_k]; file_var(0, s_v); R_LS[s_k] = s_v;
+  s_v = R_LE[s_k]; file_var(0, s_v); R_LE[s_k] = s_v;
+  ser_str(20 + s_k);
+  s_k += 1;
+);
+
+@gfx 980 620
+// ================= helpers UI (uniquement appeles depuis @gfx) =================
+function cl(r, g, b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
+function cla(r, g, b, a) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = a; );
+function hit(x, y, w, h) ( mouse_x >= x && mouse_x < x + w && mouse_y >= y && mouse_y < y + h; );
+function txt(s, x, y, w, h, fl) ( gfx_x = x; gfx_y = y; gfx_drawstr(s, fl, x + w, y + h); );
+function c_text() ( cl(0.90, 0.91, 0.92); );
+function c_dim()  ( cl(0.50, 0.52, 0.56); );
+function c_line() ( cl(0.17, 0.18, 0.20); );
+function c_panel() ( cl(0.080, 0.086, 0.096); );
+function btn(x, y, w, h, s, on) local(hv)
+(
+  hv = hit(x, y, w, h);
+  on ? (
+    cl(ACR, ACG, ACB); gfx_rect(x, y, w, h);
+    cl(0.05, 0.05, 0.06);
+  ) : (
+    hv ? cl(0.15, 0.16, 0.18) : cl(0.10, 0.107, 0.12);
+    gfx_rect(x, y, w, h);
+    cl(0.22, 0.23, 0.26); gfx_rect(x, y, w, h, 0);
+    hv ? cl(0.95, 0.95, 0.96) : cl(0.66, 0.68, 0.72);
+  );
+  gfx_setfont(2); txt(s, x, y, w, h, 5);
+  hv && g_lc;
+);
+function basename(dst, src) local(len, i, c)
+(
+  len = strlen(src); i = len - 1;
+  while (i >= 0 && (c = str_getchar(src, i)) != 47 && c != 92) ( i -= 1; );
+  strcpy_substr(dst, src, i + 1);
+  dst;
+);
+function fitname(src, maxw) local(len, i, w, h)
+(
+  basename(#fbn, src);
+  len = strlen(#fbn); i = len - 1;
+  while (i > 0 && str_getchar(#fbn, i) != '.') ( i -= 1; );
+  i > 0 ? strncpy(#fit, #fbn, i) : strcpy(#fit, #fbn);
+  gfx_measurestr(#fit, w, h);
+  w > maxw ? (
+    strcpy(#fbase, #fit); len = strlen(#fbase);
+    while (len > 1 && w > maxw) (
+      len -= 1; strncpy(#fit, #fbase, len); strcat(#fit, "..."); gfx_measurestr(#fit, w, h);
+    );
+  );
+  #fit;
+);
+function gm_name(i, dst) local(b, j, ch)
+(
+  strcpy(dst, ""); b = 100 + i * 256; j = 0;
+  while (j < 255 && (ch = gmem[b + j]) > 0) ( sprintf(#gch, "%c", ch); strcat(dst, #gch); j += 1; );
+  dst;
+);
+function list_name(i, dst)
+(
+  comp_alive ? gm_name(i, dst) : ( slider16 = i; strcpy_fromslider(#fn, slider16); basename(dst, #fn); );
+  dst;
+);
+function slot_menu(k) local(i, done, res, n, base)
+(
+  strcpy(#menu, ""); strcpy(#prev, "");
+  basename(#curb, sfile(k));
+  n = 0;
+  comp_alive ? (
+    n = min(gmem[4], 250);
+  ) : (
+    i = 0; done = 0;
+    while (!done && i < 512) (
+      slider16 = i; strcpy_fromslider(#fn, slider16); basename(#fnb, #fn);
+      (strlen(#fnb) == 0 || (i > 0 && strcmp(#fn, #prev) == 0)) ? done = 1 : ( strcpy(#prev, #fn); i += 1; );
+    );
+    n = i;
+  );
+  i = 0;
+  loop(n,
+    list_name(i, #fnb);
+    (R_ACT[k] && strcmp(#fnb, #curb) == 0) ? strcat(#menu, "!");
+    strcat(#menu, #fnb); strcat(#menu, "|");
+    i += 1;
+  );
+  n == 0 ? strcat(#menu, "#Aucun fichier dans REAPER/Data/references|");
+  comp_alive ? strcat(#menu, "|Ouvrir le dossier references|Actualiser la liste")
+             : strcat(#menu, "|#Ouvrir le dossier (companion inactif)|#Actualiser (companion inactif)");
+  strcat(#menu, "||Vider l'emplacement|Supprimer la boucle");
+  base = max(n, 1);
+  gfx_x = mouse_x; gfx_y = mouse_y;
+  res = gfx_showmenu(#menu);
+  (res >= 1 && res <= n) ? (
+    list_name(res - 1, #fnb);
+    strcpy(sfile(k), "references/"); strcat(sfile(k), #fnb);
+    R_ACT[k] = 1; R_REQ[k] += 1;
+    slider2 = k + 1; sliderchange(slider2);
+  ) : res == base + 1 ? (
+    gmem[1] = 1;
+  ) : res == base + 2 ? (
+    gmem[1] = 2;
+  ) : res == base + 3 ? (
+    R_ACT[k] = 0; R_REQ[k] += 1;
+  ) : res == base + 4 ? (
+    R_LOOPON[k] = 0; R_RECALC[k] = 1;
+  );
+);
+function winms(ring) local(i, j, v, acc)
+(
+  acc = 0; i = 0;
+  loop(N, j = (g_rps + i) & 8191; v = ring[j]; acc += v * v; i += 1; );
+  acc / N;
+);
+function spec(ring, fb, spw, csum, al) local(i, j, re, im, pw, tot)
+(
+  i = 0;
+  loop(N, j = (g_rps + i) & 8191; fb[2 * i] = ring[j] * WIN[i]; fb[2 * i + 1] = 0; i += 1; );
+  fft(fb, N); fft_permute(fb, N);
+  i = 0; tot = 0; csum[0] = 0;
+  loop(NH,
+    re = fb[2 * i]; im = fb[2 * i + 1];
+    pw = (re * re + im * im) * spnorm;
+    spw[i] += (pw - spw[i]) * al;
+    tot += spw[i]; csum[i + 1] = tot;
+    i += 1;
+  );
+);
+function cumat(C, S, x) local(i)
+(
+  x <= 0 ? 0 : x >= NH ? C[NH] : ( i = floor(x); C[i] + (x - i) * S[i]; );
+);
+function bavg(C, S, b0, b1) local(i, t)
+(
+  b0 += 0.5; b1 += 0.5;
+  b1 - b0 >= 1 ? (cumat(C, S, b1) - cumat(C, S, b0)) / (b1 - b0) : (
+    t = (b0 + b1) * 0.5 - 0.5; i = floor(t);
+    i >= NH - 1 ? S[NH - 1] : S[i] + (t - i) * (S[i + 1] - S[i]);
+  );
+);
+function ydb(d) ( g_sy + min(max((dbTop - d) / dbRange, 0), 1) * g_sh; );
+function lfmt(v) ( v > -70 ? sprintf(#lf, "%.1f", v) : strcpy(#lf, "-inf"); #lf; );
+function mrow(x, y, w, h, label, s, unit)
+(
+  gfx_setfont(2); c_dim(); txt(label, x + 12 * gsc, y, w, h, 4);
+  gfx_setfont(3); c_text(); txt(s, x, y, w - 52 * gsc, h, 6);
+  gfx_setfont(2); c_dim(); txt(unit, x + w - 46 * gsc, y, 40 * gsc, h, 4);
+  c_line(); gfx_rect(x + 12 * gsc, y + h - 1, w - 24 * gsc, 1);
+);
+function tfmt(dst, sec) ( sec = max(0, sec); sprintf(dst, "%d:%02d", floor(sec / 60), floor(sec) % 60); dst; );
+
+// ================= frame =================
+gsc = gfx_ext_retina > 1 ? gfx_ext_retina : 1;
+gfx_clear = -1;
+gW = gfx_w; gH = gfx_h;
+gpad = 12 * gsc; ggap = 8 * gsc;
+gfx_setfont(1, "Segoe UI", 15 * gsc);
+gfx_setfont(2, "Segoe UI", 12 * gsc);
+gfx_setfont(3, "Segoe UI", 22 * gsc, 'b');
+gfx_setfont(4, "Segoe UI", 15 * gsc, 'b');
+
+// le companion incremente gmem[0] en continu : vivant si ca bouge
+g_now = time_precise();
+gmem[0] != g_hbv ? ( g_hbv = gmem[0]; g_hbt = g_now; g_hbn += 1; );
+g_now - g_hbt > 2.5 ? g_hbn = 0;
+comp_alive = g_hbn >= 3;
+
+g_mc = mouse_cap;
+g_lc = (g_mc & 1) && !(g_lmc & 1);
+g_rc = (g_mc & 2) && !(g_lmc & 2);
+g_lr = !(g_mc & 1) && (g_lmc & 1);
+
+// clavier
+while ((g_ch = gfx_getchar()) > 0) (
+  (g_ch == 'a' || g_ch == 'A') ? ( slider1 = slider1 >= 0.5 ? 0 : 1; sliderchange(slider1); );
+  (g_ch >= '1' && g_ch <= '4') ? ( slider2 = g_ch - '0'; sliderchange(slider2); );
+  (g_ch == 'l' || g_ch == 'L') ? (
+    (R_LE[sel_req] - R_LS[sel_req]) >= 0.25 ? ( R_LOOPON[sel_req] = !R_LOOPON[sel_req]; R_RECALC[sel_req] = 1; );
+  );
+  (g_ch == 'r' || g_ch == 'R') ? spec_reset = 1;
+  (g_ch == 'v' || g_ch == 'V') ? ( slider15 = (floor(slider15 + 0.5) + 1) % 5; sliderchange(slider15); );
+  (g_ch == 'p' || g_ch == 'P') ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); );
+);
+
+cl(0.043, 0.047, 0.053); gfx_rect(0, 0, gW, gH);
+
+// ---------------- header ----------------
+g_hh = 26 * gsc; g_y = gpad; g_x = gpad;
+cl(ACR, ACG, ACB); gfx_rect(g_x, g_y + g_hh / 2 - 4 * gsc, 8 * gsc, 8 * gsc);
+gfx_setfont(4); c_text(); txt("REFLAB", g_x + 16 * gsc, g_y, 80 * gsc, g_hh, 4);
+g_x += 104 * gsc;
+gfx_setfont(2); c_dim(); txt("ECOUTE", g_x, g_y, 56 * gsc, g_hh, 4); g_x += 58 * gsc;
+btn(g_x, g_y, 56 * gsc, g_hh, "MIX", slider1 < 0.5) ? ( slider1 = 0; sliderchange(slider1); ); g_x += 58 * gsc;
+btn(g_x, g_y, 56 * gsc, g_hh, "REF", slider1 >= 0.5) ? ( slider1 = 1; sliderchange(slider1); ); g_x += 56 * gsc + 22 * gsc;
+gfx_setfont(2); c_dim(); txt("MATCH", g_x, g_y, 48 * gsc, g_hh, 4); g_x += 48 * gsc;
+btn(g_x, g_y, 44 * gsc, g_hh, "OFF", slider3 < 0.5) ? ( slider3 = 0; sliderchange(slider3); ); g_x += 46 * gsc;
+btn(g_x, g_y, 72 * gsc, g_hh, "INTEGRE", slider3 >= 0.5 && slider3 < 1.5) ? ( slider3 = 1; sliderchange(slider3); ); g_x += 74 * gsc;
+btn(g_x, g_y, 72 * gsc, g_hh, "SHORT-T", slider3 >= 1.5) ? ( slider3 = 2; sliderchange(slider3); ); g_x += 72 * gsc;
+
+g_x = gW - gpad;
+g_w = 70 * gsc; g_x -= g_w;
+slider6 < 0.5 ? strcpy(#b, "1/24 OCT") : slider6 < 1.5 ? strcpy(#b, "1/12 OCT") : slider6 < 2.5 ? strcpy(#b, "1/6 OCT") : strcpy(#b, "1/3 OCT");
+btn(g_x, g_y, g_w, g_hh, #b, 0) ? ( slider6 = (floor(slider6 + 0.5) + 1) % 4; sliderchange(slider6); );
+g_w = 82 * gsc; g_x -= g_w + 2 * gsc;
+sprintf(#b, "PENTE %.1f", slider5);
+btn(g_x, g_y, g_w, g_hh, #b, 0) ? ( slider5 = slider5 < 1.5 ? 3 : slider5 < 3.5 ? 4.5 : 0; sliderchange(slider5); );
+g_w = 92 * gsc; g_x -= g_w + 2 * gsc;
+g_vb = floor(slider15 + 0.5);
+g_vb == 0 ? strcpy(#b, "RAPIDE") : g_vb == 1 ? strcpy(#b, "MOYEN") : g_vb == 2 ? strcpy(#b, "LENT") :
+g_vb == 3 ? strcpy(#b, "TRES LENT") : strcpy(#b, "MOY. INF");
+hit(g_x, g_y, g_w, g_hh) && g_rc ? spec_reset = 1;
+btn(g_x, g_y, g_w, g_hh, #b, g_vb == 4) ? ( slider15 = (g_vb + 1) % 5; sliderchange(slider15); );
+g_w = 74 * gsc; g_x -= g_w + 10 * gsc;
+btn(g_x, g_y, g_w, g_hh, "LECTURE", slider8 >= 0.5) ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); );
+playing ? ( cl(ACR, ACG, ACB); gfx_rect(g_x - 10 * gsc, g_y + g_hh / 2 - 3 * gsc, 6 * gsc, 6 * gsc); );
+
+// ---------------- slots ----------------
+g_sy0 = gpad + g_hh + ggap + 2 * gsc;
+g_sh0 = 50 * gsc;
+g_cw = (gW - 2 * gpad - 3 * ggap) / 4;
+g_k = 0;
+loop(4,
+  g_x = gpad + g_k * (g_cw + ggap);
+  g_sel = g_k == sel_req;
+  g_hv = hit(g_x, g_sy0, g_cw, g_sh0);
+  g_sel ? cl(0.115, 0.122, 0.135) : g_hv ? cl(0.098, 0.105, 0.117) : c_panel();
+  gfx_rect(g_x, g_sy0, g_cw, g_sh0);
+  g_sel ? ( cl(ACR, ACG, ACB); gfx_rect(g_x, g_sy0, g_cw, 2 * gsc); );
+  gfx_setfont(4); g_sel ? cl(ACR, ACG, ACB) : c_dim();
+  sprintf(#ix, "%d", g_k + 1); txt(#ix, g_x + 12 * gsc, g_sy0 + 7 * gsc, 16 * gsc, 18 * gsc, 4);
+  g_has = R_ACT[g_k];
+  gfx_setfont(1);
+  g_has ? ( c_text(); txt(fitname(sfile(g_k), g_cw - 66 * gsc), g_x + 30 * gsc, g_sy0 + 7 * gsc, g_cw - 60 * gsc, 18 * gsc, 4); )
+        : ( c_dim(); txt("Vide", g_x + 30 * gsc, g_sy0 + 7 * gsc, g_cw - 60 * gsc, 18 * gsc, 4); );
+  gfx_setfont(2);
+  (ld_slot == g_k || R_PEND[g_k]) ? (
+    cl(ACR, ACG, ACB); sprintf(#st, "CHARGEMENT %d%%", floor(R_PROG[g_k] * 100));
+  ) : R_ERR[g_k] ? (
+    cl(1, 0.35, 0.3); strcpy(#st, "ERREUR : illisible ou memoire pleine");
+  ) : !g_has ? (
+    c_dim(); strcpy(#st, "Clic pour charger un fichier");
+  ) : (
+    c_dim();
+    R_IEFF[g_k] > -70 ? sprintf(#st, "%.1f LUFS", R_IEFF[g_k]) : strcpy(#st, "-- LUFS");
+    R_LOOPON[g_k] ? strcat(#st, "   |   BOUCLE");
+    R_TRUNC[g_k] ? strcat(#st, "   |   TRONQUE");
+  );
+  txt(#st, g_x + 30 * gsc, g_sy0 + 27 * gsc, g_cw - 60 * gsc, 16 * gsc, 4);
+  g_mz = g_x + g_cw - 28 * gsc;
+  hit(g_mz, g_sy0, 28 * gsc, g_sh0) ? c_text() : c_dim();
+  g_j = 0; loop(3, gfx_rect(g_mz + 8 * gsc + g_j * 4 * gsc, g_sy0 + g_sh0 / 2 - 1 * gsc, 2 * gsc, 2 * gsc); g_j += 1; );
+  (g_hv && g_lc) ? (
+    (!g_has || mouse_x >= g_mz) ? slot_menu(g_k) : ( slider2 = g_k + 1; sliderchange(slider2); );
+  );
+  (g_hv && g_rc) ? slot_menu(g_k);
+  g_k += 1;
+);
+
+// ---------------- forme d'onde / boucle ----------------
+g_wy = g_sy0 + g_sh0 + ggap; g_wh = 64 * gsc; g_wx = gpad; g_ww = gW - 2 * gpad;
+c_panel(); gfx_rect(g_wx, g_wy, g_ww, g_wh);
+g_k = sel_req;
+R_READY[g_k] && R_LEN[g_k] > 0 ? (
+  g_len = R_LEN[g_k]; g_dur = g_len / R_SR[g_k];
+  g_lo = R_LOOPON[g_k] && (R_LE[g_k] - R_LS[g_k]) >= 0.25;
+  g_lx0 = g_wx + R_LS[g_k] / g_dur * g_ww; g_lx1 = g_wx + R_LE[g_k] / g_dur * g_ww;
+  g_lo ? ( cla(ACR, ACG, ACB, 0.10); gfx_rect(g_lx0, g_wy, g_lx1 - g_lx0, g_wh); );
+  g_mid = g_wy + g_wh / 2; g_i = 0;
+  loop(g_ww,
+    g_b0 = floor(g_i * 2048 / g_ww); g_b1 = max(g_b0 + 1, floor((g_i + 1) * 2048 / g_ww));
+    g_m = 0; g_j = g_b0; loop(g_b1 - g_b0, g_m = max(g_m, PEAK[g_k * 2048 + g_j]); g_j += 1; );
+    g_px = g_wx + g_i;
+    (g_lo && g_px >= g_lx0 && g_px < g_lx1) ? cla(ACR, ACG, ACB, 0.9) : cla(0.42, 0.45, 0.50, 0.9);
+    g_hg = min(1, g_m) * (g_wh / 2 - 8 * gsc);
+    gfx_rect(g_px, g_mid - g_hg, 1, max(1, 2 * g_hg));
+    g_i += 1;
+  );
+  g_lo ? ( cl(ACR, ACG, ACB); gfx_rect(g_lx0, g_wy, 1 * gsc, g_wh); gfx_rect(g_lx1 - 1 * gsc, g_wy, 1 * gsc, g_wh); );
+  // selection en cours
+  (g_drag && g_dsel) ? (
+    cla(1, 1, 1, 0.12); gfx_rect(min(g_dx0, mouse_x), g_wy, abs(mouse_x - g_dx0), g_wh);
+  );
+  // tete de lecture
+  g_ph = (g_k == sel_cur && cur_ready) ? cur_pos : R_POS[g_k];
+  cl(1, 1, 1); gfx_rect(g_wx + g_ph / g_len * g_ww, g_wy, max(1, gsc), g_wh);
+  // temps
+  gfx_setfont(2); c_text();
+  tfmt(#t1, g_ph / R_SR[g_k]); tfmt(#t2, g_dur);
+  sprintf(#tt, "%s / %s", #t1, #t2);
+  txt(#tt, g_wx + 8 * gsc, g_wy + g_wh - 18 * gsc, 200 * gsc, 16 * gsc, 4);
+  g_lo ? (
+    tfmt(#t1, R_LS[g_k]); tfmt(#t2, R_LE[g_k]);
+    sprintf(#tt, "BOUCLE %s - %s", #t1, #t2); cl(ACR, ACG, ACB);
+    txt(#tt, g_wx + 8 * gsc, g_wy + 4 * gsc, 220 * gsc, 16 * gsc, 4);
+  );
+  // bouton boucle
+  g_lbw = 64 * gsc; g_lbx = g_wx + g_ww - g_lbw - 6 * gsc; g_lby = g_wy + 6 * gsc;
+  g_onbtn = hit(g_lbx, g_lby, g_lbw, 20 * gsc);
+  btn(g_lbx, g_lby, g_lbw, 20 * gsc, "BOUCLE", g_lo) ? (
+    (R_LE[g_k] - R_LS[g_k]) >= 0.25 ? ( R_LOOPON[g_k] = !R_LOOPON[g_k]; R_RECALC[g_k] = 1; );
+  );
+  // interactions : clic = position, glisser = boucle, clic droit = boucle off
+  (g_lc && !g_onbtn && hit(g_wx, g_wy, g_ww, g_wh)) ? ( g_drag = 1; g_dsel = 0; g_dx0 = mouse_x; );
+  (g_drag && (g_mc & 1) && abs(mouse_x - g_dx0) > 4 * gsc) ? g_dsel = 1;
+  (g_drag && g_lr) ? (
+    g_t0 = min(max((min(g_dx0, mouse_x) - g_wx) / g_ww, 0), 1) * g_dur;
+    g_t1 = min(max((max(g_dx0, mouse_x) - g_wx) / g_ww, 0), 1) * g_dur;
+    (g_dsel && g_t1 - g_t0 >= 0.25) ? (
+      R_LS[g_k] = g_t0; R_LE[g_k] = g_t1; R_LOOPON[g_k] = 1; R_RECALC[g_k] = 1;
+      seek_slot = g_k; seek_pos = floor(g_t0 * R_SR[g_k]); seek_flag = 1;
+    ) : (
+      seek_slot = g_k; seek_pos = floor(g_t0 * R_SR[g_k]); seek_flag = 1;
+    );
+    g_drag = 0; g_dsel = 0;
+  );
+  (g_rc && hit(g_wx, g_wy, g_ww, g_wh)) ? ( R_LOOPON[g_k] = 0; R_RECALC[g_k] = 1; );
+) : (
+  g_drag = 0;
+  gfx_setfont(2); c_dim();
+  txt("Aucune reference chargee dans cet emplacement", g_wx, g_wy, g_ww, g_wh, 5);
+);
+
+// ---------------- zones principales ----------------
+g_foot = 20 * gsc;
+g_my0 = g_wy + g_wh + ggap;
+g_mainH = gH - g_my0 - gpad - g_foot;
+g_mw = 232 * gsc;
+g_sx = gpad; g_sw = floor(gW - 2 * gpad - ggap - g_mw);
+g_dh = max(64 * gsc, floor(g_mainH * 0.24));
+g_sy = g_my0; g_sh = g_mainH - g_dh - ggap;
+g_dy = g_sy + g_sh + ggap;
+g_sw = min(g_sw, 4000);
+
+// spectres : moyenne temporelle independante du nombre d'images/s
+g_rps = rp;
+g_tn = time_precise();
+g_dt = min(max(g_tn - g_tprev, 0.005), 0.5); g_tprev = g_tn;
+g_vit = floor(slider15 + 0.5);
+(g_vit != g_vitp || sel_cur != g_selp || spec_reset) ? (
+  g_cntM = 0; g_cntR = 0; g_tavgM = 0; g_vitp = g_vit; g_selp = sel_cur; spec_reset = 0;
+);
+g_vit == 4 ? (
+  // moyenne infinie : seulement quand il y a du signal
+  // la fenetre FFT entiere doit contenir du signal (> -70 dBFS)
+  winms(RMIX) > 0.0000001 ? ( g_cntM += 1; g_aM = 1 / g_cntM; g_tavgM += g_dt; ) : g_aM = 0;
+  winms(RREF) > 0.0000001 ? ( g_cntR += 1; g_aR = 1 / g_cntR; ) : g_aR = 0;
+) : (
+  g_tau = g_vit == 0 ? 0.12 : g_vit == 1 ? 0.4 : g_vit == 2 ? 1.5 : 5;
+  g_aM = g_aR = 1 - exp(-g_dt / g_tau);
+  g_cntM == 0 ? ( g_aM = 1; g_cntM = 1; );
+  g_cntR == 0 ? ( g_aR = 1; g_cntR = 1; );
+);
+spec(RMIX, FMIX, SMIX, CMIX, g_aM);
+spec(RREF, FREF, SREF, CREF, g_aR);
+g_smo = slider6 < 0.5 ? 1/24 : slider6 < 1.5 ? 1/12 : slider6 < 2.5 ? 1/6 : 1/3;
+g_hb = 2^(g_smo * 0.5);
+g_i = 0;
+loop(g_sw,
+  g_f = 20 * exp(g_i / (g_sw - 1) * log(1000));
+  g_b0 = g_f / g_hb * N / srate; g_b1 = g_f * g_hb * N / srate;
+  g_tl = slider5 * log(g_f / 1000) / log(2);
+  PXM[g_i] = 10 * log10(max(bavg(CMIX, SMIX, g_b0, g_b1), 0) + 0.000000000000000000001) + g_tl;
+  PXR[g_i] = 10 * log10(max(bavg(CREF, SREF, g_b0, g_b1), 0) + 0.000000000000000000001) + g_tl;
+  g_i += 1;
+);
+
+// molette : niveau / ctrl+molette : plage
+(mouse_wheel != 0 && hit(g_sx, g_sy, g_sw, g_sh + ggap + g_dh)) ? (
+  (g_mc & 4) ? dbRange = min(max(dbRange - (mouse_wheel > 0 ? 6 : -6), 24), 120)
+             : dbTop = min(max(dbTop + (mouse_wheel > 0 ? -3 : 3), -80), 20);
+);
+mouse_wheel = 0;
+
+c_panel(); gfx_rect(g_sx, g_sy, g_sw, g_sh);
+// grille frequences
+gfx_setfont(2);
+g_f = 20;
+loop(10,
+  g_px = g_sx + log(g_f / 20) / log(1000) * (g_sw - 1);
+  c_line(); gfx_rect(g_px, g_sy, 1, g_sh);
+  g_f >= 1000 ? sprintf(#fl, "%dk", g_f / 1000) : sprintf(#fl, "%d", g_f);
+  g_px < g_sx + g_sw - 26 * gsc ? ( c_dim(); txt(#fl, g_px + 3 * gsc, g_sy + g_sh - 16 * gsc, 40 * gsc, 14 * gsc, 4); );
+  g_f = floor(g_f / 10^floor(log10(g_f) + 0.000000001) + 0.5) == 2 ? g_f * 2.5 : g_f * 2;
+);
+// grille dB
+g_d = floor(dbTop / 10) * 10;
+while (g_d > dbTop - dbRange) (
+  g_py = ydb(g_d);
+  g_py > g_sy + 2 ? (
+    c_line(); gfx_rect(g_sx, g_py, g_sw, 1);
+    sprintf(#fl, "%d", g_d); c_dim(); txt(#fl, g_sx + 4 * gsc, g_py + 1, 40 * gsc, 14 * gsc, 4);
+  );
+  g_d -= 10;
+);
+// mix : remplissage + trait
+g_bot = g_sy + g_sh;
+cla(MXR, MXG, MXB, 0.10);
+g_i = 0; loop(g_sw, g_py = ydb(PXM[g_i]); gfx_rect(g_sx + g_i, g_py, 1, g_bot - g_py); g_i += 1; );
+cla(MXR, MXG, MXB, 0.95);
+g_i = 1; loop(g_sw - 1, gfx_line(g_sx + g_i - 1, ydb(PXM[g_i - 1]), g_sx + g_i, ydb(PXM[g_i]), 1); g_i += 1; );
+// reference : trait epais
+g_refon = R_READY[sel_cur] && refS > -90;
+g_refon ? (
+  cl(ACR, ACG, ACB);
+  g_i = 1;
+  loop(g_sw - 1,
+    gfx_line(g_sx + g_i - 1, ydb(PXR[g_i - 1]), g_sx + g_i, ydb(PXR[g_i]), 1);
+    gfx_line(g_sx + g_i - 1, ydb(PXR[g_i - 1]) + 1, g_sx + g_i, ydb(PXR[g_i]) + 1, 1);
+    g_i += 1;
+  );
+);
+// legende
+gfx_setfont(2);
+g_lgx = g_sx + g_sw - 150 * gsc;
+cl(MXR, MXG, MXB); gfx_rect(g_lgx, g_sy + 12 * gsc, 10 * gsc, 2 * gsc);
+c_text(); txt("MIX", g_lgx + 16 * gsc, g_sy + 5 * gsc, 40 * gsc, 16 * gsc, 4);
+cl(ACR, ACG, ACB); gfx_rect(g_lgx + 60 * gsc, g_sy + 12 * gsc, 10 * gsc, 2 * gsc);
+sprintf(#lg, "REF %d", sel_cur + 1); c_text(); txt(#lg, g_lgx + 76 * gsc, g_sy + 5 * gsc, 60 * gsc, 16 * gsc, 4);
+g_vit == 4 ? (
+  cl(ACR, ACG, ACB);
+  sprintf(#lg, "MOYENNE  %d:%02d   (R : remise a zero)", floor(g_tavgM / 60), floor(g_tavgM) % 60);
+  txt(#lg, g_lgx - 240 * gsc, g_sy + 5 * gsc, 230 * gsc, 16 * gsc, 6);
+);
+
+// ecart REF - MIX
+c_panel(); gfx_rect(g_sx, g_dy, g_sw, g_dh);
+g_dmid = g_dy + g_dh / 2;
+c_line(); gfx_rect(g_sx, g_dmid, g_sw, 1);
+gfx_rect(g_sx, g_dy + g_dh / 4, g_sw, 1); gfx_rect(g_sx, g_dy + g_dh * 3 / 4, g_sw, 1);
+(g_refon && mixS > -70) ? (
+  g_i = 0;
+  loop(g_sw,
+    g_dv = (max(PXR[g_i], PXM[g_i]) > dbTop - dbRange) ? min(max(PXR[g_i] - PXM[g_i], -12), 12) : 0;
+    g_py = g_dmid - g_dv / 12 * (g_dh / 2 - 2);
+    g_dv >= 0 ? cla(ACR, ACG, ACB, 0.55) : cla(MXR, MXG, MXB, 0.55);
+    gfx_rect(g_sx + g_i, min(g_py, g_dmid), 1, max(1, abs(g_py - g_dmid)));
+    g_i += 1;
+  );
+) : (
+  c_dim(); txt("lecture de la reference + du mix requise", g_sx, g_dy, g_sw, g_dh, 5);
+);
+gfx_setfont(2); c_dim();
+txt("ECART REF - MIX", g_sx + 6 * gsc, g_dy + 3 * gsc, 160 * gsc, 14 * gsc, 4);
+txt("+6", g_sx + g_sw - 26 * gsc, g_dy + g_dh / 4 - 14 * gsc, 24 * gsc, 14 * gsc, 4);
+txt("-6", g_sx + g_sw - 26 * gsc, g_dy + g_dh * 3 / 4 + 1, 24 * gsc, 14 * gsc, 4);
+
+// survol : lecture des valeurs
+hit(g_sx, g_sy, g_sw, g_sh + ggap + g_dh) ? (
+  g_i = min(max(floor(mouse_x - g_sx), 0), g_sw - 1);
+  g_f = 20 * exp(g_i / (g_sw - 1) * log(1000));
+  cla(1, 1, 1, 0.25); gfx_rect(g_sx + g_i, g_sy, 1, g_sh); gfx_rect(g_sx + g_i, g_dy, 1, g_dh);
+  g_f < 1000 ? sprintf(#fq, "%d Hz", g_f) : sprintf(#fq, "%.2f kHz", g_f / 1000);
+  g_refon ? sprintf(#hv, "%s    MIX %.1f    REF %.1f    ECART %.1f dB", #fq, PXM[g_i], PXR[g_i], PXR[g_i] - PXM[g_i])
+          : sprintf(#hv, "%s    MIX %.1f dB", #fq, PXM[g_i]);
+  gfx_setfont(2); c_text(); txt(#hv, g_sx + 8 * gsc, g_sy + 5 * gsc, g_sw - 170 * gsc, 16 * gsc, 4);
+);
+
+// ---------------- colonne mesures ----------------
+g_mx = g_sx + g_sw + ggap; g_rh = 34 * gsc; g_th = 28 * gsc;
+// MIX
+g_y = g_my0;
+c_panel(); gfx_rect(g_mx, g_y, g_mw, g_th + 3 * g_rh + 6 * gsc);
+cl(MXR, MXG, MXB); gfx_rect(g_mx, g_y, 2 * gsc, g_th + 3 * g_rh + 6 * gsc);
+gfx_setfont(4); c_text(); txt("MIX", g_mx + 12 * gsc, g_y, 100 * gsc, g_th, 4);
+btn(g_mx + g_mw - 62 * gsc, g_y + 5 * gsc, 54 * gsc, 18 * gsc, "RESET I", 0) ? mix_reset = 1;
+g_y += g_th;
+mrow(g_mx, g_y, g_mw, g_rh, "MOMENTARY", lfmt(mixM), "LUFS"); g_y += g_rh;
+mrow(g_mx, g_y, g_mw, g_rh, "SHORT-TERM", lfmt(mixS), "LUFS"); g_y += g_rh;
+mrow(g_mx, g_y, g_mw, g_rh, "INTEGRE", lfmt(mixI), "LUFS"); g_y += g_rh;
+g_y += 6 * gsc + ggap;
+// REF
+g_ph2 = g_th + 4 * g_rh + 6 * gsc;
+c_panel(); gfx_rect(g_mx, g_y, g_mw, g_ph2);
+cl(ACR, ACG, ACB); gfx_rect(g_mx, g_y, 2 * gsc, g_ph2);
+sprintf(#rt, "REF %d", sel_cur + 1);
+gfx_setfont(4); c_text(); txt(#rt, g_mx + 12 * gsc, g_y, 60 * gsc, g_th, 4);
+gfx_setfont(2); c_dim();
+R_ACT[sel_cur] ? txt(fitname(sfile(sel_cur), g_mw - 84 * gsc), g_mx + 72 * gsc, g_y, g_mw - 80 * gsc, g_th, 4);
+g_y += g_th;
+mrow(g_mx, g_y, g_mw, g_rh, "MOMENTARY", lfmt(refM), "LUFS"); g_y += g_rh;
+mrow(g_mx, g_y, g_mw, g_rh, "SHORT-TERM", lfmt(refS), "LUFS"); g_y += g_rh;
+mrow(g_mx, g_y, g_mw, g_rh, R_LOOPON[sel_cur] ? "INTEGRE BOUCLE" : "INTEGRE FICHIER",
+     lfmt(cur_ready ? R_IEFF[sel_cur] : -200), "LUFS"); g_y += g_rh;
+g_db >= 0 ? sprintf(#gn, "+%.1f", g_db) : sprintf(#gn, "%.1f", g_db);
+mrow(g_mx, g_y, g_mw, g_rh, slider3 >= 0.5 ? "GAIN AUTO" : "GAIN", #gn, "dB"); g_y += g_rh;
+g_y += 6 * gsc + ggap;
+// ECART
+g_eh = g_my0 + g_mainH - g_y;
+g_eh > 30 * gsc ? (
+  c_panel(); gfx_rect(g_mx, g_y, g_mw, g_eh);
+  gfx_setfont(2); c_dim(); txt("ECART SHORT-TERM  REF - MIX", g_mx + 12 * gsc, g_y + 4 * gsc, g_mw, 16 * gsc, 4);
+  (refS > -70 && mixS > -70) ? (
+    g_dv = refS - mixS;
+    g_dv >= 0 ? sprintf(#ev, "+%.1f", g_dv) : sprintf(#ev, "%.1f", g_dv);
+    abs(g_dv) <= 1 ? cl(0.45, 0.85, 0.55) : cl(ACR, ACG, ACB);
+  ) : ( strcpy(#ev, "--"); c_dim(); );
+  gfx_setfont(3); txt(#ev, g_mx, g_y + 18 * gsc, g_mw - 52 * gsc, g_eh - 20 * gsc, 6);
+  gfx_setfont(2); c_dim(); txt("LU", g_mx + g_mw - 46 * gsc, g_y + 18 * gsc, 40 * gsc, g_eh - 20 * gsc, 4);
+);
+
+// ---------------- pied de page ----------------
+g_fy = gH - gpad - g_foot + 2 * gsc;
+g_x = gW - gpad - 92 * gsc;
+btn(g_x, g_fy, 92 * gsc, g_foot, "ACTUALISER", 0) ? ( gmem[1] = 2; g_note = time_precise(); );
+g_x -= 96 * gsc;
+btn(g_x, g_fy, 94 * gsc, g_foot, "DOSSIER REFS", 0) ? ( gmem[1] = 1; g_note = time_precise(); );
+gfx_setfont(2); c_dim();
+sprintf(#ft, "MEMOIRE %d%%   |   %.0f Hz", floor((aud_used + (ld_slot >= 0 ? ld_w : 0)) / AUDCAP * 100), srate);
+txt(#ft, gpad, g_fy, 200 * gsc, g_foot, 4);
+(!comp_alive && time_precise() - g_note < 4) ? (
+  cl(1, 0.35, 0.3);
+  txt("Companion inactif : lancer l'action Todoroki Companion", gpad + 170 * gsc, g_fy, 380 * gsc, g_foot, 4);
+) : (
+  c_dim();
+  txt("A : MIX/REF   1-4 : ref   L : boucle   P : lecture   V/R : vitesse/reset spectre", gpad + 170 * gsc, g_fy, g_x - gpad - 180 * gsc, g_foot, 4);
+);
+
+g_lmc = g_mc;
