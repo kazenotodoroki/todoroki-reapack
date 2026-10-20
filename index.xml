@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Todoroki" commit="e61beadd389e89043492eab7db447b4f837003b8">
+<index version="1" name="Todoroki" commit="5a726cbac863bb80e9aeb298a821e6b83c501ee6">
   <category name="Python Utilities">
     <reapack name="Todoroki_FXLIST_FX_lua_Creator.py" type="script" desc="FX Lua Creator">
       <metadata>
@@ -121,6 +121,105 @@
       <version name="1.0" author="Todoroki" time="2026-10-20T13:57:10Z">
         <changelog><![CDATA[Première version]]></changelog>
         <source main="main">https://github.com/kazenotodoroki/todoroki-reapack/raw/e61beadd389e89043492eab7db447b4f837003b8/Scripts/Todoroki_Sampling_04_Select_Regions_to_export.lua</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="Scripts/ChordMachineGun">
+    <reapack name="Todoroki_ChordMachineGun.lua" type="script" desc="ChordMachineGun">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 ChordMachineGun\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 G\u233 ?n\u233 ?rateur d'accords pour REAPER, d\u233 ?riv\u233 ? de {\b ChordGun} de pandabot (licence MIT). Il s'installe \u224 ? c\u244 ?t\u233 ? de ChordGun sans le modifier.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Grille d'accords de la gamme, insertion dans l'\u233 ?diteur MIDI ou jeu en direct\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Conduite de voix (r\u232 ?gles classiques), analys\u233 ?e en continu depuis le clavier MIDI, la lecture ou l'item\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Positions personnalis\u233 ?es (ex. {\f1 1 5 3 13 9}), renversement automatique\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Ctrl} : degr\u233 ?s de la gamme de l'accord s\u233 ?lectionn\u233 ? (accords d'emprunt)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Alt} : transformations n\u233 ?o-riemanniennes P, L, R, N, S, H, PR, explorables sans fin\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Split MIDI par voix, choix du canal de chaque voix, doublures (octave, quinte, tierce\u8230 ?)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Fen\u234 ?tre Historique, deux curseurs CC et un curseur de v\u233 ?locit\u233 ? (souris ou contr\u244 ?leur MIDI)\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Recommand\u233 ? : l'extension {\b js_ReaScriptAPI} (ReaPack), pour Ctrl/Alt + chiffres et l'\u233 ?pinglage des fen\u234 ?tres.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Mode d'emploi complet : {\f1 Todoroki_ChordMachineGun LISEZMOI.md}, install\u233 ? avec le script.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Licence MIT. ChordGun \u169 ? 2018 pandabot (Ben Johnson), ChordMachineGun \u169 ? 2026 Todoroki.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-10-20T14:50:54Z">
+        <changelog><![CDATA[Première version publique.
+- Conduite de voix live (clavier MIDI, lecture, item) et positions personnalisées
+- Degrés de la gamme de l'accord (Ctrl) et transformations néo-riemanniennes explorables (Alt)
+- Split MIDI par voix (aucun / toutes les voix / basse seule / par voix) et doublures
+- Fenêtre Historique, curseurs CC et vélocité, épinglage des fenêtres]]></changelog>
+        <source main="main midi_editor">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun PLR 1 - P (parallel).lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20PLR%201%20-%20P%20(parallel).lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun PLR 2 - L (leading-tone exchange).lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20PLR%202%20-%20L%20(leading-tone%20exchange).lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun PLR 3 - R (relative).lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20PLR%203%20-%20R%20(relative).lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun PLR 4 - N (nebenverwandt).lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20PLR%204%20-%20N%20(nebenverwandt).lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun PLR 5 - S (slide).lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20PLR%205%20-%20S%20(slide).lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun PLR 6 - H (hexatonic pole).lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20PLR%206%20-%20H%20(hexatonic%20pole).lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun PLR 7 - PR (chromatic mediant).lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20PLR%207%20-%20PR%20(chromatic%20mediant).lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun PLR back.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20PLR%20back.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun borrowed scale chord 1.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20borrowed%20scale%20chord%201.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun borrowed scale chord 2.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20borrowed%20scale%20chord%202.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun borrowed scale chord 3.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20borrowed%20scale%20chord%203.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun borrowed scale chord 4.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20borrowed%20scale%20chord%204.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun borrowed scale chord 5.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20borrowed%20scale%20chord%205.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun borrowed scale chord 6.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20borrowed%20scale%20chord%206.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun borrowed scale chord 7.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20borrowed%20scale%20chord%207.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun decrement chord inversion.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20decrement%20chord%20inversion.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun decrement chord type.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20decrement%20chord%20type.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun decrement octave.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20decrement%20octave.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun decrement scale tonic note.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20decrement%20scale%20tonic%20note.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun decrement scale type.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20decrement%20scale%20type.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun double grid size.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20double%20grid%20size.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun explode MIDI item to voice tracks.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20explode%20MIDI%20item%20to%20voice%20tracks.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun halve grid size.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20halve%20grid%20size.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun higher scale note 1.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20higher%20scale%20note%201.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun higher scale note 2.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20higher%20scale%20note%202.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun higher scale note 3.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20higher%20scale%20note%203.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun higher scale note 4.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20higher%20scale%20note%204.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun higher scale note 5.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20higher%20scale%20note%205.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun higher scale note 6.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20higher%20scale%20note%206.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun higher scale note 7.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20higher%20scale%20note%207.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun history.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20history.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun increment chord inversion.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20increment%20chord%20inversion.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun increment chord type.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20increment%20chord%20type.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun increment octave.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20increment%20octave.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun increment scale tonic note.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20increment%20scale%20tonic%20note.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun increment scale type.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20increment%20scale%20type.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun lower scale note 1.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20lower%20scale%20note%201.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun lower scale note 2.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20lower%20scale%20note%202.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun lower scale note 3.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20lower%20scale%20note%203.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun lower scale note 4.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20lower%20scale%20note%204.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun lower scale note 5.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20lower%20scale%20note%205.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun lower scale note 6.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20lower%20scale%20note%206.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun lower scale note 7.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20lower%20scale%20note%207.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun reset voice leading reference.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20reset%20voice%20leading%20reference.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale chord 1.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20chord%201.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale chord 2.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20chord%202.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale chord 3.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20chord%203.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale chord 4.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20chord%204.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale chord 5.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20chord%205.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale chord 6.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20chord%206.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale chord 7.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20chord%207.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale note 1.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20note%201.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale note 2.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20note%202.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale note 3.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20note%203.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale note 4.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20note%204.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale note 5.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20note%205.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale note 6.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20note%206.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun scale note 7.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20scale%20note%207.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun set voice leading reference from selected notes.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20set%20voice%20leading%20reference%20from%20selected%20notes.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun stop all notes from playing.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20stop%20all%20notes%20from%20playing.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun toggle MIDI channel per voice.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20toggle%20MIDI%20channel%20per%20voice.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun toggle custom position.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20toggle%20custom%20position.lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun toggle voice leading source (live - item).lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20toggle%20voice%20leading%20source%20(live%20-%20item).lua</source>
+        <source main="main midi_editor" file="Todoroki_ChordMachineGun toggle voice leading.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20toggle%20voice%20leading.lua</source>
+        <source file="Todoroki_ChordMachineGun_core.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun_core.lua</source>
+        <source file="Todoroki_ChordMachineGun LISEZMOI.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20LISEZMOI.md</source>
+        <source file="LICENSE.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/5a726cbac863bb80e9aeb298a821e6b83c501ee6/Scripts/ChordMachineGun/LICENSE.md</source>
       </version>
     </reapack>
   </category>
