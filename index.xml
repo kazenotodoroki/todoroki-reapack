@@ -1,2 +1,127 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Todoroki"/>
+<index version="1" name="Todoroki" commit="78ca4b877a4f294b9b310358dfb2e18101c96e89">
+  <category name="Python Utilities">
+    <reapack name="05_Reaper_To_DS.py" type="script" desc="Reaper To DecentSampler">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Cr\u233 ?e une librairie DecentSampler \u224 ? partir des samples export\u233 ?s de REAPER. Outil externe : \u224 ? lancer avec Python, en dehors de REAPER.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-10-20T13:05:15Z">
+        <changelog><![CDATA[Première version]]></changelog>
+        <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/78ca4b877a4f294b9b310358dfb2e18101c96e89/Python%20Utilities/05_Reaper_To_DS.py</source>
+      </version>
+    </reapack>
+    <reapack name="05_Reaper_To_Kontakt.py" type="script" desc="Reaper To Kontakt">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Renomme et range les samples export\u233 ?s de REAPER pour Kontakt. Outil externe : \u224 ? lancer avec Python, en dehors de REAPER.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-10-20T13:05:15Z">
+        <changelog><![CDATA[Première version]]></changelog>
+        <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/78ca4b877a4f294b9b310358dfb2e18101c96e89/Python%20Utilities/05_Reaper_To_Kontakt.py</source>
+      </version>
+    </reapack>
+    <reapack name="FX_lua_Creator.py" type="script" desc="FX Lua Creator">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Cr\u233 ?e des actions toggle (pour la toolbar) \u224 ? partir des param\u232 ?tres d'un plugin. Outil externe : \u224 ? lancer avec Python, en dehors de REAPER.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.2" author="Todoroki" time="2026-10-20T13:05:15Z">
+        <changelog><![CDATA[Première version]]></changelog>
+        <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/78ca4b877a4f294b9b310358dfb2e18101c96e89/Python%20Utilities/FX_lua_Creator.py</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="Scripts">
+    <reapack name="01 Regions Creator.lua" type="script" desc="Regions Creator">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Cr\u233 ?e les r\u233 ?gions et une piste MIDI pour enregistrer des samples.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-10-20T13:05:15Z">
+        <changelog><![CDATA[Première version]]></changelog>
+        <source main="main">https://github.com/kazenotodoroki/todoroki-reapack/raw/78ca4b877a4f294b9b310358dfb2e18101c96e89/Scripts/01%20Regions%20Creator.lua</source>
+      </version>
+    </reapack>
+    <reapack name="02 Session Cleaner.lua" type="script" desc="Session Cleaner">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Supprime les r\u233 ?gions et marqueurs commen\u231 ?ant par "/".\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-10-20T13:05:15Z">
+        <changelog><![CDATA[Première version]]></changelog>
+        <source main="main">https://github.com/kazenotodoroki/todoroki-reapack/raw/78ca4b877a4f294b9b310358dfb2e18101c96e89/Scripts/02%20Session%20Cleaner.lua</source>
+      </version>
+    </reapack>
+    <reapack name="03 Loops Creator.lua" type="script" desc="Loops Creator">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Cr\u233 ?e une boucle sans coupure sur chaque sample.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-10-20T13:05:15Z">
+        <changelog><![CDATA[Première version]]></changelog>
+        <source main="main">https://github.com/kazenotodoroki/todoroki-reapack/raw/78ca4b877a4f294b9b310358dfb2e18101c96e89/Scripts/03%20Loops%20Creator.lua</source>
+      </version>
+    </reapack>
+    <reapack name="04 Select Regions to export.lua" type="script" desc="Select Regions to export">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Exporte toutes les r\u233 ?gions sauf celles commen\u231 ?ant par "#".\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-10-20T13:05:15Z">
+        <changelog><![CDATA[Première version]]></changelog>
+        <source main="main">https://github.com/kazenotodoroki/todoroki-reapack/raw/78ca4b877a4f294b9b310358dfb2e18101c96e89/Scripts/04%20Select%20Regions%20to%20export.lua</source>
+      </version>
+    </reapack>
+    <reapack name="FX Param_idx Lister.lua" type="script" desc="FX Param_idx Lister">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 Liste les param\u232 ?tres d'un plugin et leurs index.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-10-20T13:05:15Z">
+        <changelog><![CDATA[Première version]]></changelog>
+        <source main="main">https://github.com/kazenotodoroki/todoroki-reapack/raw/78ca4b877a4f294b9b310358dfb2e18101c96e89/Scripts/FX%20Param_idx%20Lister.lua</source>
+      </version>
+    </reapack>
+  </category>
+</index>
