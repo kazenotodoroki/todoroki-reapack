@@ -1,0 +1,1226 @@
+// @description RS Trig Sampler - 8-slot multi-velocity / round-robin drum sampler (Trigger-style)
+// @author Todoroki
+// @version 1.4
+// @changelog
+//   - VELOCITY target per slot: play a fixed velocity (VEL SENS 0%) or follow the drummer's
+//     dynamics around it (VEL SENS 100%), clipped to 127
+//   - Clicking an empty slot opens the browser directly
+//   - Folder browser (Element / Instrument / mic), search across the whole library, >4000 files
+//   - English UI
+//   - Time-based drum envelope (attack / hold / decay / curve), anti-click fades, voice limit
+// @about
+//   # RS Trig Sampler
+//
+//   Drum replacement sampler in JSFX (portable REAPER friendly), meant to sit after a trigger
+//   (MIDI) tool. One instance = one drum element, up to 8 samples played in parallel.
+//
+//   - 8 slots, each with multi-velocity / round-robin kits (.rsk.wav) or plain audio files
+//   - Per slot: volume, pan, pitch, attack / hold / decay / curve, velocity target + sensitivity,
+//     voices, round robin cycle / random, choke groups, 8 stereo outputs, mute / solo
+//   - Samples are stored in the project and in REAPER presets (one preset = a full layered kit)
+//   - Library in `<REAPER>/Data/RSampler`, filled by the **RS Trig Kit Builder** script
+//     (Slate Trigger 2 .tci import, WAV folders, auto-organised by element / instrument)
+desc:RS Trig Sampler - 8-slot multi-velocity / round-robin drum sampler
+tags:instrument sampler drum trigger multi-velocity round-robin
+in_pin:none
+out_pin:Out 1/2 L
+out_pin:Out 1/2 R
+out_pin:Out 3/4 L
+out_pin:Out 3/4 R
+out_pin:Out 5/6 L
+out_pin:Out 5/6 R
+out_pin:Out 7/8 L
+out_pin:Out 7/8 R
+out_pin:Out 9/10 L
+out_pin:Out 9/10 R
+out_pin:Out 11/12 L
+out_pin:Out 11/12 R
+out_pin:Out 13/14 L
+out_pin:Out 13/14 R
+out_pin:Out 15/16 L
+out_pin:Out 15/16 R
+slider1:36<0,127,1>-S1 Note
+slider2:0<-60,12,0.1>-S1 Volume (dB)
+slider3:0<-100,100,1>-S1 Pan
+slider4:0<-24,24,0.01>-S1 Pitch (st)
+slider5:0<0,500,0.1>-S1 Attack (ms)
+slider6:10000<0,10000,1>-S1 Hold (ms, 10000=INF)
+slider7:50<0,100,1>-S1 Decay curve
+slider8:200<1,5000,1>-S1 Decay (ms)
+slider9:60<0,100,1>-S1 Vel Sens (%)
+slider10:8<1,16,1>-S1 Max voices
+slider11:0<0,127,1>-S1 Velocity target (0=thru)
+slider12:0<0,1,1{Cycle,Random}>-S1 Round Robin
+slider13:0<0,8,1{Off,1,2,3,4,5,6,7,8}>-S1 Choke
+slider14:0<0,7,1{1/2,3/4,5/6,7/8,9/10,11/12,13/14,15/16}>-S1 Output
+slider15:0<0,1,1{Off,On}>-S1 Mute
+slider16:0<0,1,1{Off,On}>-S1 Solo
+slider17:36<0,127,1>-S2 Note
+slider18:0<-60,12,0.1>-S2 Volume (dB)
+slider19:0<-100,100,1>-S2 Pan
+slider20:0<-24,24,0.01>-S2 Pitch (st)
+slider21:0<0,500,0.1>-S2 Attack (ms)
+slider22:10000<0,10000,1>-S2 Hold (ms, 10000=INF)
+slider23:50<0,100,1>-S2 Decay curve
+slider24:200<1,5000,1>-S2 Decay (ms)
+slider25:60<0,100,1>-S2 Vel Sens (%)
+slider26:8<1,16,1>-S2 Max voices
+slider27:0<0,127,1>-S2 Velocity target (0=thru)
+slider28:0<0,1,1{Cycle,Random}>-S2 Round Robin
+slider29:0<0,8,1{Off,1,2,3,4,5,6,7,8}>-S2 Choke
+slider30:0<0,7,1{1/2,3/4,5/6,7/8,9/10,11/12,13/14,15/16}>-S2 Output
+slider31:0<0,1,1{Off,On}>-S2 Mute
+slider32:0<0,1,1{Off,On}>-S2 Solo
+slider33:36<0,127,1>-S3 Note
+slider34:0<-60,12,0.1>-S3 Volume (dB)
+slider35:0<-100,100,1>-S3 Pan
+slider36:0<-24,24,0.01>-S3 Pitch (st)
+slider37:0<0,500,0.1>-S3 Attack (ms)
+slider38:10000<0,10000,1>-S3 Hold (ms, 10000=INF)
+slider39:50<0,100,1>-S3 Decay curve
+slider40:200<1,5000,1>-S3 Decay (ms)
+slider41:60<0,100,1>-S3 Vel Sens (%)
+slider42:8<1,16,1>-S3 Max voices
+slider43:0<0,127,1>-S3 Velocity target (0=thru)
+slider44:0<0,1,1{Cycle,Random}>-S3 Round Robin
+slider45:0<0,8,1{Off,1,2,3,4,5,6,7,8}>-S3 Choke
+slider46:0<0,7,1{1/2,3/4,5/6,7/8,9/10,11/12,13/14,15/16}>-S3 Output
+slider47:0<0,1,1{Off,On}>-S3 Mute
+slider48:0<0,1,1{Off,On}>-S3 Solo
+slider49:36<0,127,1>-S4 Note
+slider50:0<-60,12,0.1>-S4 Volume (dB)
+slider51:0<-100,100,1>-S4 Pan
+slider52:0<-24,24,0.01>-S4 Pitch (st)
+slider53:0<0,500,0.1>-S4 Attack (ms)
+slider54:10000<0,10000,1>-S4 Hold (ms, 10000=INF)
+slider55:50<0,100,1>-S4 Decay curve
+slider56:200<1,5000,1>-S4 Decay (ms)
+slider57:60<0,100,1>-S4 Vel Sens (%)
+slider58:8<1,16,1>-S4 Max voices
+slider59:0<0,127,1>-S4 Velocity target (0=thru)
+slider60:0<0,1,1{Cycle,Random}>-S4 Round Robin
+slider61:0<0,8,1{Off,1,2,3,4,5,6,7,8}>-S4 Choke
+slider62:0<0,7,1{1/2,3/4,5/6,7/8,9/10,11/12,13/14,15/16}>-S4 Output
+slider63:0<0,1,1{Off,On}>-S4 Mute
+slider64:0<0,1,1{Off,On}>-S4 Solo
+slider65:36<0,127,1>-S5 Note
+slider66:0<-60,12,0.1>-S5 Volume (dB)
+slider67:0<-100,100,1>-S5 Pan
+slider68:0<-24,24,0.01>-S5 Pitch (st)
+slider69:0<0,500,0.1>-S5 Attack (ms)
+slider70:10000<0,10000,1>-S5 Hold (ms, 10000=INF)
+slider71:50<0,100,1>-S5 Decay curve
+slider72:200<1,5000,1>-S5 Decay (ms)
+slider73:60<0,100,1>-S5 Vel Sens (%)
+slider74:8<1,16,1>-S5 Max voices
+slider75:0<0,127,1>-S5 Velocity target (0=thru)
+slider76:0<0,1,1{Cycle,Random}>-S5 Round Robin
+slider77:0<0,8,1{Off,1,2,3,4,5,6,7,8}>-S5 Choke
+slider78:0<0,7,1{1/2,3/4,5/6,7/8,9/10,11/12,13/14,15/16}>-S5 Output
+slider79:0<0,1,1{Off,On}>-S5 Mute
+slider80:0<0,1,1{Off,On}>-S5 Solo
+slider81:36<0,127,1>-S6 Note
+slider82:0<-60,12,0.1>-S6 Volume (dB)
+slider83:0<-100,100,1>-S6 Pan
+slider84:0<-24,24,0.01>-S6 Pitch (st)
+slider85:0<0,500,0.1>-S6 Attack (ms)
+slider86:10000<0,10000,1>-S6 Hold (ms, 10000=INF)
+slider87:50<0,100,1>-S6 Decay curve
+slider88:200<1,5000,1>-S6 Decay (ms)
+slider89:60<0,100,1>-S6 Vel Sens (%)
+slider90:8<1,16,1>-S6 Max voices
+slider91:0<0,127,1>-S6 Velocity target (0=thru)
+slider92:0<0,1,1{Cycle,Random}>-S6 Round Robin
+slider93:0<0,8,1{Off,1,2,3,4,5,6,7,8}>-S6 Choke
+slider94:0<0,7,1{1/2,3/4,5/6,7/8,9/10,11/12,13/14,15/16}>-S6 Output
+slider95:0<0,1,1{Off,On}>-S6 Mute
+slider96:0<0,1,1{Off,On}>-S6 Solo
+slider97:36<0,127,1>-S7 Note
+slider98:0<-60,12,0.1>-S7 Volume (dB)
+slider99:0<-100,100,1>-S7 Pan
+slider100:0<-24,24,0.01>-S7 Pitch (st)
+slider101:0<0,500,0.1>-S7 Attack (ms)
+slider102:10000<0,10000,1>-S7 Hold (ms, 10000=INF)
+slider103:50<0,100,1>-S7 Decay curve
+slider104:200<1,5000,1>-S7 Decay (ms)
+slider105:60<0,100,1>-S7 Vel Sens (%)
+slider106:8<1,16,1>-S7 Max voices
+slider107:0<0,127,1>-S7 Velocity target (0=thru)
+slider108:0<0,1,1{Cycle,Random}>-S7 Round Robin
+slider109:0<0,8,1{Off,1,2,3,4,5,6,7,8}>-S7 Choke
+slider110:0<0,7,1{1/2,3/4,5/6,7/8,9/10,11/12,13/14,15/16}>-S7 Output
+slider111:0<0,1,1{Off,On}>-S7 Mute
+slider112:0<0,1,1{Off,On}>-S7 Solo
+slider113:36<0,127,1>-S8 Note
+slider114:0<-60,12,0.1>-S8 Volume (dB)
+slider115:0<-100,100,1>-S8 Pan
+slider116:0<-24,24,0.01>-S8 Pitch (st)
+slider117:0<0,500,0.1>-S8 Attack (ms)
+slider118:10000<0,10000,1>-S8 Hold (ms, 10000=INF)
+slider119:50<0,100,1>-S8 Decay curve
+slider120:200<1,5000,1>-S8 Decay (ms)
+slider121:60<0,100,1>-S8 Vel Sens (%)
+slider122:8<1,16,1>-S8 Max voices
+slider123:0<0,127,1>-S8 Velocity target (0=thru)
+slider124:0<0,1,1{Cycle,Random}>-S8 Round Robin
+slider125:0<0,8,1{Off,1,2,3,4,5,6,7,8}>-S8 Choke
+slider126:0<0,7,1{1/2,3/4,5/6,7/8,9/10,11/12,13/14,15/16}>-S8 Output
+slider127:0<0,1,1{Off,On}>-S8 Mute
+slider128:0<0,1,1{Off,On}>-S8 Solo
+slider129:0<-60,12,0.1>-Master (dB)
+slider130:0<0,16,1{Omni,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}>-MIDI Channel
+options:maxmem=128000000 gfx_hz=60
+
+@init
+ext_noinit = 1;
+
+// ---------------------------------------------------------------- constants
+NSL    = 8;            // slots
+NP     = 16;           // params per slot
+MAXV   = 96;           // voices
+VS     = 24;           // voice stride
+V      = 0;            // voice table
+OUTB   = 2400;         // 16-ch mix bus
+EVQ    = 2500;         // midi event queue
+EVMAX  = 500;
+MAPB   = 10000;        // per-slot sample map
+MAPSZ  = 1200;
+MAXL   = 32;           // velocity layers per container
+MAXRR  = 16;           // round robins per layer
+LSZ    = 4 + 2*MAXRR;  // lo,hi,nrr,rrcnt, off[16], len[16]
+S_READY = 20000; S_NCH = 20010; S_SR = 20020; S_FRAMES = 20030; S_NL = 20040;
+S_METER = 20050; S_LASTL = 20060; S_LASTR = 20070; S_FLASH = 20080; S_LOADREQ = 20090;
+S_ERR = 20100; S_GEN = 20110; S_LASTV = 20120; S_MDISP = 20130; S_MAXRR = 20140;
+S_LASTVIN = 20150;
+WAVEB  = 30000;        // waveform overview (600 pts)
+FLB    = 40000;        // browser entries: file index
+FLT    = 44000;        // browser entries: 0 = file, >0 = folder name length, -1 = parent
+LIBOFF = 48000;        // library: char offset per file
+LIBLEN = 52000;        // library: path length per file
+BDIRC  = 56000;        // browser: current folder (chars)
+LIBCH  = 60000;        // library: path chars
+SBASE  = 393216;       // sample memory
+LIBCAP = SBASE - LIBCH;
+SLOTSZ = floor((__memtop() - SBASE) / NSL);  // REAPER 7: ~15.9M values (~3 min stereo @44.1k) per slot
+SLOTSZ -= SLOTSZ % 2;
+MAGIC  = -7337.25;     // container header magic
+PATHSTR = 200;         // strings 200..207 slot paths
+NAMESTR = 210;         // strings 210..217 display names
+LOADSTR = 220;         // strings 220..227 path actually loaded
+MAXFILES = 4000;
+LIBINDEX = "RSampler/_library.txt";  // written by RS Kit Builder / RS Rescan Library
+SQ2 = sqrt(2);
+
+!inited ? (
+  inited = 1;
+  sel = 0; brw = -1; learn_slot = -1; nfiles = 0; scanned = 0;
+  memset(0, 0, 20000);
+  s = 0; loop(NSL, strcpy(PATHSTR+s, ""); strcpy(NAMESTR+s, ""); strcpy(LOADSTR+s, ""); s += 1;);
+);
+
+// ---------------------------------------------------------------- helpers
+function P(s,k) ( slider(1 + s*NP + k); );
+function db2g(d) ( d <= -59.9 ? 0 : exp(d*0.11512925464970229); );
+
+function make_name(s) local(n,i,c,st)
+(
+  n = strlen(PATHSTR+s); st = 0; i = n-1;
+  i >= 0 ? while(
+    c = str_getchar(PATHSTR+s, i);
+    (c == 47 || c == 92) ? ( st = i+1; i = -1; );
+    i -= 1;
+    i >= 0;
+  );
+  strcpy_from(#mk, PATHSTR+s, st);
+  n = strlen(#mk);
+  matchi("*.rsk.wav", #mk) ? strncpy(NAMESTR+s, #mk, n-8) :
+  matchi("*.wav", #mk) || matchi("*.ogg", #mk) || matchi("*.raw", #mk) ? strncpy(NAMESTR+s, #mk, n-4) :
+  strcpy(NAMESTR+s, #mk);
+);
+
+function kill_slot_voices(s) local(i,vp)
+(
+  i = 0; loop(MAXV, vp = V + i*VS; vp[0] && vp[1] == s ? vp[0] = 0; i += 1;);
+);
+
+function slot_clear(s)
+(
+  S_READY[s] = 0;
+  kill_slot_voices(s);
+  S_NL[s] = 0; S_FRAMES[s] = 0; S_MAXRR[s] = 0;
+);
+
+// Load the file whose path is in PATHSTR+s into slot s.
+// A plain WAV becomes 1 layer x 1 RR. An RSK container (32-bit float WAV with an
+// encoded header in its first values) gives N velocity layers x M round robins.
+function load_slot(s) local(h,nch,sr,base,avail,n,got,frames,m,nlay,idx,l,r,lp,cnt,nrr,off,len,mrr,c2)
+(
+  slot_clear(s);
+  S_ERR[s] = 0;
+  base = SBASE + s*SLOTSZ;
+  m = MAPB + s*MAPSZ;
+  strcpy(LOADSTR+s, PATHSTR+s);
+  make_name(s);
+  strlen(PATHSTR+s) > 0 ? (
+    strcpy(#lp, PATHSTR+s);
+    h = file_open(#lp);
+    h < 0 ? (
+      // repair paths saved by v1.0 ("RSampler/RSampler/x", "RSampler//RSampler/x")
+      while(
+        matchi("RSampler//*", #lp) ? ( strcpy_from(#lp, #lp, 10); 1; ) :
+        matchi("RSampler/RSampler/*", #lp) ? ( strcpy_from(#lp, #lp, 9); 1; ) : 0;
+      );
+      h = file_open(#lp);
+      h < 0 ? (
+        // last resort: same file name directly in Data/RSampler
+        n = strlen(#lp); idx = n-1; off = 0;
+        while( c2 = str_getchar(#lp, idx); (c2 == 47 || c2 == 92) ? ( off = idx+1; idx = -1; ); idx -= 1; idx >= 0; );
+        strcpy_from(#nm2, #lp, off);
+        sprintf(#lp, "RSampler/%s", #nm2);
+        h = file_open(#lp);
+      );
+      h >= 0 ? strcpy(PATHSTR+s, #lp);
+    );
+    h >= 0 ? (
+      nch = 0; sr = 0;
+      file_riff(h, nch, sr);
+      nch > 0 && sr > 0 ? (
+        avail = file_avail(h);
+        n = min(avail, SLOTSZ - (SLOTSZ % nch));
+        got = file_mem(h, base, n);
+        got < avail ? S_ERR[s] = 3;
+        frames = floor(got / nch);
+        mrr = 1;
+        (base[0] == MAGIC && base[1] == 1 && base[2] == nch && base[3] >= 1) ? (
+          nlay = min(base[3], MAXL);
+          idx = 5; l = 0;
+          loop(nlay,
+            lp = m + 2 + l*LSZ;
+            lp[0] = base[idx]; lp[1] = base[idx+1];
+            cnt = base[idx+2];
+            nrr = min(cnt, MAXRR);
+            lp[2] = nrr; lp[3] = -1;
+            idx += 3; r = 0;
+            loop(cnt,
+              r < MAXRR ? (
+                off = max(0, floor(base[idx]));
+                len = floor(base[idx+1]);
+                off + len > frames ? len = max(0, frames - off);
+                lp[4+r] = off; lp[4+MAXRR+r] = len;
+              );
+              idx += 2; r += 1;
+            );
+            mrr = max(mrr, nrr);
+            l += 1;
+          );
+        ) : (
+          nlay = 1; lp = m + 2;
+          lp[0] = 0; lp[1] = 127; lp[2] = 1; lp[3] = -1;
+          lp[4] = 0; lp[4+MAXRR] = frames;
+        );
+        S_NCH[s] = nch; S_SR[s] = sr; S_FRAMES[s] = frames; S_NL[s] = nlay; S_MAXRR[s] = mrr;
+        S_LASTL[s] = 0; S_LASTR[s] = 0;
+        S_GEN[s] += 1;
+        S_READY[s] = frames > 1;
+      ) : ( S_ERR[s] = 2; );
+      file_close(h);
+    ) : ( S_ERR[s] = 1; );
+  ) : ( S_GEN[s] += 1; );
+);
+
+function find_layer(s, vel) local(m,nlay,l,lp,best)
+(
+  m = MAPB + s*MAPSZ; nlay = S_NL[s]; best = -1;
+  l = 0; loop(nlay, lp = m + 2 + l*LSZ; (best < 0 && vel >= lp[0] && vel <= lp[1]) ? best = l; l += 1;);
+  best < 0 ? ( best = 0; l = 0; loop(nlay, lp = m + 2 + l*LSZ; lp[0] <= vel ? best = l; l += 1;); );
+  best;
+);
+
+function voice_alloc() local(i,best,vp,bq)
+(
+  best = -1; i = 0;
+  while( (V + i*VS)[0] == 0 ? best = i; i += 1; best < 0 && i < MAXV; );
+  best < 0 ? (
+    // pool full (rare): steal the quietest fading voice, else the oldest
+    bq = 1000000000; i = 0;
+    loop(MAXV, vp = V + i*VS; (vp[10] == 4 ? vp[9] : 10 + vp[15]*0.000000001) < bq ? ( bq = (vp[10] == 4 ? vp[9] : 10 + vp[15]*0.000000001); best = i; ); i += 1;);
+  );
+  best;
+);
+
+function fade_voices_group(cg) local(i,vp)
+(
+  i = 0; loop(MAXV, vp = V + i*VS;
+    vp[0] && vp[19] == cg ? vp[10] = 4;
+    i += 1;);
+);
+
+// keep at most maxv sounding voices per slot: the oldest ones fade out (6 ms) instead of being cut
+function limit_slot_voices(s, vcap) local(i,vp,cnt,old,oi)
+(
+  cnt = 0; i = 0;
+  loop(MAXV, vp = V + i*VS; vp[0] && vp[1] == s && vp[10] != 4 ? cnt += 1; i += 1;);
+  while( cnt >= vcap ? (
+    old = 10000000000000; oi = -1; i = 0;
+    loop(MAXV, vp = V + i*VS; (vp[0] && vp[1] == s && vp[10] != 4 && vp[15] < old) ? ( old = vp[15]; oi = i; ); i += 1;);
+    oi >= 0 ? ( (V + oi*VS)[10] = 4; cnt -= 1; 1; ) : 0;
+  ) : 0; );
+);
+
+// start one voice playing layer l / round robin r of slot s
+function start_voice(s, l, r, vel, note, allowgate) local(lp,off,len,nch,vi,vp,g,pan,a,cg)
+(
+  lp = MAPB + s*MAPSZ + 2 + l*LSZ;
+  off = lp[4+r]; len = lp[4+MAXRR+r];
+  len > 1 ? (
+    cg = P(s,12);
+    cg > 0 ? fade_voices_group(cg);
+    limit_slot_voices(s, max(1, floor(P(s,9) + 0.5)));
+    vi = voice_alloc(); vp = V + vi*VS;
+    nch = S_NCH[s];
+    vp[0] = 0;
+    vp[1] = s;
+    vp[2] = SBASE + s*SLOTSZ + off*nch;
+    vp[3] = len;
+    vp[4] = nch;
+    vp[5] = 0;
+    vp[6] = S_SR[s] / srate * 2^(P(s,3)/12);
+    g = db2g(P(s,1)) * (max(vel,1)/127)^(P(s,8)*0.02);
+    pan = P(s,2)/100;
+    vp[7] = g * cos((pan+1)*$pi*0.25) * SQ2;
+    vp[8] = g * sin((pan+1)*$pi*0.25) * SQ2;
+    // time-based envelope on the sample audio (no note-off): attack -> hold -> decay
+    a = P(s,4);
+    a <= 0.05 ? ( vp[9] = 1; vp[10] = 2; vp[11] = 1; )
+              : ( vp[9] = 0; vp[10] = 1; vp[11] = 1/(a*0.001*srate); );
+    vp[12] = P(s,5) >= 9999.5 ? -1 : P(s,5)*0.001*srate;       // hold (samples), -1 = until the end
+    vp[13] = 1/(max(P(s,7),1)*0.001*srate);                    // decay progress per sample
+    vp[14] = 1 + P(s,6)*0.05;                                  // decay curve exponent (1 = linear)
+    vp[21] = 0;
+    vp[23] = max(8, 0.004*S_SR[s]);                            // 4 ms anti-click fade at sample end
+    vp[15] = vcount += 1;
+    vp[16] = note;
+    vp[17] = min(P(s,13),7)*2;
+    vp[19] = cg;
+    vp[20] = l*100 + r;
+    vp[0] = 1;
+    S_LASTL[s] = l; S_LASTR[s] = r; S_FLASH[s] = 1; S_LASTV[s] = vel;
+  );
+);
+
+function trigger(s, vel, note, allowgate) local(l,lp,nrr,r)
+(
+  S_READY[s] ? (
+    l = find_layer(s, vel);
+    lp = MAPB + s*MAPSZ + 2 + l*LSZ;
+    nrr = lp[2];
+    nrr > 0 ? (
+      P(s,11) < 1 ? (
+        r = lp[3] + 1; r >= nrr ? r = 0;
+      ) : (
+        nrr > 1 ? ( r = floor(rand(nrr)); r >= nrr ? r = nrr-1; r == lp[3] ? r = (r+1) % nrr; ) : r = 0;
+      );
+      lp[3] = r;
+      start_voice(s, l, r, vel, note, allowgate);
+    );
+  );
+);
+
+// VELOCITY (target) per slot: THRU = incoming velocity.
+// Otherwise out = target + VEL SENS x (incoming - average incoming), clipped to 1..127:
+// SENS 0% always plays the target, 100% follows the drummer's dynamics around it.
+function note_on(note, vel) local(s,dev,t,ve,hit)
+(
+  dev = vavg_n > 0 ? vel - vavg : 0;
+  hit = 0; s = 0;
+  loop(NSL,
+    (S_READY[s] && P(s,0) == note && P(s,14) < 1 && (anysolo == 0 || P(s,15) >= 1)) ? (
+      t = P(s,10);
+      ve = t >= 0.5 ? max(1, min(127, floor(t + P(s,8)*0.01*dev + 0.5))) : vel;
+      S_LASTVIN[s] = vel;
+      trigger(s, ve, note, 1);
+      hit = 1;
+    );
+    s += 1;
+  );
+  hit ? ( vavg = vavg_n > 0 ? vavg*0.8 + vel*0.2 : vel; vavg_n += 1; );
+);
+
+function herm(y0,y1,y2,y3,t) local(c1,c2,c3)
+(
+  c1 = 0.5*(y2 - y0);
+  c2 = y0 - 2.5*y1 + 2*y2 - 0.5*y3;
+  c3 = 0.5*(y3 - y0) + 1.5*(y1 - y2);
+  ((c3*t + c2)*t + c1)*t + y1;
+);
+
+// ------------------------------------------------ gfx helpers (used from @gfx)
+function env_at(tms) ( tms < e_atk ? tms/max(e_atk,0.001) : (einf || tms < e_atk + e_hold) ? 1 : tms < e_atk + e_hold + e_dec ? (1 - (tms - e_atk - e_hold)/e_dec)^e_crv : 0; );
+function C(hex)    ( gfx_set(((hex>>16)&255)/255, ((hex>>8)&255)/255, (hex&255)/255, 1); );
+function CA(hex,a) ( gfx_set(((hex>>16)&255)/255, ((hex>>8)&255)/255, (hex&255)/255, a); );
+function R(x,y,w,h) ( gfx_rect(floor(ox+x*sc), floor(oy+y*sc), max(1,floor((x+w)*sc) - floor(x*sc)), max(1,floor((y+h)*sc) - floor(y*sc))); );
+function FR(x,y,w,h) local(x0,y0,x1,y1)
+(
+  x0 = floor(ox+x*sc); y0 = floor(oy+y*sc); x1 = floor(ox+(x+w)*sc)-1; y1 = floor(oy+(y+h)*sc)-1;
+  gfx_line(x0,y0,x1,y0,0); gfx_line(x1,y0,x1,y1,0); gfx_line(x1,y1,x0,y1,0); gfx_line(x0,y1,x0,y0,0);
+);
+function LN(x1,y1,x2,y2) ( gfx_line(ox+x1*sc, oy+y1*sc, ox+x2*sc, oy+y2*sc, 1); );
+function T(x,y,w,h,str,flags) ( gfx_x = ox+x*sc; gfx_y = oy+y*sc; gfx_drawstr(str, flags, ox+(x+w)*sc, oy+(y+h)*sc); );
+function HIT(x,y,w,h) ( mxb >= x && mxb < x+w && myb >= y && myb < y+h; );
+function F(i) ( gfx_setfont(i); );
+
+function note_str(n, dst)
+(
+  strcpy_substr(#nn, "C C#D D#E F F#G G#A A#B ", (n%12)*2, 2);
+  str_getchar(#nn, 1) == 32 ? strcpy_substr(#nn, #nn, 0, 1);
+  sprintf(dst, "%d  %s%d", n, #nn, floor(n/12)-1);
+);
+
+function fmt_val(v, unit, dst)
+(
+  unit == 0 ? ( v <= -59.9 ? strcpy(dst, "-inf dB") : sprintf(dst, "%+.1f dB", v); ) :
+  unit == 1 ? ( abs(v) < 0.5 ? strcpy(dst, "C") : v < 0 ? sprintf(dst, "L%d", floor(-v+0.5)) : sprintf(dst, "R%d", floor(v+0.5)); ) :
+  unit == 2 ? ( sprintf(dst, "%+.2f st", v); ) :
+  unit == 3 ? ( v >= 1000 ? sprintf(dst, "%.2f s", v/1000) : v >= 100 ? sprintf(dst, "%d ms", floor(v+0.5)) : sprintf(dst, "%.1f ms", v); ) :
+  unit == 4 ? ( sprintf(dst, "%d%%", floor(v+0.5)); ) :
+  unit == 6 ? ( note_str(floor(v+0.5), dst); ) :
+  unit == 7 ? ( v < 0.5 ? strcpy(dst, "OFF") : sprintf(dst, "GRP %d", floor(v+0.5)); ) :
+  unit == 8 ? ( sprintf(dst, "%d/%d", floor(v+0.5)*2+1, floor(v+0.5)*2+2); ) :
+  unit == 9 ? ( v >= 9999.5 ? strcpy(dst, "INF") : v >= 1000 ? sprintf(dst, "%.2f s", v/1000) : v >= 100 ? sprintf(dst, "%d ms", floor(v+0.5)) : sprintf(dst, "%.1f ms", v); ) :
+  unit == 10 ? ( v < 1.5 ? strcpy(dst, "MONO") : sprintf(dst, "%d", floor(v+0.5)); ) :
+  unit == 11 ? ( v < 0.5 ? strcpy(dst, "LIN") : sprintf(dst, "EXP %d", floor(v+0.5)); ) :
+  unit == 12 ? ( v < 0.5 ? strcpy(dst, "THRU") : sprintf(dst, "%d", floor(v+0.5)); ) :
+  sprintf(dst, "%d", floor(v+0.5));
+);
+
+// shape: 0 linear, 1 cubic (time params)
+function to_n(v,mn,mx,shape) local(t)  ( t = (v-mn)/(mx-mn); shape == 1 ? t = t^(1/3); max(0,min(1,t)); );
+function from_n(t,mn,mx,shape)         ( t = max(0,min(1,t)); shape == 1 ? t = t*t*t; mn + (mx-mn)*t; );
+
+function set_param(sidx, v)
+(
+  slider(sidx) = v;
+  slider_automate(slider(sidx));
+);
+
+// flat parameter bar. bip = draw from centre
+function bar(id, x, y, w, sidx, mn, mx, def, step, shape, unit, bip, label) local(v,t,nt,nv,hov,tw,tc,tx)
+(
+  v = slider(sidx);
+  hov = HIT(x, y, w, 30) && (cap == 0 || cap == id) && brw < 0;
+  hov && clk ? (
+    (time_precise() - lastclk_t < 0.28 && lastclk_id == id) ? (
+      set_param(sidx, def); cap = -1;
+    ) : (
+      cap = id; drag_x = mxb; drag_t = to_n(v, mn, mx, shape);
+    );
+    lastclk_t = time_precise(); lastclk_id = id;
+  );
+  hov && cap == 0 && mouse_wheel != 0 ? (
+    nv = v + (mouse_wheel > 0 ? 1 : -1) * step * ((mouse_cap & 8) ? 1 : (unit >= 6 ? 1 : 10));
+    set_param(sidx, max(mn, min(mx, nv)));
+    mouse_wheel = 0;
+  );
+  cap == id && mb ? (
+    nt = drag_t + (mxb - drag_x) / w * ((mouse_cap & 8) ? 0.1 : 1);
+    nv = from_n(nt, mn, mx, shape);
+    nv = floor(nv/step + 0.5) * step;
+    nv = max(mn, min(mx, nv));
+    nv != v ? set_param(sidx, nv);
+    v = nv;
+  );
+  t = to_n(v, mn, mx, shape);
+  F(1); C((hov || cap == id) ? COL_TXT : COL_DIM);
+  T(x, y, w, 14, label, 0);
+  fmt_val(v, unit, #fv);
+  F(2); C(COL_TXT); T(x, y-1, w, 15, #fv, 2);
+  C(COL_TRK); R(x, y+21, w, 4);
+  C(cap == id ? COL_ACC2 : COL_ACC);
+  bip ? (
+    tc = to_n((mn+mx)*0.5, mn, mx, 0);
+    t >= tc ? R(x + w*tc, y+21, w*(t-tc), 4) : R(x + w*t, y+21, w*(tc-t), 4);
+    C(COL_DIM); R(x + w*tc, y+19, 1, 8);
+  ) : (
+    R(x, y+21, w*t, 4);
+  );
+  C(COL_TXT); R(x + w*t - 1, y+18, 2, 10);
+);
+
+// two/three-way segmented switch
+function seg(id, x, y, w, sidx, n, a, b, c, label) local(i,cw,v,hx)
+(
+  v = floor(slider(sidx)+0.5);
+  F(1); C(COL_DIM); T(x, y, w, 12, label, 0);
+  cw = w / n; i = 0;
+  loop(n,
+    hx = x + i*cw;
+    (HIT(hx, y+14, cw, 20) && clk && cap == 0 && brw < 0) ? ( set_param(sidx, i); v = i; cap = -1; );
+    v == i ? ( C(COL_ACC); R(hx, y+14, cw-1, 20); C(0xFFFFFF); ) : ( C(COL_PNL2); R(hx, y+14, cw-1, 20); C(COL_DIM); );
+    F(4); T(hx, y+14, cw-1, 20, i == 0 ? a : i == 1 ? b : c, 5);
+    i += 1;
+  );
+);
+
+function button(x, y, w, h, label, active) local(hov,r)
+(
+  hov = HIT(x,y,w,h) && cap == 0 && brw < 0;
+  active ? ( C(COL_ACC); R(x,y,w,h); C(0xFFFFFF); ) : ( C(hov ? COL_PNL3 : COL_PNL2); R(x,y,w,h); C(hov ? COL_TXT : COL_DIM); );
+  F(4); T(x, y, w, h, label, 5);
+  r = hov && clk;
+  r ? cap = -1;
+  r;
+);
+
+// ---------------------------------------------------------------- library (paths kept in RAM: no 1024-string limit)
+function lc(c) ( c >= 65 && c <= 90 ? c + 32 : c; );
+function lib_add(str) local(n,i,o)
+(
+  n = strlen(str);
+  (nfiles < MAXFILES && libused + n <= LIBCAP) ? (
+    o = LIBCH + libused; i = 0;
+    loop(n, o[i] = str_getchar(str, i, 'cu'); i += 1;);
+    LIBOFF[nfiles] = libused; LIBLEN[nfiles] = n; libused += n; nfiles += 1;
+  );
+);
+// chars [st, st+n) of library entry i -> dst
+function lib_str(i, st, n, dst) local(o,k)
+(
+  strcpy(dst, ""); o = LIBCH + LIBOFF[i] + st; k = 0;
+  loop(max(0, n), str_setchar(dst, k, o[k], 'cu'); k += 1;);
+  dst;
+);
+function lib_prefix(i) local(o,k,ok)
+(
+  LIBLEN[i] <= bdir_len ? 0 : (
+    o = LIBCH + LIBOFF[i]; ok = 1; k = 0;
+    bdir_len > 0 ? while( lc(o[k]) != lc(BDIRC[k]) ? ok = 0; k += 1; ok && k < bdir_len; );
+    ok;
+  );
+);
+// position of the next '/' after the current folder in entry i (-1 if it is a file here)
+function lib_slash(i) local(o,k,n,p)
+(
+  o = LIBCH + LIBOFF[i]; n = LIBLEN[i]; p = -1; k = bdir_len;
+  k < n ? while( o[k] == 47 ? p = k - bdir_len; k += 1; p < 0 && k < n; );
+  p;
+);
+function lib_same_folder(i, j, fl) local(a,b,k,ok)
+(
+  a = LIBCH + LIBOFF[i] + bdir_len; b = LIBCH + LIBOFF[j] + bdir_len; ok = 1; k = 0;
+  loop(fl, lc(a[k]) != lc(b[k]) ? ok = 0; k += 1;);
+  ok;
+);
+function bdir_set(str) local(n,i)
+(
+  n = min(250, strlen(str)); i = 0;
+  loop(n, BDIRC[i] = str_getchar(str, i, 'cu'); i += 1;);
+  bdir_len = n;
+);
+function bdir_up() local(k)
+(
+  k = bdir_len - 2;
+  while( k >= 0 && BDIRC[k] != 47 ? ( k -= 1; 1; ) : 0; );
+  bdir_len = max(0, k + 1);
+);
+function bdir_enter(i, fl) local(o,k)
+(
+  o = LIBCH + LIBOFF[i] + bdir_len; k = 0;
+  loop(fl + 1, BDIRC[bdir_len + k] = o[k]; k += 1;);
+  bdir_len += fl + 1;
+);
+
+// read the library index (a JSFX cannot list a folder by itself)
+function scan_files() local(h,n,c,go)
+(
+  nfiles = 0; libused = 0; lib_missing = 0;
+  h = file_open(LIBINDEX);
+  h < 0 ? lib_missing = 1 : (
+    go = 1;
+    while(
+      n = file_string(h, #ln);
+      n <= 0 ? go = 0 : (
+        while( n > 0 && ((c = str_getchar(#ln, n-1)) == 10 || c == 13 || c == 32) ? ( strcpy_substr(#ln, #ln, 0, n-1); n -= 1; 1; ) : 0; );
+        (n > 0 && str_getchar(#ln, 0) != 59) ? lib_add(#ln);
+      );
+      go;
+    );
+    file_close(h);
+  );
+  scanned = 1;
+);
+
+// open the browser for slot s, in the folder of the sample it holds
+function browser_open(s) local(n,k,p)
+(
+  brw = s; strcpy(#filter, ""); bscroll = 0;
+  scan_files();
+  matchi("RSampler/*", PATHSTR+s) ? (
+    strcpy_from(#bd, PATHSTR+s, 9);
+    n = strlen(#bd); p = -1; k = n - 1;
+    k >= 0 ? while( str_getchar(#bd, k) == 47 ? p = k; k -= 1; p < 0 && k >= 0; );
+    p >= 0 ? ( strcpy_substr(#bd, #bd, 0, p + 1); bdir_set(#bd); );
+  );
+);
+
+// absolute dropped path -> "RSampler/..." (portable) when it lives in <REAPER>/Data
+function to_rel(dst) local(n,i,pos,plen)
+(
+  strcpy(#tr, dst); n = strlen(#tr);
+  i = 0; loop(n, str_getchar(#tr, i) == 92 ? str_setchar(#tr, i, 47); i += 1;);
+  pos = -1; plen = 15; i = n - plen;
+  i >= 0 ? while( strcpy_substr(#sub, #tr, i, plen); stricmp(#sub, "/Data/RSampler/") == 0 ? pos = i; i -= 1; pos < 0 && i >= 0; );
+  pos >= 0 ? ( strcpy_from(#sub, #tr, pos + plen); sprintf(dst, "RSampler/%s", #sub); ) : (
+    plen = 6; i = n - plen;
+    i >= 0 ? while( strcpy_substr(#sub, #tr, i, plen); stricmp(#sub, "/Data/") == 0 ? pos = i; i -= 1; pos < 0 && i >= 0; );
+    pos >= 0 ? strcpy_from(dst, #tr, pos + plen);
+  );
+);
+
+function is_abs(str) ( str_getchar(str, 1) == 58 || str_getchar(str, 0) == 47 || str_getchar(str, 0) == 92; );
+
+function compute_wave(s, l, r) local(lp,off,len,nch,base,c,a,b,i,step,pk,p,v,gmax)
+(
+  lp = MAPB + s*MAPSZ + 2 + l*LSZ;
+  off = lp[4+r]; len = lp[4+MAXRR+r]; nch = S_NCH[s];
+  base = SBASE + s*SLOTSZ + off*nch;
+  gmax = 0; c = 0;
+  len > 1 ? loop(600,
+    a = floor(c*len/600); b = floor((c+1)*len/600); b <= a ? b = a+1;
+    step = max(1, floor((b-a)/40));
+    pk = 0; i = a;
+    while(
+      p = base + i*nch;
+      v = abs(p[0]); v > pk ? pk = v;
+      nch > 1 ? ( v = abs(p[1]); v > pk ? pk = v; );
+      i += step;
+      i < b && i < len;
+    );
+    WAVEB[c] = pk; pk > gmax ? gmax = pk;
+    c += 1;
+  );
+  wv_peak = gmax; wv_len = len; wv_base = base;
+  wv_secs = S_SR[s] > 0 ? len / S_SR[s] : 0;
+);
+
+fastrel = exp(-6.907755 / (0.006*srate));
+
+@block
+fastrel = exp(-6.907755 / (0.006*srate));
+
+// pending loads (from UI or project recall)
+s = 0;
+loop(NSL,
+  S_LOADREQ[s] ? ( S_LOADREQ[s] = 0; load_slot(s); );
+  s += 1;
+);
+
+// solo state
+anysolo = 0; s = 0; loop(NSL, P(s,15) >= 1 ? anysolo = 1; s += 1;);
+gch = floor(slider(130) + 0.5);
+mgain = db2g(slider(129));
+
+// audition requests from the UI
+prev_req ? (
+  prev_req = 0;
+  prev_exact ? ( S_READY[prev_s] ? start_voice(prev_s, prev_l, prev_r, prev_v, -1, 0); )
+             : trigger(prev_s, prev_v, -1, 0);
+);
+
+// midi -> queue (sample accurate)
+evn = 0;
+while(
+  midirecv(ofs, m1, m2, m3) ? (
+    midisend(ofs, m1, m2, m3);
+    st = m1 & 0xF0; ch = m1 & 0x0F;
+    ((gch == 0 || ch == gch-1) && (st == 0x90 || st == 0x80) && evn < EVMAX) ? (
+      q = EVQ + evn*4; q[0] = ofs; q[1] = (st == 0x90 && m3 > 0) ? 1 : 0; q[2] = m2; q[3] = m3;
+      evn += 1;
+      q[1] ? ( last_note = m2; learn_cnt += 1; );
+    );
+    1;
+  ) : 0;
+);
+evi = 0; spos = 0;
+nch_out = min(16, num_ch);
+
+@sample
+while(
+  evi < evn ? (
+    q = EVQ + evi*4;
+    q[0] <= spos ? (
+      q[1] ? note_on(q[2], q[3]);
+      evi += 1;
+      1;
+    ) : 0;
+  ) : 0;
+);
+spos += 1;
+
+i = 0;
+loop(MAXV,
+  vp = V + i*VS;
+  vp[0] ? (
+    st = vp[10]; env = vp[9];
+    st == 1 ? (
+      env += vp[11]; env >= 1 ? ( env = 1; vp[10] = 2; );
+    ) : st == 2 ? (
+      vp[12] >= 0 ? ( vp[12] -= 1; vp[12] <= 0 ? vp[10] = 3; );
+    ) : st == 3 ? (
+      prog = vp[21] + vp[13]; vp[21] = prog;
+      prog >= 1 ? ( env = 0; vp[0] = 0; ) : env = (1 - prog)^vp[14];
+    ) : st == 4 ? (
+      env *= fastrel; env < 0.00003 ? vp[0] = 0;
+    );
+    vp[9] = env;
+
+    pos = vp[5]; len = vp[3];
+    pos >= len - 1 ? vp[0] = 0 : vp[0] ? (
+      nch = vp[4];
+      ip = floor(pos); fr = pos - ip;
+      p = vp[2] + ip*nch;
+      nch >= 2 ? (
+        fr == 0 ? ( l = p[0]; r = p[1]; ) :
+        (ip >= 1 && ip + 2 < len) ? (
+          l = herm(p[-nch], p[0], p[nch], p[2*nch], fr);
+          r = herm(p[1-nch], p[1], p[nch+1], p[2*nch+1], fr);
+        ) : (
+          l = p[0] + (p[nch] - p[0])*fr; r = p[1] + (p[nch+1] - p[1])*fr;
+        );
+      ) : (
+        fr == 0 ? ( l = p[0]; ) :
+        (ip >= 1 && ip + 2 < len) ? ( l = herm(p[-1], p[0], p[1], p[2], fr); ) :
+        ( l = p[0] + (p[1] - p[0])*fr; );
+        r = l;
+      );
+      rem = len - 1 - pos;
+      fe = rem < vp[23] ? env*rem/vp[23] : env;
+      l *= vp[7]*fe; r *= vp[8]*fe;
+      o = OUTB + vp[17];
+      o[0] += l; o[1] += r;
+      a = max(abs(l), abs(r));
+      a > S_METER[vp[1]] ? S_METER[vp[1]] = a;
+      vp[5] = pos + vp[6];
+    );
+  );
+  i += 1;
+);
+
+c = 0;
+loop(nch_out, spl(c) = OUTB[c]*mgain; OUTB[c] = 0; c += 1;);
+c < 16 ? memset(OUTB + c, 0, 16 - c);
+
+@serialize
+ver = 1;
+file_var(0, ver);
+ss = 0; loop(NSL, file_string(0, PATHSTR+ss); ss += 1;);
+file_var(0, sel);
+file_avail(0) >= 0 ? (
+  ss = 0;
+  loop(NSL,
+    (stricmp(PATHSTR+ss, LOADSTR+ss) != 0 || (!S_READY[ss] && strlen(PATHSTR+ss) > 0)) ? S_LOADREQ[ss] = 1;
+    ss += 1;
+  );
+  sel = max(0, min(NSL-1, sel));
+);
+
+@gfx 920 560
+// ---------------------------------------------------------------- palette
+COL_BG   = 0x0E0F11; COL_HDR = 0x0A0B0C;
+COL_PNL  = 0x15171B; COL_PNL2 = 0x1D2025; COL_PNL3 = 0x272B31;
+COL_LINE = 0x2A2E35; COL_TRK = 0x24272D;
+COL_TXT  = 0xE4E7EB; COL_DIM = 0x7D838D; COL_FAINT = 0x4A4F57;
+COL_ACC  = 0xB0161E; COL_ACC2 = 0xD6343B; COL_CYAN = 0xC98C8F;
+
+W0 = 920; H0 = 560;
+nsc = max(0.6, min(gfx_w/W0, gfx_h/H0));
+nsc != sc ? (
+  sc = nsc;
+  gfx_setfont(1, "Arial", max(9,  floor(11*sc)));
+  gfx_setfont(2, "Arial", max(10, floor(13*sc)));
+  gfx_setfont(3, "Arial", max(12, floor(19*sc)), 'b');
+  gfx_setfont(4, "Arial", max(9,  floor(10*sc)), 'b');
+);
+ox = floor((gfx_w - W0*sc)*0.5); oy = floor((gfx_h - H0*sc)*0.5);
+gfx_clear = (COL_BG & 255)*65536 + ((COL_BG>>8)&255)*256 + ((COL_BG>>16)&255);
+
+chr = gfx_getchar();
+mb = mouse_cap & 1; rb = (mouse_cap & 2) ? 1 : 0;
+clk = mb && !lmb; rclk = rb && !lrb;
+mxb = (mouse_x - ox)/sc; myb = (mouse_y - oy)/sc;
+!mb ? cap = 0;
+!scanned ? scan_files();
+
+// note learn
+learn_slot >= 0 && learn_cnt != learn_seen ? (
+  set_param(1 + learn_slot*NP, last_note);
+  learn_slot = -1;
+);
+
+// ---------------------------------------------------------------- header
+C(COL_HDR); R(0, 0, W0, 40);
+C(COL_LINE); R(0, 40, W0, 1);
+C(COL_ACC); R(16, 14, 12, 12);
+F(3); C(COL_TXT); T(36, 0, 200, 40, "RS TRIG", 4);
+F(4); C(COL_DIM); T(122, 2, 200, 40, "SAMPLER  /  8 SLOTS", 4);
+
+// voices
+nact = 0; gi = 0; loop(MAXV, (V+gi*VS)[0] ? nact += 1; gi += 1;);
+F(4); C(COL_DIM); T(330, 0, 60, 40, "VOICES", 4);
+sprintf(#t, "%02d/%d", nact, MAXV); F(2); C(nact > 0 ? COL_TXT : COL_FAINT); T(380, 0, 60, 40, #t, 4);
+
+// midi channel
+F(4); C(COL_DIM); T(452, 0, 40, 40, "MIDI", 4);
+gch_ui = floor(slider(130)+0.5);
+gch_ui == 0 ? strcpy(#t, "OMNI") : sprintf(#t, "CH %d", gch_ui);
+button(490, 10, 64, 20, #t, 0) ? (
+  gfx_x = mouse_x; gfx_y = mouse_y;
+  mres = gfx_showmenu("Omni|Ch 1|Ch 2|Ch 3|Ch 4|Ch 5|Ch 6|Ch 7|Ch 8|Ch 9|Ch 10|Ch 11|Ch 12|Ch 13|Ch 14|Ch 15|Ch 16");
+  mres > 0 ? set_param(130, mres-1);
+);
+bar(900, 580, 8, 200, 129, -60, 12, 0, 0.1, 0, 0, 0, "MASTER");
+C(COL_FAINT); F(1); T(800, 0, 108, 40, "v1.4", 6);
+
+// ---------------------------------------------------------------- slot list
+gs = 0;
+loop(NSL,
+  x = 8; y = 48 + gs*55; w = 296; h = 51;
+  rowhov = HIT(x, y, w, h) && cap == 0 && brw < 0;
+  C(sel == gs ? COL_PNL2 : (rowhov ? 0x181A1F : COL_PNL)); R(x, y, w, h);
+  sel == gs ? ( C(COL_ACC); R(x, y, 3, h); );
+
+  // trigger square / audition
+  fl = S_FLASH[gs];
+  C(COL_TRK); R(x+12, y+28, 14, 14);
+  fl > 0.02 ? ( CA(COL_ACC, min(1, fl)); R(x+12, y+28, 14, 14); );
+  S_FLASH[gs] *= 0.82;
+
+  F(4); C(sel == gs ? COL_ACC : COL_DIM);
+  sprintf(#t, "%02d", gs+1); T(x+12, y+7, 24, 16, #t, 0);
+
+  F(2); C(S_READY[gs] ? COL_TXT : COL_FAINT);
+  T(x+40, y+6, 170, 18, S_READY[gs] ? NAMESTR+gs : (S_ERR[gs] == 1 ? "file not found" : S_ERR[gs] == 2 ? "unreadable format" : "empty  -  click to load"), 0);
+
+  F(1); C(COL_DIM);
+  note_str(floor(P(gs,0)+0.5), #nt);
+  S_READY[gs] ? sprintf(#t, "%s   %dV x %dRR", #nt, S_NL[gs], S_MAXRR[gs]) : strcpy(#t, #nt);
+  T(x+40, y+27, 170, 14, #t, 0);
+
+  // meter
+  md = S_METER[gs]; S_METER[gs] = 0;
+  S_MDISP[gs] = max(md, S_MDISP[gs]*0.88);
+  mdb = S_MDISP[gs] > 0.00001 ? max(0, min(1, (20*log10(S_MDISP[gs]) + 48)/54)) : 0;
+  C(COL_TRK); R(x+40, y+h-6, 170, 2);
+  C(mdb > 0.92 ? 0xFFFFFF : COL_CYAN); R(x+40, y+h-6, 170*mdb, 2);
+
+  // mute / solo
+  mu = P(gs,14) >= 1; so = P(gs,15) >= 1;
+  mbx = x + w - 56;
+  C(mu ? 0xC9C9C9 : COL_PNL3); R(mbx, y+14, 22, 22);
+  F(4); C(mu ? COL_BG : COL_DIM); T(mbx, y+14, 22, 22, "M", 5);
+  C(so ? 0xF2C230 : COL_PNL3); R(mbx+26, y+14, 22, 22);
+  C(so ? COL_BG : COL_DIM); T(mbx+26, y+14, 22, 22, "S", 5);
+
+  rowhov && clk ? (
+    HIT(mbx, y+14, 22, 22) ? ( set_param(1+gs*NP+14, !mu); cap = -1; ) :
+    HIT(mbx+26, y+14, 22, 22) ? ( set_param(1+gs*NP+15, !so); cap = -1; ) :
+    HIT(x+12, y+28, 14, 14) ? ( sel = gs; prev_s = gs; prev_v = 100; prev_exact = 0; prev_req = 1; cap = -1; ) :
+    ( sel = gs; cap = -1; (!S_READY[gs] && S_ERR[gs] != 1) ? browser_open(gs); );
+  );
+  rowhov && rclk ? (
+    gfx_x = mouse_x; gfx_y = mouse_y;
+    mres = gfx_showmenu("Load...|Clear slot||Audition (vel 100)");
+    mres == 1 ? ( sel = gs; browser_open(gs); ) :
+    mres == 2 ? ( strcpy(PATHSTR+gs, ""); S_LOADREQ[gs] = 1; sliderchange(-1); ) :
+    mres == 3 ? ( prev_s = gs; prev_v = 100; prev_exact = 0; prev_req = 1; );
+  );
+  gs += 1;
+);
+
+// library footer
+C(COL_PNL); R(8, 492, 296, 60);
+F(4); C(COL_DIM); T(20, 500, 200, 14, "LIBRARY", 0);
+F(1); C(COL_FAINT); lib_missing ? strcpy(#t, "no index: run RS Trig Rescan Library") : sprintf(#t, "Data/RSampler  -  %d file(s)", nfiles); T(20, 516, 200, 14, #t, 0);
+T(20, 532, 200, 14, "or drop files onto a slot", 0);
+button(220, 506, 72, 24, "RESCAN", 0) ? scan_files();
+
+// ---------------------------------------------------------------- detail panel
+gs = sel; PX = 316; PW = 596;
+base1 = 1 + gs*NP;
+
+F(3); C(S_READY[gs] ? COL_TXT : COL_FAINT);
+sprintf(#t, "%02d  ", gs+1);
+T(PX, 48, 400, 24, #t, 4);
+gfx_measurestr(#t, tw, th);
+T(PX + tw/sc, 48, 380, 24, S_READY[gs] ? NAMESTR+gs : "Empty slot", 4);
+F(1);
+strlen(PATHSTR+gs) && is_abs(PATHSTR+gs) ? ( C(0xF2C230); sprintf(#t, "%s   (outside Data: not portable)", PATHSTR+gs); ) : ( C(COL_FAINT); strcpy(#t, strlen(PATHSTR+gs) ? PATHSTR+gs : "Click an empty slot, LOAD, or drop a file here"); );
+T(PX, 70, PW-190, 14, #t, 0);
+
+button(PX+PW-176, 50, 84, 26, "LOAD", 0) ? browser_open(gs);
+button(PX+PW-86, 50, 86, 26, "CLEAR", 0) ? ( strcpy(PATHSTR+gs, ""); S_LOADREQ[gs] = 1; sliderchange(-1); );
+
+// waveform
+WY = 90; WH = 118;
+C(COL_PNL); R(PX, WY, PW, WH);
+S_READY[gs] ? (
+  vl = view_lock ? view_l : S_LASTL[gs]; vr = view_lock ? view_r : S_LASTR[gs];
+  vl >= S_NL[gs] ? vl = 0;
+  (wv_s != gs || wv_l != vl || wv_r != vr || wv_gen != S_GEN[gs]) ? (
+    compute_wave(gs, vl, vr);
+    wv_s = gs; wv_l = vl; wv_r = vr; wv_gen = S_GEN[gs];
+  );
+  mid = WY + WH*0.5; amp = WH*0.5 - 8;
+  C(COL_LINE); R(PX, mid, PW, 1);
+  CA(COL_ACC, 0.85);
+  gc = 0;
+  loop(600,
+    hh = min(1, WAVEB[gc]) * amp;
+    hh >= 0.5/sc ? R(PX + gc*PW/600, mid - hh, PW/600 + 0.4, hh*2);
+    gc += 1;
+  );
+  // playheads
+  gi = 0;
+  loop(MAXV, gvp = V + gi*VS;
+    gvp[0] && gvp[1] == gs && gvp[2] == wv_base ? ( C(COL_TXT); R(PX + PW*min(1, gvp[5]/max(1,wv_len)), WY+4, 1, WH-8); );
+    gi += 1;);
+  F(4); C(COL_DIM);
+  lpp = MAPB + gs*MAPSZ + 2 + vl*LSZ;
+  sprintf(#t, "VEL %d-%d   LAYER %d   RR %d   %.3f s   %d Hz   %s", lpp[0], lpp[1], vl+1, vr+1, wv_secs, S_SR[gs], S_NCH[gs] > 1 ? "STEREO" : "MONO");
+  T(PX+8, WY+5, PW-16, 14, #t, 0);
+  view_lock ? ( C(COL_CYAN); T(PX+8, WY+WH-18, 200, 14, "VIEW LOCKED (click to follow)", 0); );
+  HIT(PX, WY, PW, WH) && clk && cap == 0 && brw < 0 ? ( view_lock = 0; cap = -1; );
+  S_ERR[gs] == 3 ? ( C(0xF2C230); T(PX+8, WY+WH-18, PW-16, 14, "File truncated: too long for one slot (update REAPER)", 2); );
+) : (
+  F(2); C(COL_FAINT); T(PX, WY, PW, WH, "No sample", 5);
+);
+
+// velocity x round-robin grid
+GY = 216; GH = 50;
+F(4); C(COL_DIM); T(PX, GY, 300, 12, "VELOCITY  x  ROUND ROBIN", 0);
+F(1); C(COL_FAINT); T(PX, GY, PW, 12, "click = audition / lock view", 2);
+gnl = S_READY[gs] ? S_NL[gs] : 0;
+gnl > 0 ? (
+  gcw = PW / gnl; gl = 0;
+  loop(gnl,
+    glp = MAPB + gs*MAPSZ + 2 + gl*LSZ; gnrr = max(1, glp[2]);
+    gch_h = GH / gnrr; gr = 0;
+    loop(gnrr,
+      cx = PX + gl*gcw; cy = GY + 16 + gr*gch_h;
+      ishot = (S_LASTL[gs] == gl && S_LASTR[gs] == gr);
+      isview = (gs == wv_s && gl == wv_l && gr == wv_r);
+      C(isview ? COL_PNL3 : COL_PNL2); R(cx, cy, gcw-2, gch_h-1);
+      ishot && S_FLASH[gs] > 0.02 ? ( CA(COL_ACC, min(1, S_FLASH[gs]*1.3)); R(cx, cy, gcw-2, gch_h-1); );
+      isview ? ( C(COL_ACC); R(cx, cy + gch_h - 3, gcw-2, 2); );
+      HIT(cx, cy, gcw-2, gch_h-1) && clk && cap == 0 && brw < 0 ? (
+        view_lock = 1; view_l = gl; view_r = gr;
+        prev_s = gs; prev_l = gl; prev_r = gr; prev_v = floor((glp[0]+glp[1])*0.5); prev_exact = 1; prev_req = 1;
+        cap = -1;
+      );
+      gr += 1;
+    );
+    gcw > 26 ? (
+      F(1); C(COL_FAINT);
+      sprintf(#t, gcw > 60 ? "%d-%d" : "%d", gcw > 60 ? glp[0] : glp[1], glp[1]);
+      T(PX + gl*gcw, GY + GH + 18, gcw-2, 12, #t, 1);
+    );
+    gl += 1;
+  );
+) : ( C(COL_PNL); R(PX, GY+16, PW, GH); );
+
+// parameters
+CW = 137; CG = 16;
+RY1 = 300;
+bar(101, PX + 0*(CW+CG), RY1, CW, base1+1, -60, 12, 0, 0.1, 0, 0, 0, "VOLUME");
+bar(102, PX + 1*(CW+CG), RY1, CW, base1+2, -100, 100, 0, 1, 0, 1, 1, "PAN");
+bar(103, PX + 2*(CW+CG), RY1, CW, base1+3, -24, 24, 0, 0.01, 0, 2, 1, "PITCH");
+bar(104, PX + 3*(CW+CG), RY1, CW, base1+9, 1, 16, 8, 1, 0, 10, 0, "VOICES");
+
+// envelope display: the envelope drawn over the sample it shapes (time axis = sample length)
+EY = 344; EH = 66;
+C(COL_PNL); R(PX, EY, PW, EH);
+e_atk = P(gs,4); e_hold = P(gs,5); e_crv = 1 + P(gs,6)*0.05; e_dec = max(1, P(gs,7));
+einf = e_hold >= 9999.5;
+edur = (S_READY[gs] && wv_s == gs) ? wv_secs*1000 / 2^(P(gs,3)/12) : 1000;
+edur < 1 ? edur = 1;
+eend = einf ? edur : min(edur, e_atk + e_hold + e_dec);
+F(4); C(COL_DIM); T(PX+8, EY+4, 200, 12, "ENVELOPE", 0);
+F(1); C(COL_FAINT);
+fmt_val(eend, 3, #e1); fmt_val(edur, 3, #e2);
+sprintf(#t, "plays %s  /  sample %s", #e1, #e2);
+T(PX+120, EY+4, PW-128, 12, #t, 2);
+gx0 = PX + 8; gw = PW - 16; yt = EY + 20; yb = EY + EH - 5; hh = yb - yt;
+// 1) segment markers (under everything)
+C(COL_LINE);
+e_atk > 0 && e_atk < edur ? R(gx0 + gw*e_atk/edur, yt, 1, hh);
+!einf && e_atk + e_hold < edur ? R(gx0 + gw*(e_atk+e_hold)/edur, yt, 1, hh);
+// 2) original sample (faint) and the part actually heard (red)
+gk = 0;
+loop(150,
+  tms = edur*(gk + 0.5)/150;
+  pk = S_READY[gs] && wv_s == gs ? min(1, max(max(WAVEB[gk*4], WAVEB[gk*4+1]), max(WAVEB[gk*4+2], WAVEB[gk*4+3]))) : 0;
+  C(COL_PNL3); R(gx0 + gk*gw/150, yb - pk*hh, gw/150 - 0.6, pk*hh);
+  CA(COL_ACC, 0.75); ev = env_at(tms); R(gx0 + gk*gw/150, yb - pk*ev*hh, gw/150 - 0.6, pk*ev*hh);
+  gk += 1;
+);
+// 3) envelope line on top
+C(COL_TXT);
+epx = gx0; epy = yb - env_at(0)*hh; gk = 1;
+loop(120,
+  tms = edur*gk/120; nx = gx0 + gw*gk/120; ny = yb - env_at(tms)*hh;
+  LN(epx, epy, nx, ny); epx = nx; epy = ny; gk += 1;
+);
+
+RY2 = 418;
+bar(105, PX + 0*(CW+CG), RY2, CW, base1+4, 0, 500, 0, 0.1, 1, 3, 0, "ATTACK");
+bar(106, PX + 1*(CW+CG), RY2, CW, base1+5, 0, 10000, 10000, 1, 1, 9, 0, "HOLD");
+bar(107, PX + 2*(CW+CG), RY2, CW, base1+7, 1, 5000, 200, 1, 1, 3, 0, "DECAY");
+bar(108, PX + 3*(CW+CG), RY2, CW, base1+6, 0, 100, 50, 1, 0, 11, 0, "CURVE");
+
+RY3 = 462;
+bar(109, PX + 0*(CW+CG), RY3, CW - 46, base1+0, 0, 127, 36, 1, 0, 6, 0, "NOTE");
+button(PX + CW - 40, RY3 + 6, 40, 22, "LEARN", learn_slot == gs) ? (
+  learn_slot == gs ? learn_slot = -1 : ( learn_slot = gs; learn_seen = learn_cnt; );
+);
+bar(110, PX + 1*(CW+CG), RY3, CW, base1+10, 0, 127, 0, 1, 0, 12, 0, "VELOCITY");
+bar(111, PX + 2*(CW+CG), RY3, CW, base1+8, 0, 100, 60, 1, 0, 4, 0, "VEL SENS");
+// velocity readout: last incoming -> played
+VX = PX + 3*(CW+CG);
+F(1); C(COL_DIM); T(VX, RY3, CW, 14, "IN  >  PLAYED", 0);
+F(3);
+S_LASTV[gs] > 0 ? ( C(COL_TXT); sprintf(#t, "%d  >  %d", S_LASTVIN[gs], S_LASTV[gs]); ) : ( C(COL_FAINT); strcpy(#t, "-"); );
+T(VX, RY3 + 12, CW, 22, #t, 0);
+P(gs,10) >= 0.5 && S_LASTV[gs] >= 127 ? ( F(4); C(0xF2C230); T(VX, RY3 + 12, CW, 22, "MAX", 6); );
+
+RY4 = 508;
+seg(203, PX, RY4, 290, base1+11, 2, "CYCLE", "RANDOM", "", "ROUND ROBIN");
+bar(112, PX + 2*(CW+CG), RY4, CW, base1+12, 0, 8, 0, 1, 0, 7, 0, "CHOKE");
+bar(113, PX + 3*(CW+CG), RY4, CW, base1+13, 0, 7, 0, 1, 0, 8, 0, "OUTPUT");
+
+// ---------------------------------------------------------------- browser overlay
+brw >= 0 ? (
+  CA(0x000000, 0.72); R(0, 0, W0, H0);
+  BX = 150; BY = 46; BW = 620; BH = 470;
+  C(COL_PNL); R(BX, BY, BW, BH);
+  C(COL_LINE); FR(BX, BY, BW, BH);
+  C(COL_ACC); R(BX, BY, BW, 2);
+  F(3); C(COL_TXT); sprintf(#t, "LOAD  >  SLOT %02d", brw+1); T(BX+16, BY+10, 400, 26, #t, 4);
+
+  // keyboard: type to search everywhere, Backspace = parent folder, Esc = close
+  chr > 0 ? (
+    chr == 27 ? brw = -1 :
+    chr == 8 ? ( strlen(#filter) > 0 ? strcpy_substr(#filter, #filter, 0, strlen(#filter)-1) : bdir_up(); bscroll = 0; ) :
+    (chr >= 32 && chr < 127 && chr != 37 && chr != 42 && chr != 63) ? ( str_setchar(#filter, strlen(#filter), chr); bscroll = 0; );
+  );
+  C(COL_PNL2); R(BX+16, BY+44, BW-32, 26);
+  F(2);
+  strlen(#filter) ? ( C(COL_TXT); T(BX+26, BY+44, BW-50, 26, #filter, 4); )
+                  : ( C(COL_FAINT); T(BX+26, BY+44, BW-50, 26, "type to search the whole library...", 4); );
+
+  // breadcrumb
+  searching = strlen(#filter) > 0;
+  F(1);
+  searching ? ( C(COL_DIM); strcpy(#t, "Search results (all folders)"); ) : (
+    C(COL_DIM); strcpy(#t, "Data/RSampler/");
+    gk = 0; loop(bdir_len, str_setchar(#t, strlen(#t), BDIRC[gk], 'cu'); gk += 1;);
+  );
+  T(BX+16, BY+76, BW-32, 14, #t, 0);
+
+  // entries
+  nf = 0;
+  searching ? (
+    sprintf(#pat, "*%s*", #filter);
+    gi = 0;
+    loop(nfiles,
+      lib_str(gi, 0, LIBLEN[gi], #tmp);
+      matchi(#pat, #tmp) && nf < MAXFILES ? ( FLB[nf] = gi; FLT[nf] = 0; nf += 1; );
+      gi += 1;
+    );
+  ) : (
+    bdir_len > 0 ? ( FLB[nf] = -1; FLT[nf] = -1; nf += 1; );
+    // folders first (the index is sorted, so a folder's files are contiguous)
+    nf0 = nf; gi = 0;
+    loop(nfiles,
+      lib_prefix(gi) ? (
+        fl = lib_slash(gi);
+        fl > 0 ? (
+          dup = 0; fj = nf - 1;
+          // usually the previous folder (sorted index): checking backwards stops early
+          while( fj >= nf0 && !dup ? ( (FLT[fj] == fl && lib_same_folder(gi, FLB[fj], fl)) ? dup = 1; fj -= 1; 1; ) : 0; );
+          !dup ? ( FLB[nf] = gi; FLT[nf] = fl; nf += 1; );
+        );
+      );
+      gi += 1;
+    );
+    gi = 0;
+    loop(nfiles,
+      lib_prefix(gi) && lib_slash(gi) < 0 ? ( FLB[nf] = gi; FLT[nf] = 0; nf += 1; );
+      gi += 1;
+    );
+  );
+
+  RH = 22; LY = BY + 96; NV = 15;
+  HIT(BX, BY, BW, BH) && mouse_wheel != 0 ? ( bscroll -= mouse_wheel > 0 ? 3 : -3; mouse_wheel = 0; );
+  bscroll = max(0, min(bscroll, nf - NV));
+  gk = 0;
+  loop(min(NV, nf),
+    ei = bscroll + gk; idx = FLB[ei]; et = FLT[ei]; ry = LY + gk*RH;
+    hov = HIT(BX+16, ry, BW-32, RH);
+    C(hov ? COL_PNL3 : ((gk & 1) ? COL_PNL : 0x181A1E)); R(BX+16, ry, BW-32, RH);
+    F(2);
+    et == -1 ? (
+      C(COL_DIM); T(BX+26, ry, BW-60, RH, "..   (parent folder)", 4);
+      hov && clk ? ( bdir_up(); bscroll = 0; cap = -1; );
+    ) : et > 0 ? (
+      C(COL_ACC); R(BX+26, ry+7, 10, 8);
+      lib_str(idx, bdir_len, et, #tmp);
+      C(hov ? COL_TXT : 0xD5D9DE); T(BX+44, ry, BW-90, RH, #tmp, 4);
+      F(4); C(COL_FAINT); T(BX+16, ry, BW-44, RH, "FOLDER", 6);
+      hov && clk ? ( bdir_enter(idx, et); bscroll = 0; cap = -1; );
+    ) : (
+      searching ? lib_str(idx, 0, LIBLEN[idx], #tmp) : lib_str(idx, bdir_len, LIBLEN[idx] - bdir_len, #tmp);
+      iskit = matchi("*.rsk.wav", #tmp);
+      iskit ? strcpy_substr(#tmp, #tmp, 0, strlen(#tmp) - 8);
+      C(hov ? COL_TXT : 0xB8BDC4); T(BX+26, ry, BW-90, RH, #tmp, 4);
+      F(4); C(iskit ? COL_ACC : COL_FAINT); T(BX+16, ry, BW-44, RH, iskit ? "KIT" : "AUDIO", 6);
+      hov && clk ? (
+        lib_str(idx, 0, LIBLEN[idx], #tmp);
+        sprintf(PATHSTR + brw, "RSampler/%s", #tmp);
+        S_LOADREQ[brw] = 1; view_lock = 0;
+        sliderchange(-1);
+        brw = -1; cap = -1;
+      );
+    );
+    gk += 1;
+  );
+  (nf == 0 || (nf == 1 && FLT[0] == -1 && nfiles == 0)) ? (
+    F(2); C(COL_DIM);
+    T(BX+16, LY+40, BW-32, 20, lib_missing ? "Library index not found" : nfiles == 0 ? "Library is empty" : "No match", 1);
+    F(1); C(COL_FAINT);
+    T(BX+16, LY+66, BW-32, 16, "Run the action \"RS Trig Rescan Library\" in REAPER, or drop a file onto a slot.", 1);
+  );
+  nf > NV ? (
+    C(COL_TRK); R(BX+BW-12, LY, 3, NV*RH);
+    C(COL_DIM); R(BX+BW-12, LY + NV*RH*bscroll/nf, 3, max(10, NV*RH*NV/nf));
+  );
+  F(1); C(COL_FAINT);
+  sprintf(#t, "%d item(s)   -   Backspace = parent folder   -   Esc = close   -   wheel = scroll", nf);
+  T(BX+16, BY+BH-26, BW-32, 16, #t, 0);
+  clk && !HIT(BX, BY, BW, BH) && cap == 0 ? ( brw = -1; cap = -1; );
+);
+
+// drag & drop: files dropped on the window fill slots from the one under the mouse
+gfx_getdropfile(0) ? (
+  ds = sel;
+  (mxb >= 8 && mxb < 304 && myb >= 48 && myb < 48 + NSL*55) ? ds = floor((myb - 48)/55);
+  gk = 0;
+  while( (ds + gk < NSL && gfx_getdropfile(gk, #drop)) ? (
+      to_rel(#drop);
+      strcpy(PATHSTR + ds + gk, #drop); S_LOADREQ[ds + gk] = 1;
+      gk += 1; 1; ) : 0; );
+  gfx_getdropfile(-1);
+  sel = ds; view_lock = 0; brw = -1;
+  sliderchange(-1);
+);
+
+mouse_wheel = 0;
+lmb = mb; lrb = rb;
