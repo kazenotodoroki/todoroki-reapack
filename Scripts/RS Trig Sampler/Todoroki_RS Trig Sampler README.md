@@ -10,9 +10,9 @@ Put it after your trigger tool (MIDI) on the track. One instance plays one drum 
 | Package | Installs |
 |---|---|
 | **RS Trig Sampler** (FX) | the JSFX `RS Trig Sampler` |
-| **RS Trig Kit Builder** (Scripts) | actions `RS Trig Kit Builder` and `RS Trig Rescan Library`, a demo kit, this README |
+| **RS Trig Kit Builder** (Scripts) | actions `Todoroki_RS Trig Kit Builder` and `Todoroki_RS Trig Rescan Library`, the page `Todoroki_RS Trig TCI Converter.html`, a demo kit, this README |
 
-After installing, run **RS Trig Rescan Library** once. It creates the library (`<REAPER>/Data/RSampler`) and installs the demo kit.
+After installing, run **Todoroki_RS Trig Rescan Library** once (Actions list: search "RS Trig"). It creates the library (`<REAPER>/Data/RSampler`) and installs the demo kit.
 
 ## The sampler
 
@@ -61,6 +61,21 @@ Pick a `.tci`, then import that file only, or its whole folder tree. Pick a file
 - Decoding is bit-exact: it is the same audio Trigger plays, with the same velocity layers and round robins (e.g. 4 layers x 12 RR, ranges 1-30 / 31-61 / 62-92 / 93-127).
 - Optional: also export every sound as a WAV (`Data/RSampler_TCI_WAV/`).
 - Speed: about 2 s per stereo kit of 48 sounds.
+
+### TCI Converter (web page, whole library)
+
+Open it from **RS Trig Kit Builder > Open TCI converter**. The file is `Todoroki_RS Trig TCI Converter.html`, next to the script.
+
+1. **Source**: pick the top folder of your Trigger library, or drop it onto the page.
+   - The preview shows where every kit will go (element counts, instrument folders).
+2. **Output**: choose one of two modes.
+   - **Write into my library folder** (Chrome / Edge): pick `<REAPER>/Data/RSampler`.
+     - Kits are written in place and `_library.txt` is updated, so you only have to click RESCAN in the sampler.
+     - "Skip kits that already exist" lets you resume an interrupted import.
+   - **Download a ZIP** (any browser, up to ~3.9 GB per ZIP): extract it into `<REAPER>/Data`, then run **RS Trig Rescan Library**.
+3. **Optional WAV export**: every sound is written as a WAV into a separate folder you pick, so the WAVs do not show up in the sampler's browser.
+
+The page works offline from disk and nothing is uploaded. It uses the same decoder and the same organisation as the script, and produces byte-identical kits.
 
 ### Library organisation
 

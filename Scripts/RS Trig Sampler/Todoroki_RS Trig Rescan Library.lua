@@ -3,4 +3,4 @@
 -- Assign it to a shortcut or a toolbar button.
 local dir = debug.getinfo(1, "S").source:match("^@?(.*[/\\])") or ""
 RS_KB_MODE = "rescan"
-dofile(dir .. "RS Trig Kit Builder.lua")
+dofile(dir .. "Todoroki_RS Trig Kit Builder.lua")

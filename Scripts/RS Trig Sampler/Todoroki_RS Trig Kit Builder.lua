@@ -1,7 +1,10 @@
 -- @description RS Trig Kit Builder - TCI import, kit builder and library for RS Trig Sampler
 -- @author Todoroki
--- @version 1.4
+-- @version 1.5
 -- @changelog
+--   - Files renamed with the Todoroki_ prefix, like the other scripts of this repository
+--   - New: RS Trig TCI Converter (browser page) to convert a whole Trigger library folder,
+--     same decoder and organisation, writes straight into Data/RSampler (Chrome / Edge) or a ZIP
 --   - Import Slate Trigger 2 .tci files (bit-exact decoding, velocity layers and round robins kept)
 --   - Automatic library organisation: <Element>/<Instrument>/<name>.rsk.wav
 --   - Build kits from WAV folders (V01_RR1, Vel3, name_025_01 and untagged conventions)
@@ -9,9 +12,10 @@
 --   - English UI
 -- @provides
 --   [main] .
---   [main] RS Trig Rescan Library.lua
---   [nomain] RS Trig Demo Kick.rsk.wav
---   RS Trig Sampler README.md
+--   [main] Todoroki_RS Trig Rescan Library.lua
+--   [nomain] Todoroki_RS Trig Demo Kick.rsk.wav
+--   [nomain] Todoroki_RS Trig TCI Converter.html
+--   Todoroki_RS Trig Sampler README.md
 -- @about
 --   # RS Trig Kit Builder
 --
@@ -21,6 +25,8 @@
 --   - Build multi-velocity / round-robin kits from WAV folders
 --   - Everything lands in `<REAPER>/Data/RSampler`, sorted as Element / Instrument
 --   - "RS Trig Rescan Library" refreshes the list shown in the sampler's browser
+--   - "Todoroki_RS Trig TCI Converter.html" (menu: Open TCI converter) does the same TCI import from a web
+--     browser, handy for a whole library folder
 --
 --   Pure Lua, no extension required (portable REAPER friendly).
 
@@ -785,7 +791,7 @@ local function file_exists(p) local f = io.open(p, "rb"); if f then f:close(); r
 -- first run: copy the demo kit shipped with the script into the library
 local function install_demo()
   local here = (debug.getinfo(1, "S").source:match("^@?(.*[/\\])") or "")
-  local src = here .. "RS Trig Demo Kick.rsk.wav"
+  local src = here .. "Todoroki_RS Trig Demo Kick.rsk.wav"
   local dst_dir = join(lib_dir(), "Kick")
   local dst = join(dst_dir, "Demo Kick.rsk.wav")
   if file_exists(dst) or not file_exists(src) then return false end
@@ -807,6 +813,17 @@ local function open_folder(d)
   if reaper.CF_ShellExecute then reaper.CF_ShellExecute(d)
   elseif SEP == "\\" then os.execute('explorer "' .. d .. '"')
   else os.execute('open "' .. d .. '" 2>/dev/null || xdg-open "' .. d .. '"') end
+end
+
+local function open_converter()
+  local here = (debug.getinfo(1, "S").source:match("^@?(.*[/\\])") or "")
+  local page = here .. "Todoroki_RS Trig TCI Converter.html"
+  if not file_exists(page) then msg("Converter page not found:\n" .. page); return end
+  if reaper.CF_ShellExecute then reaper.CF_ShellExecute(page)
+  elseif SEP == "\\" then os.execute('start "" "' .. page .. '"')
+  else os.execute('open "' .. page .. '" 2>/dev/null || xdg-open "' .. page .. '"') end
+  reaper.ShowConsoleMsg("\nRS Trig TCI Converter: " .. page ..
+    "\nIn the page, pick the folder " .. lib_dir() .. " as output.\n")
 end
 
 local function out_path(it)
@@ -939,13 +956,14 @@ local function main()
   ensure_library()
   gfx.init(TITLE, 220, 40)
   gfx.x, gfx.y = 10, 10
-  local m = gfx.showmenu("Import .tci files (Slate Trigger 2)...|Build kits from a WAV folder...|Unpack a .rsk.wav kit to WAV files...||Rescan library|Open library folder (Data/RSampler)")
+  local m = gfx.showmenu("Import .tci files (Slate Trigger 2)...|Open TCI converter (web browser, whole library)...|Build kits from a WAV folder...|Unpack a .rsk.wav kit to WAV files...||Rescan library|Open library folder (Data/RSampler)")
   gfx.quit()
   if m == 1 then action_import_tci()
-  elseif m == 2 then action_build()
-  elseif m == 3 then action_unpack()
-  elseif m == 4 then action_rescan(false)
-  elseif m == 5 then open_folder(lib_dir()) end
+  elseif m == 2 then open_converter()
+  elseif m == 3 then action_build()
+  elseif m == 4 then action_unpack()
+  elseif m == 5 then action_rescan(false)
+  elseif m == 6 then open_folder(lib_dir()) end
 end
 
 if reaper and RS_KB_MODE == "rescan" then

@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RS Trig TCI Converter</title>
+<!-- RS Trig TCI Converter - part of the RS Trig Sampler package (ReaPack: Todoroki).
+     Converts Slate Trigger 2 .tci files into RS Trig Sampler kits (.rsk.wav), sorted as
+     <Element>/<Instrument>/<name>. Works offline from disk; your files never leave the computer. -->
+<style>
+:root{
+  --bg:#0E0F11; --hdr:#0A0B0C; --pnl:#15171B; --pnl2:#1D2025; --pnl3:#272B31; --line:#2A2E35;
+  --txt:#E4E7EB; --dim:#7D838D; --faint:#4A4F57; --acc:#B0161E; --acc2:#D6343B; --rose:#C98C8F; --warn:#F2C230;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.45 "Segoe UI",system-ui,-apple-system,Arial,sans-serif}
+button,input,select{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:14px;height:48px;padding:0 20px;background:var(--hdr);border-bottom:1px solid var(--line)}
+header .logo{width:12px;height:12px;background:var(--acc)}
+header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.02em}
+header .sub{color:var(--dim);font-size:11px;font-weight:700;letter-spacing:.08em}
+header .ver{margin-left:auto;color:var(--faint);font-size:11px}
+main{max-width:1180px;margin:0 auto;padding:18px 20px 40px;display:grid;gap:14px}
+section{background:var(--pnl);border-left:3px solid transparent;padding:16px 18px}
+section.active{border-left-color:var(--acc)}
+h2{margin:0 0 10px;font-size:11px;letter-spacing:.1em;color:var(--dim);font-weight:700}
+h2 b{color:var(--txt)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{background:var(--pnl2);border:0;padding:8px 14px;font-weight:700;font-size:11px;letter-spacing:.06em;cursor:pointer;color:var(--dim)}
+.btn:hover{background:var(--pnl3);color:var(--txt)}
+.btn.primary{background:var(--acc);color:#fff}
+.btn.primary:hover{background:var(--acc2)}
+.btn:disabled{opacity:.35;cursor:default}
+.drop{border:1px dashed var(--line);padding:22px;text-align:center;color:var(--dim);margin-top:12px}
+.drop.over{border-color:var(--acc2);color:var(--txt);background:#1a1214}
+.muted{color:var(--dim)} .faint{color:var(--faint)} .warn{color:var(--warn)} .ok{color:#8fd19e} .err{color:var(--acc2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{background:var(--pnl2);padding:3px 9px;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--dim)}
+.chip b{color:var(--txt);margin-left:4px}
+.tablewrap{max-height:340px;overflow:auto;border-top:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{position:sticky;top:0;background:var(--pnl2);text-align:left;font-size:10px;letter-spacing:.08em;color:var(--dim);padding:6px 8px;font-weight:700}
+td{padding:5px 8px;border-bottom:1px solid #1b1e22;vertical-align:top;word-break:break-word}
+td.src{color:var(--dim);width:42%}
+td.el{font-weight:700;width:9%}
+td.st{width:16%;font-size:11px}
+tr:hover td{background:#181a1e}
+input[type=text]{background:var(--pnl2);border:0;padding:7px 10px;min-width:240px;outline:none}
+input[type=text]:focus{background:var(--pnl3)}
+label.opt{display:flex;gap:8px;align-items:flex-start;cursor:pointer;padding:6px 0}
+label.opt input{accent-color:var(--acc);margin-top:3px}
+.choice{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.card{background:var(--pnl2);padding:12px 14px;cursor:pointer;border-left:3px solid transparent}
+.card.on{border-left-color:var(--acc);background:#22191b}
+.card.off{opacity:.45;cursor:default}
+.card h3{margin:0 0 4px;font-size:13px}
+.card p{margin:0;color:var(--dim);font-size:12px}
+.bar{height:4px;background:var(--pnl3);margin:12px 0 6px}
+.bar i{display:block;height:100%;width:0;background:var(--acc)}
+#log{background:#0b0c0e;max-height:220px;overflow:auto;padding:8px 10px;font:11px/1.5 Consolas,monospace;color:var(--dim);white-space:pre-wrap}
+.hide{display:none!important}
+@media (max-width:760px){.choice{grid-template-columns:1fr} td.src{width:auto}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"></div><h1>RS TRIG</h1><span class="sub">TCI CONVERTER</span>
+  <span class="ver">v1.4 - offline, nothing is uploaded</span>
+</header>
+<main>
+
+<section id="s1" class="active">
+  <h2>1 &nbsp;<b>SOURCE</b> &nbsp;- your Slate Trigger 2 library (.tci)</h2>
+  <div class="row">
+    <button class="btn primary" id="pickDir">CHOOSE LIBRARY FOLDER</button>
+    <button class="btn" id="pickFiles">CHOOSE .TCI FILES</button>
+    <span class="muted" id="srcInfo">Pick the top folder of your library to convert everything at once.</span>
+  </div>
+  <input type="file" id="inDir" webkitdirectory multiple class="hide">
+  <input type="file" id="inFiles" accept=".tci" multiple class="hide">
+  <div class="drop" id="drop">or drop a folder / .tci files here</div>
+</section>
+
+<section id="s2">
+  <h2>2 &nbsp;<b>PREVIEW</b> &nbsp;- where every kit goes (Element / Instrument / name)</h2>
+  <div class="chips" id="chips"><span class="chip">no files yet</span></div>
+  <div class="row" style="margin-bottom:8px">
+    <input type="text" id="filter" placeholder="filter...">
+    <span class="faint" id="shown"></span>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>SOURCE</th><th>ELEMENT</th><th>INSTRUMENT / NAME</th><th>STATUS</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+</section>
+
+<section id="s3">
+  <h2>3 &nbsp;<b>OUTPUT</b></h2>
+  <div class="choice">
+    <div class="card on" id="modeDir">
+      <h3>Write into my library folder</h3>
+      <p>Pick <b>&lt;REAPER&gt;/Data/RSampler</b>. Kits are written in place and the library index is updated:
+         click RESCAN in the sampler and you are done. Chrome / Edge.</p>
+    </div>
+    <div class="card" id="modeZip">
+      <h3>Download a ZIP</h3>
+      <p>Extract it into <b>&lt;REAPER&gt;/Data</b>, then run the action <b>RS Trig Rescan Library</b>.
+         Any browser, up to ~3.9 GB per ZIP.</p>
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px" id="dirRow">
+    <button class="btn" id="pickOut">PICK DATA/RSAMPLER FOLDER</button>
+    <span class="muted" id="outInfo">no folder picked</span>
+  </div>
+  <label class="opt"><input type="checkbox" id="optSkip" checked>
+    <span>Skip kits that already exist <span class="faint">(resume an interrupted import)</span></span></label>
+  <label class="opt"><input type="checkbox" id="optWav">
+    <span>Also export every sound as a WAV file <span class="faint">(name_V01_RR01.wav - in a separate folder so they do not show up in the sampler's browser)</span></span></label>
+  <div class="row hide" id="wavRow">
+    <button class="btn" id="pickWav">PICK WAV EXPORT FOLDER</button>
+    <span class="muted" id="wavInfo">e.g. &lt;REAPER&gt;/Data/RSampler_TCI_WAV</span>
+  </div>
+  <div class="row" style="margin-top:14px">
+    <button class="btn primary" id="go" disabled>CONVERT</button>
+    <button class="btn hide" id="stop">STOP</button>
+    <span class="muted" id="status"></span>
+  </div>
+  <div class="bar"><i id="prog"></i></div>
+  <div id="log" class="hide"></div>
+</section>
+
+<section>
+  <h2>NOTES</h2>
+  <p class="muted" style="margin:0">
+    Decoding is bit-exact (same audio as Trigger plays, same velocity layers and round robins) and produces exactly the same
+    files as the <b>RS Trig Kit Builder</b> script in REAPER. The Trigger Instrument Editor applies a gain to every sound of a
+    multi-sound .tci: kits keep that level, like Trigger. Large stereo kits (4 x 12 sounds) are about 2 min 30 of audio and
+    ~55 MB on disk each.
+  </p>
+</section>
+</main>
+
+<script id="rscore">
+/* RS Trig TCI Converter - core (shared by the page and the Node tests).
+   Mirrors "RS Trig Kit Builder.lua": same TCI decoder, same kit format, same library organisation. */
+(function (root, factory) {
+  if (typeof module !== 'undefined' && module.exports) module.exports = factory();
+  else root.RSCore = factory();
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+  const MAGIC = -7337.25, MAX_LAYERS = 32, MAX_RR = 16;
+  const AUDIO_EXT = { wav: 1, flac: 1, ogg: 1, aif: 1, aiff: 1, mp3: 1 };
+
+  // ------------------------------------------------------------ TCI reading
+  // 64-byte "TRIGGER COMPRESSED INSTRUMENT" header, then records [id u32][size u32][data]
+  function tciRead(u8) {
+    if (u8.length < 72) throw new Error('not a TCI file');
+    const magic = String.fromCharCode.apply(null, u8.subarray(0, 8));
+    if (magic !== 'TRIGGER ') throw new Error('not a TCI file');
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    const t = { sr: 44100, waves: [], layers: [] };
+    let pos = 64, cur = null;
+    while (pos + 8 <= u8.length) {
+      const id = dv.getUint32(pos, true), len = dv.getUint32(pos + 4, true);
+      pos += 8;
+      if (len > u8.length - pos) throw new Error('unexpected TCI structure (truncated record)');
+      if (id === 0x14 && len === 4) t.sr = dv.getUint32(pos, true);
+      else if (id === 0x05) t.waves.push({ start: pos, len });
+      else if (id === 0x0b) { cur = { lo: 0, idx: [] }; t.layers.push(cur); }
+      else if (id === 0x0c && cur && len === 4) cur.lo = dv.getUint32(pos, true);
+      else if (id === 0x0f && cur && len === 4) cur.idx.push(dv.getUint32(pos, true));
+      else if (id === 0x12) cur = null;
+      pos += len;
+    }
+    if (!t.waves.length) throw new Error('no sound found (different TCI format?)');
+    return t;
+  }
+
+  // one sound: [channels u8][bit count u32][value count u32] then blocks [k u8][201 x k bits],
+  // each value = sign bit + (k-1)-bit magnitude on a 24-bit scale, MSB first, channels interleaved.
+  // The last value is not stored. Returns { nch, frames, sr, pcm: Float32Array (interleaved), complete }
+  function decodeWave(u8, rec, sr) {
+    const s = rec.start;
+    const nch = u8[s];
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    const comp = dv.getUint32(s + 1, true), count = dv.getUint32(s + 5, true);
+    if (nch < 1 || nch > 2 || count < 2) throw new Error('invalid sound header');
+    const base = (s + 9) * 8, end = u8.length * 8;
+    const out = new Float32Array(count);
+    const scale = 1 / 8388608;
+    let pos = 0, n = 0, ok = true;
+    const need = count - 1;
+    function bits(p, k) {               // k <= 32, exact with doubles (<= 40 bits)
+      const a = base + p;
+      if (a + k > end) return -1;
+      let bi = a >>> 3, off = a & 7, v = 0;
+      const nb = (off + k + 7) >>> 3;
+      for (let i = 0; i < nb; i++) v = v * 256 + u8[bi + i];
+      v = Math.floor(v / Math.pow(2, nb * 8 - off - k));
+      return v % Math.pow(2, k);
+    }
+    while (n < need) {
+      const k = bits(pos, 8); pos += 8;
+      const take = Math.min(201, need - n);
+      if (k < 1 || k > 32 || pos + take * k > comp) { ok = false; break; }
+      const half = Math.pow(2, k - 1);
+      for (let i = 0; i < take; i++) {
+        const v = bits(pos, k); pos += k;
+        const m = v % half;
+        out[n++] = (v >= half && m ? -m : m) * scale;   // no negative zero (same bytes as the Lua importer)
+      }
+    }
+    return { nch, sr, frames: Math.floor(count / nch), pcm: out, complete: ok && n === need };
+  }
+
+  // ------------------------------------------------------------ kit writing (.rsk.wav)
+  // layers: [{ waves: [w, ...], vhi }] in ascending velocity order. Returns { bytes: Uint8Array, info }
+  function buildKit(layers) {
+    let nch = 1; const srCount = {};
+    for (const L of layers) for (const w of L.waves) { if (w.nch === 2) nch = 2; srCount[w.sr] = (srCount[w.sr] || 0) + 1; }
+    let sr = 44100, best = -1;
+    for (const k in srCount) if (srCount[k] > best) { sr = +k; best = srCount[k]; }
+    let good = [], goodHi = [];
+    for (const L of layers) {
+      let f = L.waves.filter(w => w.frames > 1);
+      if (f.length) { if (f.length > MAX_RR) f = f.slice(0, MAX_RR); good.push(f); goodHi.push(L.vhi); }
+    }
+    if (!good.length) throw new Error('no readable sound');
+    while (good.length > MAX_LAYERS) { good.shift(); goodHi.shift(); }
+    const NL = good.length, los = [], his = [];
+    const useHi = goodHi.every(v => v !== undefined && v !== null);
+    for (let i = 0; i < NL; i++) {
+      if (useHi) {
+        his[i] = (i === NL - 1) ? 127 : Math.max(1, Math.min(127, Math.floor(goodHi[i])));
+        los[i] = (i === 0) ? 1 : Math.min(his[i - 1] + 1, 127);
+        if (his[i] < los[i]) his[i] = los[i];
+      } else {
+        los[i] = Math.floor(i * 127 / NL) + 1;
+        his[i] = Math.floor((i + 1) * 127 / NL);
+      }
+    }
+    let hdrLen = 5;
+    for (const f of good) hdrLen += 3 + 2 * f.length;
+    if (hdrLen % nch) hdrLen += nch - hdrLen % nch;
+    let frame = hdrLen / nch;
+    const hdr = [MAGIC, 1, nch, NL, hdrLen], order = [];
+    good.forEach((f, li) => {
+      hdr.push(los[li], his[li], f.length);
+      for (const w of f) { hdr.push(frame, w.frames); order.push(w); frame += w.frames; }
+    });
+    while (hdr.length < hdrLen) hdr.push(0);
+    if (frame >= 16777216) throw new Error('kit too long (offsets > 16.7M frames)');
+    const total = frame * nch;
+    const bytes = new Uint8Array(44 + total * 4);
+    const dv = new DataView(bytes.buffer);
+    const wr = (o, s) => { for (let i = 0; i < s.length; i++) bytes[o + i] = s.charCodeAt(i); };
+    wr(0, 'RIFF'); dv.setUint32(4, 36 + total * 4, true); wr(8, 'WAVE');
+    wr(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 3, true); dv.setUint16(22, nch, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * nch * 4, true); dv.setUint16(32, nch * 4, true); dv.setUint16(34, 32, true);
+    wr(36, 'data'); dv.setUint32(40, total * 4, true);
+    const f32 = new Float32Array(bytes.buffer, 44, total);
+    f32.set(hdr, 0);
+    let o = hdrLen;
+    for (const w of order) {
+      const nf = Math.min(w.frames, Math.floor(sr * 0.003));
+      if (w.nch === nch) f32.set(w.pcm.subarray(0, w.frames * nch), o);
+      else for (let i = 0; i < w.frames; i++) { f32[o + 2 * i] = w.pcm[i]; f32[o + 2 * i + 1] = w.pcm[i]; }   // mono -> stereo
+      for (let fi = 0; fi < nf; fi++) {               // 3 ms end fade: a hard-cut sample clicks
+        const g = (nf - 1 - fi) / nf, fr = w.frames - nf + fi;
+        for (let c = 0; c < nch; c++) f32[o + fr * nch + c] = Math.fround(f32[o + fr * nch + c] * g);
+      }
+      o += w.frames * nch;
+    }
+    const nrr = Math.max(...good.map(f => f.length));
+    const rng = los.map((l, i) => l + '-' + his[i]).join(' ');
+    return { bytes, info: `${NL} velocity layer(s) x ${nrr} RR, ${nch === 2 ? 'stereo' : 'mono'}, ${sr} Hz, ${(frame / sr).toFixed(2)} s  [vel ${rng}]`,
+             layers: NL, rr: nrr, nch, seconds: frame / sr };
+  }
+
+  function floatWav(w) {   // one decoded sound as a 32-bit float WAV
+    const n = w.frames * w.nch, bytes = new Uint8Array(44 + n * 4), dv = new DataView(bytes.buffer);
+    const wr = (o, s) => { for (let i = 0; i < s.length; i++) bytes[o + i] = s.charCodeAt(i); };
+    wr(0, 'RIFF'); dv.setUint32(4, 36 + n * 4, true); wr(8, 'WAVE'); wr(12, 'fmt '); dv.setUint32(16, 16, true);
+    dv.setUint16(20, 3, true); dv.setUint16(22, w.nch, true); dv.setUint32(24, w.sr, true); dv.setUint32(28, w.sr * w.nch * 4, true);
+    dv.setUint16(32, w.nch * 4, true); dv.setUint16(34, 32, true); wr(36, 'data'); dv.setUint32(40, n * 4, true);
+    new Float32Array(bytes.buffer, 44, n).set(w.pcm.subarray(0, n));
+    return bytes;
+  }
+
+  // one .tci -> kit bytes (+ decoded sounds per layer for the optional WAV export)
+  function convertTci(u8) {
+    const t = tciRead(u8);
+    let ls = t.layers.filter(L => L.idx.length);
+    if (!ls.length) ls = t.waves.map((_, i) => ({ lo: Math.floor(i * 128 / t.waves.length), idx: [i] }));
+    ls = ls.slice().sort((a, b) => a.lo - b.lo);
+    const dec = {}; let bad = 0;
+    const kl = ls.map((L, li) => {
+      const waves = [];
+      for (const wi of L.idx) {
+        if (!dec[wi] && t.waves[wi]) { dec[wi] = decodeWave(u8, t.waves[wi], t.sr); if (!dec[wi].complete) bad++; }
+        if (dec[wi]) waves.push(dec[wi]);
+      }
+      const nx = ls[li + 1];
+      return { waves, vhi: nx ? nx.lo - 1 : 127 };
+    });
+    const kit = buildKit(kl);
+    kit.bad = bad; kit.layerWaves = kl.map(L => L.waves);
+    return kit;
+  }
+
+  // ------------------------------------------------------------ library organisation
+  // <Element>/<Instrument>/<name>.rsk.wav, library names ignored.
+  const tokens = s => s.toLowerCase().match(/[a-z0-9]+/g) || [];
+  function elementOf(name) {
+    const l = name.toLowerCase(), tk = tokens(name), has = new Set(tk);
+    if (l.includes('kick') || has.has('bd') || has.has('bassdrum') || l.includes('bass drum')) return 'Kick';
+    if (l.includes('snare') || has.has('sd') || has.has('snr') || has.has('sn')) return 'Snare';
+    if (l.includes('hihat') || l.includes('hi-hat') || l.includes('hi hat') || has.has('hh') || has.has('hat') || has.has('hats')) return 'HiHat';
+    if (['cymbal', 'crash', 'ride', 'china', 'splash'].some(w => l.includes(w)) || has.has('cym')) return 'Cymbal';
+    for (const w of tk) if (/^toms?\d*$/.test(w) || /^t\d$/.test(w) || w.startsWith('floortom') || w.startsWith('racktom')) return 'Tom';
+    if (['perc', 'clap', 'shaker', 'tamb', 'cowbell', 'snap'].some(w => l.includes(w))) return 'Percussion';
+    return null;
+  }
+  const GENERIC = new Set(['individuals', 'individual', 'mics', 'mic', 'raw', 'processed', 'lo', 'low', 'mid', 'middle',
+    'hi', 'high', 'soft', 'medium', 'hard', 'samples', 'multis', 'wav', 'tci']);
+  const ELWORDS = new Set(['kick', 'kicks', 'snare', 'snares', 'tom', 'toms', 'floor', 'rack', 'hihat', 'hihats', 'hat', 'hats',
+    'cymbal', 'cymbals', 'perc', 'percussion', 'bd', 'sd', 'drum', 'drums']);
+  function stripNumber(name) { const r = name.replace(/^\d+[\s._-]+/, ''); return r === '' ? name : r; }
+  const isGeneric = n => GENERIC.has(stripNumber(n).toLowerCase().replace(/[\s_-]+/g, ''));
+  function isElementOnly(name) {
+    let n = stripNumber(name).toLowerCase();
+    if (/\d/.test(n)) return false;
+    n = n.replace(/[\s_-]+/g, ' ').trim();
+    if (!n) return false;
+    return n.split(' ').every(w => ELWORDS.has(w));
+  }
+  // items: [{ dirs: [...], base, root }] -> adds element, inst, name (unique)
+  function organise(items) {
+    for (const it of items) {
+      const parts = it.dirs.concat([it.base]);
+      let el = null;
+      for (let i = parts.length - 1; i >= 0 && !el; i--) el = elementOf(parts[i]);
+      if (!el && it.root) el = elementOf(it.root);
+      it.element = el || 'Other';
+      it.below = []; it.above = [];
+      let ii = -1;
+      for (let i = it.dirs.length - 1; i >= 0; i--) if (!isGeneric(it.dirs[i]) && !isElementOnly(it.dirs[i])) { ii = i; break; }
+      it.src = it.dirs.slice(0, ii + 1).join('/');
+      if (ii >= 0) {
+        it.inst = stripNumber(it.dirs[ii]);
+        for (let i = ii + 1; i < it.dirs.length; i++) it.below.push(stripNumber(it.dirs[i]));
+        for (let i = ii - 1; i >= 0; i--) it.above.push(stripNumber(it.dirs[i]));
+      } else {
+        const r = it.root ? stripNumber(it.root) : '';
+        it.inst = (r && !isGeneric(r) && !isElementOnly(r)) ? r : it.base;
+        for (const d of it.dirs) it.below.push(stripNumber(d));
+      }
+      it.name = it.base;
+    }
+    const key = it => (it.element + '/' + it.inst + '/' + it.name).toLowerCase();
+    const collisions = () => {
+      const g = new Map(), bad = [];
+      for (const it of items) { const k = key(it); if (!g.has(k)) g.set(k, []); g.get(k).push(it); }
+      for (const l of g.values()) if (l.length > 1) bad.push(...l);
+      return bad;
+    };
+    const fix = new Set();
+    for (const it of collisions()) if (it.below.length) fix.add(it.src);
+    for (const it of items) if (fix.has(it.src) && it.below.length) it.name = it.below.join(' ') + ' ' + it.base;
+    for (let level = 0; level < 3; level++) {
+      const tag = new Set();
+      for (const it of collisions()) if (it.above[level]) tag.add(it.src);
+      if (!tag.size) break;
+      for (const it of items) if (tag.has(it.src) && it.above[level]) it.inst += ' (' + it.above[level] + ')';
+    }
+    const seen = new Map();
+    for (const it of items) {
+      const k = key(it);
+      if (seen.has(k)) { seen.set(k, seen.get(k) + 1); it.name += ' ' + seen.get(k); } else seen.set(k, 1);
+    }
+    return items;
+  }
+  const cleanName = s => s.replace(/[<>:"/\\|?*]/g, '_');
+  const naturalKey = s => s.toLowerCase().replace(/\d+/g, d => String(+d).padStart(12, '0'));
+  const naturalCmp = (a, b) => { const x = naturalKey(a), y = naturalKey(b); return x < y ? -1 : x > y ? 1 : 0; };
+
+  // ------------------------------------------------------------ ZIP (store, streamed parts)
+  const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function ZipWriter() {
+    const parts = [], central = []; let offset = 0;
+    const enc = new TextEncoder();
+    this.add = (path, data) => {
+      const name = enc.encode(path), crc = crc32(data);
+      const h = new Uint8Array(30 + name.length), dv = new DataView(h.buffer);
+      dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint16(6, 0x0800, true);
+      dv.setUint32(14, crc, true); dv.setUint32(18, data.length, true); dv.setUint32(22, data.length, true);
+      dv.setUint16(26, name.length, true); h.set(name, 30);
+      parts.push(h, data);
+      central.push({ name, crc, size: data.length, offset });
+      offset += h.length + data.length;
+    };
+    this.size = () => offset;
+    this.finish = () => {
+      let cs = 0; const cparts = [];
+      for (const e of central) {
+        const c = new Uint8Array(46 + e.name.length), dv = new DataView(c.buffer);
+        dv.setUint32(0, 0x02014b50, true); dv.setUint16(4, 20, true); dv.setUint16(6, 20, true); dv.setUint16(8, 0x0800, true);
+        dv.setUint32(16, e.crc, true); dv.setUint32(20, e.size, true); dv.setUint32(24, e.size, true);
+        dv.setUint16(28, e.name.length, true); dv.setUint32(42, e.offset, true); c.set(e.name, 46);
+        cparts.push(c); cs += c.length;
+      }
+      const end = new Uint8Array(22), dv = new DataView(end.buffer);
+      dv.setUint32(0, 0x06054b50, true); dv.setUint16(8, central.length, true); dv.setUint16(10, central.length, true);
+      dv.setUint32(12, cs, true); dv.setUint32(16, offset, true);
+      return parts.concat(cparts, [end]);
+    };
+  }
+
+  return { tciRead, decodeWave, buildKit, floatWav, convertTci, elementOf, organise, cleanName, naturalCmp, ZipWriter, crc32, AUDIO_EXT };
+}));
+
+</script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const C = window.RSCore;
+const hasFS = typeof window.showDirectoryPicker === 'function';
+let items = [], outDir = null, wavDir = null, mode = hasFS ? 'dir' : 'zip', running = false, stopReq = false;
+
+// ---------------------------------------------------------------- worker (decoding off the UI thread)
+const workerSrc = $('rscore').textContent + `
+self.onmessage = e => {
+  const { id, buf, wavs } = e.data;
+  try {
+    const kit = C_convert(new Uint8Array(buf), wavs);
+    self.postMessage(kit, [kit.bytes.buffer].concat(kit.wavs.map(w => w.bytes.buffer)));
+  } catch (err) { self.postMessage({ id, error: String(err && err.message || err) }); }
+  function C_convert(u8, wantWav) {
+    const k = RSCore.convertTci(u8);
+    const out = { id, bytes: k.bytes, info: k.info, bad: k.bad, wavs: [] };
+    if (wantWav) k.layerWaves.forEach((ws, li) => ws.forEach((w, ri) =>
+      out.wavs.push({ li: li + 1, ri: ri + 1, bytes: RSCore.floatWav(w) })));
+    return out;
+  }
+};`;
+const worker = new Worker(URL.createObjectURL(new Blob([workerSrc], { type: 'application/javascript' })));
+let pending = null;
+worker.onmessage = e => { const p = pending; pending = null; if (p) p(e.data); };
+const convertInWorker = (buf, wavs) => new Promise(res => { pending = res; worker.postMessage({ id: 1, buf, wavs }, [buf]); });
+
+// ---------------------------------------------------------------- source
+$('pickDir').onclick = () => $('inDir').click();
+$('pickFiles').onclick = () => $('inFiles').click();
+$('inDir').onchange = e => setSource([...e.target.files].map(f => ({ file: f, rel: f.webkitRelativePath || f.name })));
+$('inFiles').onchange = e => setSource([...e.target.files].map(f => ({ file: f, rel: f.name })));
+const drop = $('drop');
+drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+drop.ondragleave = () => drop.classList.remove('over');
+drop.ondrop = async e => {
+  e.preventDefault(); drop.classList.remove('over');
+  const entries = [...e.dataTransfer.items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  const list = [];
+  async function walk(entry, path) {
+    if (entry.isFile) {
+      const f = await new Promise((res, rej) => entry.file(res, rej));
+      list.push({ file: f, rel: path + entry.name });
+    } else if (entry.isDirectory) {
+      const r = entry.createReader();
+      let batch;
+      do { batch = await new Promise((res, rej) => r.readEntries(res, rej)); for (const c of batch) await walk(c, path + entry.name + '/'); }
+      while (batch.length);
+    }
+  }
+  $('srcInfo').textContent = 'reading dropped items...';
+  for (const en of entries) await walk(en, '');
+  setSource(list);
+};
+
+function setSource(list) {
+  const tci = list.filter(x => /\.tci$/i.test(x.file.name));
+  items = tci.map(x => {
+    const parts = x.rel.split('/').filter(Boolean);
+    const root = parts.length > 1 ? parts[0] : '';
+    return { file: x.file, rel: x.rel, dirs: parts.slice(parts.length > 1 ? 1 : 0, -1), base: x.file.name.replace(/\.tci$/i, ''), root, state: '' };
+  });
+  items.sort((a, b) => C.naturalCmp(a.dirs.join('/') + '/' + a.base, b.dirs.join('/') + '/' + b.base));
+  C.organise(items);
+  const bytes = items.reduce((s, it) => s + it.file.size, 0);
+  const roots = [...new Set(items.map(it => it.root).filter(Boolean))];
+  $('srcInfo').innerHTML = items.length
+    ? `<b>${items.length}</b> .tci file(s), ${(bytes / 1e9).toFixed(2)} GB${roots.length ? ' from <b>' + esc(roots.join(', ')) + '</b>' : ''}`
+    : '<span class="warn">no .tci file found in this selection</span>';
+  $('s1').classList.remove('active'); $('s2').classList.add('active'); $('s3').classList.add('active');
+  renderTable(); refreshGo();
+}
+
+// ---------------------------------------------------------------- preview
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function renderTable() {
+  const counts = {};
+  items.forEach(it => counts[it.element] = (counts[it.element] || 0) + 1);
+  const insts = new Set(items.map(it => it.element + '/' + it.inst)).size;
+  $('chips').innerHTML = items.length
+    ? Object.keys(counts).sort().map(k => `<span class="chip">${esc(k)}<b>${counts[k]}</b></span>`).join('') +
+      `<span class="chip">INSTRUMENT FOLDERS<b>${insts}</b></span>`
+    : '<span class="chip">no files yet</span>';
+  const q = $('filter').value.trim().toLowerCase();
+  const shown = items.filter(it => !q || (it.rel + ' ' + it.element + ' ' + it.inst + ' ' + it.name).toLowerCase().includes(q));
+  const max = 1500;
+  $('rows').innerHTML = shown.slice(0, max).map(it => {
+    const i = items.indexOf(it);
+    return `<tr><td class="src">${esc(it.rel)}</td><td class="el">${esc(it.element)}</td>` +
+      `<td>${esc(it.inst)} <span class="faint">/</span> ${esc(it.name)}</td><td class="st" id="st${i}">${it.state}</td></tr>`;
+  }).join('');
+  $('shown').textContent = items.length ? `${Math.min(shown.length, max)} / ${items.length} shown` : '';
+}
+$('filter').oninput = renderTable;
+
+// ---------------------------------------------------------------- output
+function setMode(m) {
+  if (m === 'dir' && !hasFS) return;
+  mode = m;
+  $('modeDir').classList.toggle('on', m === 'dir'); $('modeZip').classList.toggle('on', m === 'zip');
+  $('dirRow').classList.toggle('hide', m !== 'dir');
+  $('optSkip').parentElement.classList.toggle('hide', m !== 'dir');
+  $('wavRow').classList.toggle('hide', !(m === 'dir' && $('optWav').checked));
+  refreshGo();
+}
+$('modeDir').onclick = () => setMode('dir');
+$('modeZip').onclick = () => setMode('zip');
+if (!hasFS) {
+  $('modeDir').classList.add('off');
+  $('modeDir').querySelector('p').innerHTML += '<br><span class="warn">Not available in this browser: use Chrome or Edge, or the ZIP.</span>';
+}
+$('optWav').onchange = () => setMode(mode);
+$('pickOut').onclick = async () => {
+  try {
+    outDir = await window.showDirectoryPicker({ id: 'rsampler', mode: 'readwrite' });
+    $('outInfo').innerHTML = '<b>' + esc(outDir.name) + '</b>' + (outDir.name.toLowerCase() === 'rsampler' ? ' <span class="ok">ok</span>'
+      : ' <span class="warn">- expected the folder named RSampler inside &lt;REAPER&gt;/Data</span>');
+  } catch (e) { /* cancelled */ }
+  refreshGo();
+};
+$('pickWav').onclick = async () => {
+  try { wavDir = await window.showDirectoryPicker({ id: 'rsampler-wav', mode: 'readwrite' }); $('wavInfo').innerHTML = '<b>' + esc(wavDir.name) + '</b>'; }
+  catch (e) {}
+  refreshGo();
+};
+function refreshGo() {
+  const okOut = mode === 'zip' || (outDir && (!$('optWav').checked || wavDir));
+  $('go').disabled = running || !items.length || !okOut;
+}
+setMode(mode);
+
+// ---------------------------------------------------------------- conversion
+function log(s, cls) {
+  const el = $('log'); el.classList.remove('hide');
+  const line = document.createElement('div'); if (cls) line.className = cls; line.textContent = s;
+  el.appendChild(line); el.scrollTop = el.scrollHeight;
+}
+function setState(i, html) { items[i].state = html; const el = $('st' + i); if (el) el.innerHTML = html; }
+async function subdir(dir, names) { for (const n of names) dir = await dir.getDirectoryHandle(n, { create: true }); return dir; }
+async function exists(dir, names, file) {
+  try { for (const n of names) dir = await dir.getDirectoryHandle(n); await dir.getFileHandle(file); return true; } catch (e) { return false; }
+}
+async function writeFile(dir, name, bytes) {
+  const fh = await dir.getFileHandle(name, { create: true });
+  const w = await fh.createWritable(); await w.write(bytes); await w.close();
+}
+async function writeIndex(root) {
+  const list = [];
+  async function scan(dir, rel) {
+    for await (const [name, h] of dir.entries()) {
+      if (h.kind === 'directory') await scan(h, rel + name + '/');
+      else { const ext = (name.match(/\.([^.]+)$/) || [, ''])[1].toLowerCase(); if (C.AUDIO_EXT[ext]) list.push(rel + name); }
+    }
+  }
+  await scan(root, '');
+  list.sort(C.naturalCmp);
+  await writeFile(root, '_library.txt', new TextEncoder().encode('; RS Trig Sampler - generated automatically, do not edit\n' + list.map(p => p + '\n').join('')));
+  return list.length;
+}
+function download(parts, name) {
+  const url = URL.createObjectURL(new Blob(parts, { type: 'application/zip' }));
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+$('stop').onclick = () => { stopReq = true; $('status').textContent = 'stopping after the current file...'; };
+$('go').onclick = async () => {
+  running = true; stopReq = false; refreshGo();
+  $('stop').classList.remove('hide'); $('log').innerHTML = '';
+  const wantWav = $('optWav').checked, skip = mode === 'dir' && $('optSkip').checked;
+  const zip = mode === 'zip' ? new C.ZipWriter() : null;
+  let done = 0, made = 0, skipped = 0, failed = 0, zipPart = 1;
+  const t0 = performance.now();
+  const total = items.length;
+  for (let i = 0; i < total && !stopReq; i++) {
+    const it = items[i];
+    const dirNames = [C.cleanName(it.element), C.cleanName(it.inst)], fname = C.cleanName(it.name) + '.rsk.wav';
+    const label = it.element + '/' + it.inst + '/' + it.name;
+    $('status').textContent = `${i + 1} / ${total}  -  ${label}`;
+    try {
+      if (skip && await exists(outDir, dirNames, fname)) { skipped++; setState(i, '<span class="faint">exists, skipped</span>'); }
+      else {
+        const buf = await it.file.arrayBuffer();
+        const r = await convertInWorker(buf, wantWav);
+        if (r.error) throw new Error(r.error);
+        if (mode === 'dir') {
+          await writeFile(await subdir(outDir, dirNames), fname, r.bytes);
+          if (wantWav) {
+            const wd = await subdir(wavDir, dirNames.concat([C.cleanName(it.name)]));
+            for (const w of r.wavs) await writeFile(wd, `${C.cleanName(it.name)}_V${String(w.li).padStart(2, '0')}_RR${String(w.ri).padStart(2, '0')}.wav`, w.bytes);
+          }
+        } else {
+          if (zip.size() + r.bytes.length > 3.9e9) throw new Error('ZIP limit reached (3.9 GB): use the folder mode, or convert fewer files at once');
+          zip.add('RSampler/' + dirNames.join('/') + '/' + fname, r.bytes);
+          if (wantWav) for (const w of r.wavs)
+            zip.add('RSampler_TCI_WAV/' + dirNames.join('/') + '/' + C.cleanName(it.name) + '/' + `${C.cleanName(it.name)}_V${String(w.li).padStart(2, '0')}_RR${String(w.ri).padStart(2, '0')}.wav`, w.bytes);
+        }
+        made++;
+        setState(i, (r.bad ? '<span class="warn">ok, ' + r.bad + ' damaged sound(s)</span>' : '<span class="ok">ok</span>') +
+          '<br><span class="faint">' + esc(r.info.replace(/,.*\[vel/, ' [vel')) + '</span>');
+        log('OK   ' + label + '  -  ' + r.info + (r.bad ? '  (' + r.bad + ' damaged sound(s) completed with silence)' : ''), r.bad ? 'warn' : '');
+      }
+    } catch (err) {
+      failed++; setState(i, '<span class="err">' + esc(err.message) + '</span>');
+      log('ERR  ' + it.rel + '  -  ' + err.message, 'err');
+      if (/ZIP limit/.test(err.message)) break;
+    }
+    done++;
+    const el = (performance.now() - t0) / 1000, eta = el / done * (total - done);
+    $('prog').style.width = (100 * done / total).toFixed(1) + '%';
+    $('status').textContent = `${done} / ${total}  -  ${Math.round(el)} s elapsed, ~${Math.round(eta)} s left`;
+  }
+  let msg = `${made} kit(s) converted` + (skipped ? `, ${skipped} skipped` : '') + (failed ? `, ${failed} failed` : '') + (stopReq ? ' (stopped)' : '');
+  if (mode === 'dir') {
+    try { const n = await writeIndex(outDir); msg += ` - library index updated (${n} files): click RESCAN in the sampler.`; }
+    catch (e) { msg += ' - could not write the index: run "RS Trig Rescan Library" in REAPER.'; }
+  } else if (made) {
+    download(zip.finish(), 'RSampler kits.zip');
+    msg += ' - ZIP downloaded: extract it into <REAPER>/Data, then run "RS Trig Rescan Library".';
+  }
+  $('status').textContent = msg; log(msg, 'ok');
+  running = false; $('stop').classList.add('hide'); refreshGo();
+};
+</script>
+</body>
+</html>
