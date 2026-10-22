@@ -1,11 +1,17 @@
 // @description RefLab - referencing multi-pistes (spectre, LUFS, match loudness, boucles)
 // @author Todoroki
-// @version 1.2
+// @version 1.3
 // @changelog
-//   - Vitesse de mesure du spectre reglable : rapide, moyen, lent, tres lent, moyenne infinie
-//   - Bouton VITESSE, clic droit / touche R : remise a zero de la moyenne
-//   - Deux nouveaux parametres assignables : vitesse suivante, reset moyenne spectre
-//   - Fonctionne avec le Todoroki Companion (dossier references, actualisation)
+//   - Les references, boucles et la reference selectionnee sont memorisees DANS LE PROJET
+//     (via le Todoroki Companion), meme quand RefLab est dans le Monitoring FX
+//   - Sauvegarde interne du plugin plus robuste (ordre de chargement, version du format)
+//   - Spectre : nouvelles vitesses ULTRA LENT (15 s) et GLACIAL (45 s), glissement doux en dB,
+//     gel automatique quand la lecture s'arrete
+//   - Isolation de bandes facon ISOL8 : 5 bandes (crossovers Linkwitz-Riley, somme a plat),
+//     solo exclusif / cumulable, crossovers deplacables sur le spectre
+//   - Modes d'ecoute : stereo, mono, side, gauche, droite (sur le mix ET les references)
+//   - Courbe d'ecart lisible : centrage sur l'ecart moyen, echelle auto ou fixe, lissage dedie
+//   - Tous les nouveaux reglages assignables en MIDI (Param > Learn) et via des actions
 // @about
 //   # RefLab
 //
@@ -13,6 +19,7 @@
 //
 //   - 4 references, chargees depuis `<REAPER>/Data/references`
 //   - Spectre mix + reference superposes, courbe d'ecart, vitesse de mesure reglable
+//   - Isolation de bandes (5 bandes) et modes d'ecoute stereo / mono / side / G / D
 //   - LUFS momentary / short-term / integre (BS.1770), match loudness automatique
 //   - Boucle par reference (glisser sur la forme d'onde)
 //   - Tous les reglages assignables en MIDI (Param > Learn) ou via les actions "RefLab - ..."
@@ -36,10 +43,32 @@ slider11:0<0,1,1>-[Bouton] Reference precedente
 slider12:0<0,1,1>-[Bouton] Bascule boucle
 slider13:0<0,1,1>-[Bouton] Reset loudness integre
 slider14:0<0,1,1>-[Bouton] Mode match suivant
-slider15:1<0,4,1{Rapide,Moyen,Lent,Tres lent,Moyenne infinie}>-Vitesse spectre
+slider15:1<0,6,1{Rapide,Moyen,Lent,Tres lent,Ultra lent,Glacial,Moyenne infinie}>-Vitesse spectre
+slider16:/references:none:-enum
 slider17:0<0,1,1>-[Bouton] Vitesse spectre suivante
 slider18:0<0,1,1>-[Bouton] Reset moyenne spectre
-slider16:/references:none:-enum
+slider19:1<0,1,1{Off,On}>-Isolation active
+slider20:0<0,1,1{Off,Solo}>-Bande 1 Graves solo
+slider21:0<0,1,1{Off,Solo}>-Bande 2 Bas-medium solo
+slider22:0<0,1,1{Off,Solo}>-Bande 3 Medium solo
+slider23:0<0,1,1{Off,Solo}>-Bande 4 Haut-medium solo
+slider24:0<0,1,1{Off,Solo}>-Bande 5 Aigus solo
+slider25:120<30,600,1>-Coupure 1 (Hz)
+slider26:500<150,3000,1>-Coupure 2 (Hz)
+slider27:2000<600,9000,1>-Coupure 3 (Hz)
+slider28:6000<2000,18000,1>-Coupure 4 (Hz)
+slider29:0<0,4,1{Stereo,Mono,Side,Gauche,Droite}>-Mode d'ecoute
+slider30:0<0,1,1{Centre,Absolu}>-Ecart : reference
+slider31:0<0,4,1{Auto,3 dB,6 dB,12 dB,24 dB}>-Ecart : echelle
+slider32:2<0,3,1{Comme spectre,1/6 oct,1/3 oct,1 oct}>-Ecart : lissage
+slider33:0<0,1,1>-[Bouton] Isolation on/off
+slider34:0<0,1,1>-[Bouton] Mode d'ecoute suivant
+slider35:0<0,1,1>-[Bouton] Solo exclusif bande 1
+slider36:0<0,1,1>-[Bouton] Solo exclusif bande 2
+slider37:0<0,1,1>-[Bouton] Solo exclusif bande 3
+slider38:0<0,1,1>-[Bouton] Solo exclusif bande 4
+slider39:0<0,1,1>-[Bouton] Solo exclusif bande 5
+slider40:0<0,1,1>-[Bouton] Ecart : echelle suivante
 
 in_pin:Left
 in_pin:Right
@@ -61,6 +90,12 @@ R_RECALC=1180; R_PROG=1190; R_ACT=900; R_REQ=910;
 MRING=1200; MHIST=1300; RRING=3000; RHIST=3100;
 PEAK=8192; WIN=16384; SMIX=24576; SREF=28672; CMIX=32768; CREF=36872;
 PXM=40976; PXR=45080;
+QXM=213000; QXR=217104;                                   // spectres lisses en dB (vitesses lentes)
+DXA=221400; DXM=225504; DXC=229608; DXD=233712; DXS=237816; // courbe d'ecart
+// Etat relu a l'ouverture : zone tampon fixe 600..640 (+ #pf0..3), appliquee dans le bloc audio.
+// gmem "RefLab" : [10] publication, [11] ref choisie, [12] restauration, [13] ref, [15] accuse,
+//                 [16] donnees presentes, [20..35] etat publie, [40..55] etat a restaurer,
+//                 [70000..] noms publies, [71024..] noms a restaurer
 FMIX=65536; FREF=131072; RMIX=196608; RREF=204800;
 BLK=262144; BLKCAP=65536; SCR=327680; SCRN=65536; AUD=393216;
 AUDCAP = __memtop() - AUD;
@@ -266,6 +301,137 @@ function ser_str(str) local(len, i, ch)
   );
 );
 
+// ---------- etat des emplacements : application sans recharger si rien n'a change ----------
+function pfile(k) ( k == 0 ? #pf0 : k == 1 ? #pf1 : k == 2 ? #pf2 : #pf3; );
+function apply_slot(k, act, nm, lo, ls, le) local(same)
+(
+  act = act > 0.5;
+  same = (act == (R_ACT[k] > 0.5)) && (!act || strcmp(nm, sfile(k)) == 0);
+  R_LOOPON[k] = lo > 0.5; R_LS[k] = ls; R_LE[k] = le;
+  same ? (
+    R_RECALC[k] = 1;
+  ) : (
+    R_ACT[k] = act; strcpy(sfile(k), nm); strcpy(20 + k, nm); R_REQ[k] += 1;
+  );
+);
+function gm_rd(base, dst) local(j, ch)
+(
+  strcpy(dst, ""); j = 0;
+  while (j < 255 && (ch = gmem[base + j]) > 0) ( sprintf(#gch2, "%c", ch); strcat(dst, #gch2); j += 1; );
+  dst;
+);
+function gm_wr(base, src) local(j, n, ch)
+(
+  n = min(strlen(src), 255); j = 0;
+  loop(n, ch = str_getchar(src, j); ch < 0 ? ch += 256; gmem[base + j] = ch; j += 1; );
+  gmem[base + n] = 0;
+);
+
+// ---------- isolation de bandes : biquads (crossovers Linkwitz-Riley 4e ordre) ----------
+function bq(x) instance(b0 b1 b2 a1 a2 z1 z2) local(y)
+(
+  y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; y;
+);
+function bq_rst() instance(z1 z2) ( z1 = 0; z2 = 0; );
+function bq_lp(f) instance(b0 b1 b2 a1 a2) local(w, cs, al, a0)
+(
+  w = 2 * $pi * f / srate; cs = cos(w); al = sin(w) / (2 * 0.7071067811865476); a0 = 1 + al;
+  b0 = (1 - cs) / 2 / a0; b1 = (1 - cs) / a0; b2 = b0; a1 = -2 * cs / a0; a2 = (1 - al) / a0;
+);
+function bq_hp(f) instance(b0 b1 b2 a1 a2) local(w, cs, al, a0)
+(
+  w = 2 * $pi * f / srate; cs = cos(w); al = sin(w) / (2 * 0.7071067811865476); a0 = 1 + al;
+  b0 = (1 + cs) / 2 / a0; b1 = -(1 + cs) / a0; b2 = b0; a1 = -2 * cs / a0; a2 = (1 - al) / a0;
+);
+function bq_ap(f) instance(b0 b1 b2 a1 a2) local(w, cs, al, a0)
+(
+  w = 2 * $pi * f / srate; cs = cos(w); al = sin(w) / (2 * 0.7071067811865476); a0 = 1 + al;
+  b0 = (1 - al) / a0; b1 = -2 * cs / a0; b2 = 1; a1 = b1; a2 = b0;
+);
+function iso_reset()
+(
+  xl1a.bq_rst();
+  xl1b.bq_rst();
+  xl1c.bq_rst();
+  xl1d.bq_rst();
+  xl2a.bq_rst();
+  xl2b.bq_rst();
+  xl2c.bq_rst();
+  xl2d.bq_rst();
+  xl3a.bq_rst();
+  xl3b.bq_rst();
+  xl3c.bq_rst();
+  xl3d.bq_rst();
+  xl4a.bq_rst();
+  xl4b.bq_rst();
+  xl4c.bq_rst();
+  xl4d.bq_rst();
+  apl2.bq_rst();
+  apl3.bq_rst();
+  apl4.bq_rst();
+  xr1a.bq_rst();
+  xr1b.bq_rst();
+  xr1c.bq_rst();
+  xr1d.bq_rst();
+  xr2a.bq_rst();
+  xr2b.bq_rst();
+  xr2c.bq_rst();
+  xr2d.bq_rst();
+  xr3a.bq_rst();
+  xr3b.bq_rst();
+  xr3c.bq_rst();
+  xr3d.bq_rst();
+  xr4a.bq_rst();
+  xr4b.bq_rst();
+  xr4c.bq_rst();
+  xr4d.bq_rst();
+  apr2.bq_rst();
+  apr3.bq_rst();
+  apr4.bq_rst();
+);
+function iso_coefs()
+(
+  xl1a.bq_lp(xo1); xl1b.bq_lp(xo1); xl1c.bq_hp(xo1); xl1d.bq_hp(xo1);
+  xl2a.bq_lp(xo2); xl2b.bq_lp(xo2); xl2c.bq_hp(xo2); xl2d.bq_hp(xo2);
+  xl3a.bq_lp(xo3); xl3b.bq_lp(xo3); xl3c.bq_hp(xo3); xl3d.bq_hp(xo3);
+  xl4a.bq_lp(xo4); xl4b.bq_lp(xo4); xl4c.bq_hp(xo4); xl4d.bq_hp(xo4);
+  apl2.bq_ap(xo2);
+  apl3.bq_ap(xo3);
+  apl4.bq_ap(xo4);
+  xr1a.bq_lp(xo1); xr1b.bq_lp(xo1); xr1c.bq_hp(xo1); xr1d.bq_hp(xo1);
+  xr2a.bq_lp(xo2); xr2b.bq_lp(xo2); xr2c.bq_hp(xo2); xr2d.bq_hp(xo2);
+  xr3a.bq_lp(xo3); xr3b.bq_lp(xo3); xr3c.bq_hp(xo3); xr3d.bq_hp(xo3);
+  xr4a.bq_lp(xo4); xr4b.bq_lp(xo4); xr4c.bq_hp(xo4); xr4d.bq_hp(xo4);
+  apr2.bq_ap(xo2);
+  apr3.bq_ap(xo3);
+  apr4.bq_ap(xo4);
+);
+function hz_x(f) ( g_sx + log(f / 20) / log(1000) * (g_sw - 1); );
+
+// ---------- bandes : acces aux sliders ----------
+function bsel(k) ( k == 1 ? slider20 : k == 2 ? slider21 : k == 3 ? slider22 : k == 4 ? slider23 : slider24; );
+function bset(k, v)
+(
+  k == 1 ? ( slider20 = v; sliderchange(slider20); ) :
+  k == 2 ? ( slider21 = v; sliderchange(slider21); ) :
+  k == 3 ? ( slider22 = v; sliderchange(slider22); ) :
+  k == 4 ? ( slider23 = v; sliderchange(slider23); ) :
+           ( slider24 = v; sliderchange(slider24); );
+);
+function nsolo() ( (slider20 >= 0.5) + (slider21 >= 0.5) + (slider22 >= 0.5) + (slider23 >= 0.5) + (slider24 >= 0.5); );
+function iso_on() ( slider19 < 0.5 ? ( slider19 = 1; sliderchange(slider19); ); );
+function solo_excl(k) local(j)
+(
+  (slider19 >= 0.5 && nsolo() == 1 && bsel(k) >= 0.5) ? (
+    bset(k, 0);
+  ) : (
+    j = 1; loop(5, bset(j, j == k); j += 1; );
+    iso_on();
+  );
+);
+function solo_toggle(k) ( bset(k, bsel(k) >= 0.5 ? 0 : 1); iso_on(); );
+function solo_clear() local(j) ( j = 1; loop(5, bset(j, 0); j += 1; ); );
+
 // ---------- commandes (boutons assignables / actions REAPER) ----------
 function do_cmd(c) local(jj, ss, dn, kk)
 (
@@ -287,11 +453,28 @@ function do_cmd(c) local(jj, ss, dn, kk)
   c == 5 ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); ) :
   c == 6 ? ( mix_reset = 1; ) :
   c == 7 ? ( slider3 = (floor(slider3 + 0.5) + 1) % 3; sliderchange(slider3); ) :
-  c == 8 ? ( slider15 = (floor(slider15 + 0.5) + 1) % 5; sliderchange(slider15); spec_reset = 1; ) :
+  c == 8 ? ( slider15 = (floor(slider15 + 0.5) + 1) % 7; sliderchange(slider15); spec_reset = 1; ) :
   c == 9 ? ( spec_reset = 1; ) :
   (c >= 11 && c <= 14) ? ( slider2 = c - 10; sliderchange(slider2); ) :
   c == 20 ? ( slider1 = 0; sliderchange(slider1); ) :
-  c == 21 ? ( slider1 = 1; sliderchange(slider1); );
+  c == 21 ? ( slider1 = 1; sliderchange(slider1); ) :
+  c == 22 ? ( slider29 = (floor(slider29 + 0.5) + 1) % 5; sliderchange(slider29); ) :
+  (c >= 23 && c <= 27) ? ( slider29 = c - 23; sliderchange(slider29); ) :
+  c == 30 ? ( slider19 = slider19 >= 0.5 ? 0 : 1; sliderchange(slider19); ) :
+  (c >= 31 && c <= 35) ? solo_toggle(c - 30) :
+  c == 40 ? solo_clear() :
+  (c >= 41 && c <= 45) ? solo_excl(c - 40) :
+  c == 46 ? ( slider30 = slider30 >= 0.5 ? 0 : 1; sliderchange(slider30); ) :
+  c == 47 ? ( slider31 = (floor(slider31 + 0.5) + 1) % 5; sliderchange(slider31); ) :
+  c == 48 ? ( slider32 = (floor(slider32 + 0.5) + 1) % 4; sliderchange(slider32); ) :
+  (c >= 50 && c <= 56) ? ( slider15 = c - 50; sliderchange(slider15); spec_reset = 1; ) :
+  (c >= 60 && c <= 62) ? ( slider3 = c - 60; sliderchange(slider3); ) :
+  c == 63 ? ( slider5 = slider5 < 1.5 ? 3 : slider5 < 3.5 ? 4.5 : 0; sliderchange(slider5); ) :
+  c == 64 ? ( slider6 = (floor(slider6 + 0.5) + 1) % 4; sliderchange(slider6); ) :
+  c == 65 ? ( slider4 = min(slider4 + 0.5, 24); sliderchange(slider4); ) :
+  c == 66 ? ( slider4 = max(slider4 - 0.5, -24); sliderchange(slider4); ) :
+  c == 67 ? ( slider4 = 0; sliderchange(slider4); ) :
+  c == 68 ? ( slider7 = slider7 >= 0.5 ? 0 : 1; sliderchange(slider7); );
 );
 
 // ---------- init (premiere fois seulement) ----------
@@ -308,6 +491,10 @@ function do_cmd(c) local(jj, ss, dn, kk)
   i = 0; loop(N, WIN[i] = 0.5 - 0.5 * cos(2 * $pi * i / N); i += 1; );
   memset(SMIX, 0, 8192);
   rp = 0;
+  st_need = 1; st_sync = 0; st_last = -1;
+  mc00 = 1; mc01 = 0; mc10 = 0; mc11 = 1;
+  bg1 = bg2 = bg3 = bg4 = bg5 = 1; isomix = 0; iso_run = 0;
+  g_drng = 12;
 );
 kcoef(srate);
 kb0 = c_b0; kb1 = c_b1; kb2 = c_b2; ka1 = c_a1; ka2 = c_a2; ha1 = c_h1; ha2 = c_h2;
@@ -315,6 +502,8 @@ sb_mix = floor(0.1 * srate + 0.5);
 mixm.km_init(MRING, MHIST);
 refm.km_init(RRING, RHIST);
 xrate = 1 / (0.015 * srate);
+mrate = 1 - exp(-1 / (0.012 * srate));
+xo_sr = 0;   // force le recalcul des crossovers
 spnorm = 16 / (N * N);
 
 @slider
@@ -326,10 +515,83 @@ slider13 >= 0.5 ? ( slider13 = 0; sliderchange(slider13); do_cmd(6); );
 slider14 >= 0.5 ? ( slider14 = 0; sliderchange(slider14); do_cmd(7); );
 slider17 >= 0.5 ? ( slider17 = 0; sliderchange(slider17); do_cmd(8); );
 slider18 >= 0.5 ? ( slider18 = 0; sliderchange(slider18); do_cmd(9); );
+slider33 >= 0.5 ? ( slider33 = 0; sliderchange(slider33); do_cmd(30); );
+slider34 >= 0.5 ? ( slider34 = 0; sliderchange(slider34); do_cmd(22); );
+slider35 >= 0.5 ? ( slider35 = 0; sliderchange(slider35); do_cmd(41); );
+slider36 >= 0.5 ? ( slider36 = 0; sliderchange(slider36); do_cmd(42); );
+slider37 >= 0.5 ? ( slider37 = 0; sliderchange(slider37); do_cmd(43); );
+slider38 >= 0.5 ? ( slider38 = 0; sliderchange(slider38); do_cmd(44); );
+slider39 >= 0.5 ? ( slider39 = 0; sliderchange(slider39); do_cmd(45); );
+slider40 >= 0.5 ? ( slider40 = 0; sliderchange(slider40); do_cmd(47); );
 
 @block
 // commandes envoyees par les actions REAPER (scripts RefLab)
 gmem[2] != 0 ? ( gcmd = gmem[2]; gmem[2] = 0; do_cmd(gcmd); );
+
+// ---- etat relu a l'ouverture (zone tampon) : applique ici, quel que soit l'ordre d'appel ----
+ser_pending ? (
+  ser_pending = 0;
+  k = 0;
+  loop(4, apply_slot(k, 600[k], pfile(k), 610[k], 620[k], 630[k]); k += 1; );
+);
+
+// ---- memoire par projet (Todoroki Companion) ----
+// 1) au demarrage : demander l'etat du projet courant
+(st_need && gmem[1] == 0) ? ( gmem[1] = 3; st_need = 0; );
+// 2) le Companion pousse l'etat du projet (ouverture, changement d'onglet...)
+gmem[12] != st_rcv ? (
+  st_rcv = gmem[12]; st_sync = 1;
+  gmem[16] > 0 ? (
+    k = 0;
+    loop(4,
+      gm_rd(71024 + k * 256, #rn);
+      apply_slot(k, gmem[40 + 4 * k], #rn, gmem[41 + 4 * k], gmem[42 + 4 * k], gmem[43 + 4 * k]);
+      k += 1;
+    );
+    (gmem[13] >= 0 && gmem[13] <= 3) ? ( slider2 = gmem[13] + 1; sliderchange(slider2); );
+  );
+  st_last = -1;
+);
+// 3) publier l'etat quand il change (le Companion l'enregistre dans le projet)
+st_sum = floor(slider2 + 0.5) * 101; k = 0;
+loop(4,
+  st_sum += (k + 1) * (R_ACT[k] * 3 + R_REQ[k] * 7 + R_LOOPON[k] * 13 + R_LS[k] * 17 + R_LE[k] * 19);
+  k += 1;
+);
+(st_sync && st_sum != st_last) ? (
+  st_last = st_sum;
+  gmem[11] = floor(slider2 + 0.5) - 1;
+  k = 0;
+  loop(4,
+    gmem[20 + 4 * k] = R_ACT[k]; gmem[21 + 4 * k] = R_LOOPON[k];
+    gmem[22 + 4 * k] = R_LS[k];  gmem[23 + 4 * k] = R_LE[k];
+    gm_wr(70000 + k * 256, R_ACT[k] ? sfile(k) : "");
+    k += 1;
+  );
+  gmem[15] = st_rcv;
+  gmem[10] += 1;
+);
+
+// ---- ecoute : matrice et isolation de bandes ----
+mmo = floor(slider29 + 0.5);
+mt00 = mmo == 0 ? 1 : mmo == 1 ? 0.5 : mmo == 2 ? 0.5 : mmo == 3 ? 1 : 0;
+mt01 = mmo == 0 ? 0 : mmo == 1 ? 0.5 : mmo == 2 ? -0.5 : mmo == 3 ? 0 : 1;
+mt10 = mmo == 0 ? 0 : mmo == 1 ? 0.5 : mmo == 2 ? 0.5 : mmo == 3 ? 1 : 0;
+mt11 = mmo == 0 ? 1 : mmo == 1 ? 0.5 : mmo == 2 ? -0.5 : mmo == 3 ? 0 : 1;
+// crossovers ordonnes (ecart mini 1/3 d'octave)
+xo1 = min(max(slider25, 30), 600);
+xo2 = min(max(slider26, xo1 * 1.26), 3000);
+xo3 = min(max(slider27, xo2 * 1.26), 9000);
+xo4 = min(max(slider28, xo3 * 1.26), min(18000, srate * 0.45));
+(xo1 != xo1p || xo2 != xo2p || xo3 != xo3p || xo4 != xo4p || srate != xo_sr) ? (
+  xo1p = xo1; xo2p = xo2; xo3p = xo3; xo4p = xo4; xo_sr = srate;
+  iso_coefs();
+);
+iso_eff = slider19 >= 0.5 && nsolo() > 0;
+bt1 = iso_eff ? slider20 >= 0.5 : 1; bt2 = iso_eff ? slider21 >= 0.5 : 1;
+bt3 = iso_eff ? slider22 >= 0.5 : 1; bt4 = iso_eff ? slider23 >= 0.5 : 1;
+bt5 = iso_eff ? slider24 >= 0.5 : 1;
+(iso_eff && !iso_run) ? ( iso_reset(); iso_run = 1; isomix = 0; );
 
 // position du slot courant -> tableau
 cur_ready ? R_POS[sel_cur] = cur_pos;
@@ -522,24 +784,90 @@ RMIX[rp] = (l + r) * 0.5;
 RREF[rp] = (rl + rr) * 0.5;
 rp = (rp + 1) & 8191;
 xf = slider1 >= 0.5 ? min(1, xf + xrate) : max(0, xf - xrate);
-spl0 = l + (rl - l) * xf;
-spl1 = r + (rr - r) * xf;
+o0 = l + (rl - l) * xf;
+o1 = r + (rr - r) * xf;
+// matrice d'ecoute (stereo / mono / side / gauche / droite), transitions douces
+mc00 += (mt00 - mc00) * mrate; mc01 += (mt01 - mc01) * mrate;
+mc10 += (mt10 - mc10) * mrate; mc11 += (mt11 - mc11) * mrate;
+m0 = mc00 * o0 + mc01 * o1;
+m1 = mc10 * o0 + mc11 * o1;
+// isolation de bandes (calculee seulement quand elle sert : sinon signal intact)
+iso_run ? (
+  bg1 += (bt1 - bg1) * mrate; bg2 += (bt2 - bg2) * mrate; bg3 += (bt3 - bg3) * mrate;
+  bg4 += (bt4 - bg4) * mrate; bg5 += (bt5 - bg5) * mrate;
+  isomix += (iso_eff - isomix) * mrate;
+    i_b1 = xl1b.bq(xl1a.bq(m0)); i_h1 = xl1d.bq(xl1c.bq(m0));
+    i_b2 = xl2b.bq(xl2a.bq(i_h1)); i_h2 = xl2d.bq(xl2c.bq(i_h1));
+    i_b3 = xl3b.bq(xl3a.bq(i_h2)); i_h3 = xl3d.bq(xl3c.bq(i_h2));
+    i_b4 = xl4b.bq(xl4a.bq(i_h3)); i_b5 = xl4d.bq(xl4c.bq(i_h3));
+    i_o0 = apl2.bq(bg1 * i_b1) + bg2 * i_b2;
+    i_o0 = apl3.bq(i_o0) + bg3 * i_b3;
+    i_o0 = apl4.bq(i_o0) + bg4 * i_b4 + bg5 * i_b5;
+    i_b1 = xr1b.bq(xr1a.bq(m1)); i_h1 = xr1d.bq(xr1c.bq(m1));
+    i_b2 = xr2b.bq(xr2a.bq(i_h1)); i_h2 = xr2d.bq(xr2c.bq(i_h1));
+    i_b3 = xr3b.bq(xr3a.bq(i_h2)); i_h3 = xr3d.bq(xr3c.bq(i_h2));
+    i_b4 = xr4b.bq(xr4a.bq(i_h3)); i_b5 = xr4d.bq(xr4c.bq(i_h3));
+    i_o1 = apr2.bq(bg1 * i_b1) + bg2 * i_b2;
+    i_o1 = apr3.bq(i_o1) + bg3 * i_b3;
+    i_o1 = apr4.bq(i_o1) + bg4 * i_b4 + bg5 * i_b5;
+  m0 += (i_o0 - m0) * isomix;
+  m1 += (i_o1 - m1) * isomix;
+  (!iso_eff && isomix < 0.0001) ? ( isomix = 0; iso_run = 0; );
+);
+spl0 = m0;
+spl1 = m1;
 
 @serialize
+// Format v2 : [magie 52763, version] puis, par emplacement : actif, nom, boucle on, debut, fin.
+// La lecture remplit une zone tampon (600..640 + #pf0..3) appliquee dans @block :
+// fonctionne que REAPER appelle @serialize avant ou apres @init.
 s_rd = file_avail(0) >= 0;
-s_k = 0;
-loop(4,
-  s_v = R_ACT[s_k]; file_var(0, s_v); R_ACT[s_k] = s_v;
-  ser_str(sfile(s_k));
-  s_rd ? R_REQ[s_k] += 1;
-  s_v = R_LOOPON[s_k]; file_var(0, s_v); R_LOOPON[s_k] = s_v;
-  s_v = R_LS[s_k]; file_var(0, s_v); R_LS[s_k] = s_v;
-  s_v = R_LE[s_k]; file_var(0, s_v); R_LE[s_k] = s_v;
-  ser_str(20 + s_k);
-  s_k += 1;
+s_rd ? (
+  s_mag = 0; file_var(0, s_mag);
+  s_k = 0;
+  s_mag == 52763 ? (
+    s_ver = 0; file_var(0, s_ver);
+    loop(4,
+      s_v = 0; file_var(0, s_v); 600[s_k] = s_v;
+      ser_str(pfile(s_k));
+      s_v = 0; file_var(0, s_v); 610[s_k] = s_v;
+      s_v = 0; file_var(0, s_v); 620[s_k] = s_v;
+      s_v = 0; file_var(0, s_v); 630[s_k] = s_v;
+      s_k += 1;
+    );
+  ) : (
+    // ancien format (1.1 / 1.2) : actif, nom, boucle, debut, fin, nom precedent
+    loop(4,
+      s_k == 0 ? ( s_v = s_mag; ) : ( s_v = 0; file_var(0, s_v); );
+      600[s_k] = s_v;
+      ser_str(pfile(s_k));
+      s_v = 0; file_var(0, s_v); 610[s_k] = s_v;
+      s_v = 0; file_var(0, s_v); 620[s_k] = s_v;
+      s_v = 0; file_var(0, s_v); 630[s_k] = s_v;
+      ser_str(#pjunk);
+      s_k += 1;
+    );
+  );
+  ser_pending = 1;
+) : (
+  s_mag = 52763; file_var(0, s_mag);
+  s_ver = 2; file_var(0, s_ver);
+  s_k = 0;
+  loop(4,
+    ser_pending ? (
+      s_v = 600[s_k]; file_var(0, s_v); ser_str(pfile(s_k));
+      s_v = 610[s_k]; file_var(0, s_v); s_v = 620[s_k]; file_var(0, s_v); s_v = 630[s_k]; file_var(0, s_v);
+    ) : (
+      s_v = R_ACT[s_k] > 0.5 ? 1 : 0; file_var(0, s_v);
+      strcpy(#sempty, "");
+      ser_str(s_v ? sfile(s_k) : #sempty);
+      s_v = R_LOOPON[s_k]; file_var(0, s_v); s_v = R_LS[s_k]; file_var(0, s_v); s_v = R_LE[s_k]; file_var(0, s_v);
+    );
+    s_k += 1;
+  );
 );
 
-@gfx 980 620
+@gfx 980 700
 // ================= helpers UI (uniquement appeles depuis @gfx) =================
 function cl(r, g, b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
 function cla(r, g, b, a) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = a; );
@@ -682,6 +1010,30 @@ function mrow(x, y, w, h, label, s, unit)
   gfx_setfont(2); c_dim(); txt(unit, x + w - 46 * gsc, y, 40 * gsc, h, 4);
   c_line(); gfx_rect(x + 12 * gsc, y + h - 1, w - 24 * gsc, 1);
 );
+function hzfmt(dst, f)
+(
+  f >= 1000 ? (
+    abs(f / 1000 - floor(f / 1000 + 0.5)) < 0.05 ? sprintf(dst, "%dk", floor(f / 1000 + 0.5)) : sprintf(dst, "%.1fk", f / 1000);
+  ) : sprintf(dst, "%d", floor(f + 0.5));
+  dst;
+);
+// bouton a 3 etats : 0 eteint, 1 allume, 2 arme (allume mais isolation en pause)
+function btn3(x, y, w, h, s, st) local(hv)
+(
+  hv = hit(x, y, w, h);
+  st == 1 ? ( cl(ACR, ACG, ACB); gfx_rect(x, y, w, h); cl(0.05, 0.05, 0.06); ) :
+  st == 2 ? (
+    hv ? cl(0.15, 0.16, 0.18) : cl(0.10, 0.107, 0.12); gfx_rect(x, y, w, h);
+    cl(ACR, ACG, ACB); gfx_rect(x, y, w, h, 0); gfx_rect(x + 1, y + 1, w - 2, h - 2, 0);
+    cl(ACR * 0.9, ACG * 0.9, ACB * 0.9);
+  ) : (
+    hv ? cl(0.15, 0.16, 0.18) : cl(0.10, 0.107, 0.12); gfx_rect(x, y, w, h);
+    cl(0.22, 0.23, 0.26); gfx_rect(x, y, w, h, 0);
+    hv ? cl(0.95, 0.95, 0.96) : cl(0.66, 0.68, 0.72);
+  );
+  gfx_setfont(2); txt(s, x, y, w, h, 5);
+  hv;
+);
 function tfmt(dst, sec) ( sec = max(0, sec); sprintf(dst, "%d:%02d", floor(sec / 60), floor(sec) % 60); dst; );
 
 // ================= frame =================
@@ -693,6 +1045,7 @@ gfx_setfont(1, "Segoe UI", 15 * gsc);
 gfx_setfont(2, "Segoe UI", 12 * gsc);
 gfx_setfont(3, "Segoe UI", 22 * gsc, 'b');
 gfx_setfont(4, "Segoe UI", 15 * gsc, 'b');
+gfx_setfont(5, "Segoe UI", 10 * gsc);
 
 // le companion incremente gmem[0] en continu : vivant si ca bouge
 g_now = time_precise();
@@ -713,7 +1066,14 @@ while ((g_ch = gfx_getchar()) > 0) (
     (R_LE[sel_req] - R_LS[sel_req]) >= 0.25 ? ( R_LOOPON[sel_req] = !R_LOOPON[sel_req]; R_RECALC[sel_req] = 1; );
   );
   (g_ch == 'r' || g_ch == 'R') ? spec_reset = 1;
-  (g_ch == 'v' || g_ch == 'V') ? ( slider15 = (floor(slider15 + 0.5) + 1) % 5; sliderchange(slider15); );
+  (g_ch == 'v' || g_ch == 'V') ? do_cmd(8);
+  (g_ch == 'i' || g_ch == 'I') ? do_cmd(30);
+  (g_ch == 'm' || g_ch == 'M') ? do_cmd(22);
+  (g_ch == 'e' || g_ch == 'E') ? do_cmd(47);
+  // F1-F5 : solo exclusif de la bande (Maj ou Ctrl : cumuler). REAPER renvoie 'f1'..'f5'.
+  g_bk = (g_ch >= 'f1' && g_ch <= 'f5') ? g_ch - 'f1' + 1 :
+         ((g_ch & 255) == 'f' && (g_ch >> 8) >= '1' && (g_ch >> 8) <= '5') ? (g_ch >> 8) - '0' : 0;
+  g_bk > 0 ? ( (mouse_cap & 8) || (mouse_cap & 4) ? solo_toggle(g_bk) : solo_excl(g_bk); );
   (g_ch == 'p' || g_ch == 'P') ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); );
 );
 
@@ -742,9 +1102,10 @@ btn(g_x, g_y, g_w, g_hh, #b, 0) ? ( slider5 = slider5 < 1.5 ? 3 : slider5 < 3.5 
 g_w = 92 * gsc; g_x -= g_w + 2 * gsc;
 g_vb = floor(slider15 + 0.5);
 g_vb == 0 ? strcpy(#b, "RAPIDE") : g_vb == 1 ? strcpy(#b, "MOYEN") : g_vb == 2 ? strcpy(#b, "LENT") :
-g_vb == 3 ? strcpy(#b, "TRES LENT") : strcpy(#b, "MOY. INF");
+g_vb == 3 ? strcpy(#b, "TRES LENT") : g_vb == 4 ? strcpy(#b, "ULTRA LENT") : g_vb == 5 ? strcpy(#b, "GLACIAL") :
+strcpy(#b, "MOY. INF");
 hit(g_x, g_y, g_w, g_hh) && g_rc ? spec_reset = 1;
-btn(g_x, g_y, g_w, g_hh, #b, g_vb == 4) ? ( slider15 = (g_vb + 1) % 5; sliderchange(slider15); );
+btn(g_x, g_y, g_w, g_hh, #b, g_vb >= 4) ? do_cmd(8);
 g_w = 74 * gsc; g_x -= g_w + 10 * gsc;
 btn(g_x, g_y, g_w, g_hh, "LECTURE", slider8 >= 0.5) ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); );
 playing ? ( cl(ACR, ACG, ACB); gfx_rect(g_x - 10 * gsc, g_y + g_hh / 2 - 3 * gsc, 6 * gsc, 6 * gsc); );
@@ -858,7 +1219,8 @@ R_READY[g_k] && R_LEN[g_k] > 0 ? (
 // ---------------- zones principales ----------------
 g_foot = 20 * gsc;
 g_my0 = g_wy + g_wh + ggap;
-g_mainH = gH - g_my0 - gpad - g_foot;
+g_ih = 36 * gsc;
+g_mainH = gH - g_my0 - gpad - g_foot - g_ih - ggap;
 g_mw = 232 * gsc;
 g_sx = gpad; g_sw = floor(gW - 2 * gpad - ggap - g_mw);
 g_dh = max(64 * gsc, floor(g_mainH * 0.24));
@@ -871,19 +1233,36 @@ g_rps = rp;
 g_tn = time_precise();
 g_dt = min(max(g_tn - g_tprev, 0.005), 0.5); g_tprev = g_tn;
 g_vit = floor(slider15 + 0.5);
-(g_vit != g_vitp || sel_cur != g_selp || spec_reset) ? (
+g_inf = g_vit == 6;
+g_tau = g_vit == 0 ? 0.12 : g_vit == 1 ? 0.4 : g_vit == 2 ? 1.5 : g_vit == 3 ? 5 : g_vit == 4 ? 15 : 45;
+g_slow = !g_inf && g_tau > 0.4;
+(g_vit != g_vitp || sel_cur != g_selp || spec_reset || g_sw != g_swp) ? (
   g_cntM = 0; g_cntR = 0; g_tavgM = 0; g_vitp = g_vit; g_selp = sel_cur; spec_reset = 0;
+  g_swp = g_sw; g_warmM = 0; g_warmR = 0;
 );
-g_vit == 4 ? (
+// signal present dans la fenetre FFT ? (> -70 dBFS)
+g_sigM = winms(RMIX) > 0.0000001;
+g_sigR = winms(RREF) > 0.0000001;
+g_inf ? (
   // moyenne infinie : seulement quand il y a du signal
-  // la fenetre FFT entiere doit contenir du signal (> -70 dBFS)
-  winms(RMIX) > 0.0000001 ? ( g_cntM += 1; g_aM = 1 / g_cntM; g_tavgM += g_dt; ) : g_aM = 0;
-  winms(RREF) > 0.0000001 ? ( g_cntR += 1; g_aR = 1 / g_cntR; ) : g_aR = 0;
+  g_sigM ? ( g_cntM += 1; g_aM = 1 / g_cntM; g_tavgM += g_dt; ) : g_aM = 0;
+  g_sigR ? ( g_cntR += 1; g_aR = 1 / g_cntR; ) : g_aR = 0;
 ) : (
-  g_tau = g_vit == 0 ? 0.12 : g_vit == 1 ? 0.4 : g_vit == 2 ? 1.5 : 5;
-  g_aM = g_aR = 1 - exp(-g_dt / g_tau);
-  g_cntM == 0 ? ( g_aM = 1; g_cntM = 1; );
-  g_cntR == 0 ? ( g_aR = 1; g_cntR = 1; );
+  // etage 1 : moyenne en puissance (courte) ; etage 2 (vitesses lentes) : glissement en dB
+  g_tau1 = g_tau <= 0.4 ? g_tau : g_tau <= 1.5 ? 0.4 : 1;
+  g_aM = g_aR = 1 - exp(-g_dt / g_tau1);
+  g_a2 = 1 - exp(-g_dt / g_tau);
+  g_a2M = g_a2R = g_a2;
+  // vitesses lentes : la courbe se fige quand le signal s'arrete
+  g_slow ? (
+    !g_sigM ? ( g_aM = 0; g_a2M = 0; ) : g_warmM += g_dt;
+    !g_sigR ? ( g_aR = 0; g_a2R = 0; ) : g_warmR += g_dt;
+    // demarrage : suivi rapide le temps que la fenetre d'analyse soit pleine, puis glissement lent
+    g_warmM < 1.5 ? g_a2M = 1;
+    g_warmR < 1.5 ? g_a2R = 1;
+  );
+  g_cntM == 0 && g_sigM ? ( g_aM = 1; g_cntM = 1; );
+  g_cntR == 0 && g_sigR ? ( g_aR = 1; g_cntR = 1; );
 );
 spec(RMIX, FMIX, SMIX, CMIX, g_aM);
 spec(RREF, FREF, SREF, CREF, g_aR);
@@ -896,6 +1275,11 @@ loop(g_sw,
   g_tl = slider5 * log(g_f / 1000) / log(2);
   PXM[g_i] = 10 * log10(max(bavg(CMIX, SMIX, g_b0, g_b1), 0) + 0.000000000000000000001) + g_tl;
   PXR[g_i] = 10 * log10(max(bavg(CREF, SREF, g_b0, g_b1), 0) + 0.000000000000000000001) + g_tl;
+  g_slow ? (
+    QXM[g_i] += (PXM[g_i] - QXM[g_i]) * g_a2M;
+    QXR[g_i] += (PXR[g_i] - QXR[g_i]) * g_a2R;
+    PXM[g_i] = QXM[g_i]; PXR[g_i] = QXR[g_i];
+  );
   g_i += 1;
 );
 
@@ -944,6 +1328,46 @@ g_refon ? (
     g_i += 1;
   );
 );
+// isolation : bandes non ecoutees assombries + crossovers deplacables
+iso_eff ? (
+  g_k = 1;
+  loop(5,
+    bsel(g_k) < 0.5 ? (
+      g_xa = g_k == 1 ? g_sx : hz_x(g_k == 2 ? xo1 : g_k == 3 ? xo2 : g_k == 4 ? xo3 : xo4);
+      g_xb = g_k == 5 ? g_sx + g_sw : hz_x(g_k == 1 ? xo1 : g_k == 2 ? xo2 : g_k == 3 ? xo3 : xo4);
+      g_xa = max(g_xa, g_sx); g_xb = min(g_xb, g_sx + g_sw);
+      g_xb > g_xa ? ( cla(0.02, 0.022, 0.026, 0.62); gfx_rect(g_xa, g_sy, g_xb - g_xa, g_sh); );
+    );
+    g_k += 1;
+  );
+);
+(iso_eff || g_xdrag) ? (
+  g_k = 1;
+  loop(4,
+    g_xf = g_k == 1 ? xo1 : g_k == 2 ? xo2 : g_k == 3 ? xo3 : xo4;
+    g_px = hz_x(g_xf);
+    g_hvx = abs(mouse_x - g_px) <= 5 * gsc && hit(g_sx, g_sy, g_sw, g_sh);
+    (g_hvx || g_xdrag == g_k) ? cl(1, 0.75, 0.5) : cl(ACR * 0.8, ACG * 0.8, ACB * 0.8);
+    gfx_rect(g_px, g_sy, 1 * gsc, g_sh);
+    gfx_rect(g_px - 3 * gsc, g_sy, 7 * gsc, 7 * gsc);
+    (g_hvx || g_xdrag == g_k) ? (
+      hzfmt(#hz, g_xf); strcat(#hz, " Hz");
+      gfx_setfont(2); txt(#hz, g_px + 6 * gsc, g_sy + 22 * gsc, 80 * gsc, 14 * gsc, 4);
+    );
+    (g_lc && g_hvx && !g_xdrag) ? g_xdrag = g_k;
+    g_k += 1;
+  );
+);
+g_xdrag ? (
+  (g_mc & 1) ? (
+    g_nf = 20 * exp(min(max((mouse_x - g_sx) / (g_sw - 1), 0), 1) * log(1000));
+    g_xdrag == 1 ? ( slider25 = floor(min(max(g_nf, 30), min(600, xo2 / 1.26))); sliderchange(slider25); ) :
+    g_xdrag == 2 ? ( slider26 = floor(min(max(g_nf, max(150, xo1 * 1.26)), min(3000, xo3 / 1.26))); sliderchange(slider26); ) :
+    g_xdrag == 3 ? ( slider27 = floor(min(max(g_nf, max(600, xo2 * 1.26)), min(9000, xo4 / 1.26))); sliderchange(slider27); ) :
+                   ( slider28 = floor(min(max(g_nf, max(2000, xo3 * 1.26)), 18000)); sliderchange(slider28); );
+  ) : g_xdrag = 0;
+);
+
 // legende
 gfx_setfont(2);
 g_lgx = g_sx + g_sw - 150 * gsc;
@@ -951,41 +1375,111 @@ cl(MXR, MXG, MXB); gfx_rect(g_lgx, g_sy + 12 * gsc, 10 * gsc, 2 * gsc);
 c_text(); txt("MIX", g_lgx + 16 * gsc, g_sy + 5 * gsc, 40 * gsc, 16 * gsc, 4);
 cl(ACR, ACG, ACB); gfx_rect(g_lgx + 60 * gsc, g_sy + 12 * gsc, 10 * gsc, 2 * gsc);
 sprintf(#lg, "REF %d", sel_cur + 1); c_text(); txt(#lg, g_lgx + 76 * gsc, g_sy + 5 * gsc, 60 * gsc, 16 * gsc, 4);
-g_vit == 4 ? (
+g_inf ? (
   cl(ACR, ACG, ACB);
   sprintf(#lg, "MOYENNE  %d:%02d   (R : remise a zero)", floor(g_tavgM / 60), floor(g_tavgM) % 60);
   txt(#lg, g_lgx - 240 * gsc, g_sy + 5 * gsc, 230 * gsc, 16 * gsc, 6);
+) : g_slow ? (
+  cl(ACR, ACG, ACB);
+  sprintf(#lg, "LISSAGE %d s%s", g_tau, (!g_sigM && !g_sigR) ? "  (fige)" : "");
+  txt(#lg, g_lgx - 240 * gsc, g_sy + 5 * gsc, 230 * gsc, 16 * gsc, 6);
 );
 
-// ecart REF - MIX
+// ecart REF - MIX : masque, lissage dedie, centrage sur l'ecart moyen, echelle auto
 c_panel(); gfx_rect(g_sx, g_dy, g_sw, g_dh);
+g_dval = g_refon && mixS > -70;
 g_dmid = g_dy + g_dh / 2;
-c_line(); gfx_rect(g_sx, g_dmid, g_sw, 1);
-gfx_rect(g_sx, g_dy + g_dh / 4, g_sw, 1); gfx_rect(g_sx, g_dy + g_dh * 3 / 4, g_sw, 1);
-(g_refon && mixS > -70) ? (
-  g_i = 0;
+g_dval ? (
+  g_fl = dbTop - dbRange;
+  g_i = 0; DXC[0] = 0; DXD[0] = 0;
   loop(g_sw,
-    g_dv = (max(PXR[g_i], PXM[g_i]) > dbTop - dbRange) ? min(max(PXR[g_i] - PXM[g_i], -12), 12) : 0;
-    g_py = g_dmid - g_dv / 12 * (g_dh / 2 - 2);
-    g_dv >= 0 ? cla(ACR, ACG, ACB, 0.55) : cla(MXR, MXG, MXB, 0.55);
-    gfx_rect(g_sx + g_i, min(g_py, g_dmid), 1, max(1, abs(g_py - g_dmid)));
+    g_ok = max(PXR[g_i], PXM[g_i]) > g_fl;
+    DXM[g_i] = g_ok;
+    DXA[g_i] = g_ok ? PXR[g_i] - PXM[g_i] : 0;
+    DXC[g_i + 1] = DXC[g_i] + DXA[g_i]; DXD[g_i + 1] = DXD[g_i] + g_ok;
     g_i += 1;
   );
+  g_lz = floor(slider32 + 0.5);
+  g_oct = g_lz == 1 ? 1/6 : g_lz == 2 ? 1/3 : g_lz == 3 ? 1 : 0;
+  g_hw = floor(g_oct * 0.5 * (g_sw - 1) / (log(1000) / log(2)));
+  g_ilo = floor(log(40 / 20) / log(1000) * (g_sw - 1));
+  g_ihi = floor(log(14000 / 20) / log(1000) * (g_sw - 1));
+  g_i = 0; g_s1 = 0; g_n1 = 0;
+  loop(g_sw,
+    g_lo = max(0, g_i - g_hw); g_hi = min(g_sw - 1, g_i + g_hw);
+    g_cn = DXD[g_hi + 1] - DXD[g_lo];
+    DXS[g_i] = g_cn > 0 ? (DXC[g_hi + 1] - DXC[g_lo]) / g_cn : 0;
+    (DXM[g_i] && g_i >= g_ilo && g_i <= g_ihi) ? ( g_s1 += DXS[g_i]; g_n1 += 1; );
+    g_i += 1;
+  );
+  g_moy = g_n1 > 0 ? g_s1 / g_n1 : 0;
+  g_off = slider30 < 0.5 ? g_moy : 0;
+  // pic de la courbe (40 Hz - 14 kHz) pour l'echelle automatique
+  g_i = g_ilo; g_pk = 0;
+  loop(g_ihi - g_ilo + 1,
+    DXM[g_i] ? g_pk = max(g_pk, abs(DXS[g_i] - g_off));
+    g_i += 1;
+  );
+  g_sc = floor(slider31 + 0.5);
+  g_sc == 0 ? (
+    g_want = g_pk * 1.1 <= 3 ? 3 : g_pk * 1.1 <= 6 ? 6 : g_pk * 1.1 <= 12 ? 12 : 24;
+    g_want >= g_drng ? ( g_drng = g_want; g_dlow = g_tn; ) : ( g_tn - g_dlow > 3 ? ( g_drng = g_want; g_dlow = g_tn; ); );
+  ) : g_drng = g_sc == 1 ? 3 : g_sc == 2 ? 6 : g_sc == 3 ? 12 : 24;
+  // grille
+  c_line(); gfx_rect(g_sx, g_dy + g_dh / 4, g_sw, 1); gfx_rect(g_sx, g_dy + g_dh * 3 / 4, g_sw, 1);
+  cl(0.26, 0.27, 0.30); gfx_rect(g_sx, g_dmid, g_sw, 1);
+  // courbe
+  g_hh2 = g_dh / 2 - 3 * gsc;
+  g_i = 0; g_pyp = g_dmid;
+  loop(g_sw,
+    DXM[g_i] ? (
+      g_dv = DXS[g_i] - g_off;
+      g_cl = abs(g_dv) > g_drng;
+      g_dv = min(max(g_dv, -g_drng), g_drng);
+      g_py = g_dmid - g_dv / g_drng * g_hh2;
+      g_dv >= 0 ? cla(ACR, ACG, ACB, 0.32) : cla(MXR, MXG, MXB, 0.32);
+      gfx_rect(g_sx + g_i, min(g_py, g_dmid), 1, max(1, abs(g_py - g_dmid)));
+      g_dv >= 0 ? cla(ACR, ACG, ACB, 1) : cla(MXR, MXG, MXB, 1);
+      g_i > 0 && DXM[g_i - 1] ? gfx_line(g_sx + g_i - 1, g_pyp, g_sx + g_i, g_py, 1) : gfx_rect(g_sx + g_i, g_py, 1, 1);
+      g_cl ? ( cl(1, 1, 1); gfx_rect(g_sx + g_i, g_dv > 0 ? g_dy + 1 : g_dy + g_dh - 3, 1, 2); );
+      g_pyp = g_py;
+    );
+    g_i += 1;
+  );
+  gfx_setfont(2); c_dim();
+  sprintf(#dl, "+%d", g_drng); txt(#dl, g_sx + 6 * gsc, g_dy + 3 * gsc, 40 * gsc, 14 * gsc, 4);
+  sprintf(#dl, "+%d", g_drng / 2); txt(#dl, g_sx + 6 * gsc, g_dy + g_dh / 4 - 7 * gsc, 40 * gsc, 14 * gsc, 4);
+  sprintf(#dl, "-%d", g_drng / 2); txt(#dl, g_sx + 6 * gsc, g_dy + g_dh * 3 / 4 - 7 * gsc, 40 * gsc, 14 * gsc, 4);
+  sprintf(#dl, "-%d dB", g_drng); txt(#dl, g_sx + 6 * gsc, g_dy + g_dh - 16 * gsc, 60 * gsc, 14 * gsc, 4);
 ) : (
-  c_dim(); txt("lecture de la reference + du mix requise", g_sx, g_dy, g_sw, g_dh, 5);
+  c_line(); gfx_rect(g_sx, g_dmid, g_sw, 1);
+  gfx_setfont(2); c_dim(); txt("lecture de la reference + du mix requise", g_sx, g_dy, g_sw, g_dh, 5);
 );
+// titre + reglages de la courbe d'ecart
 gfx_setfont(2); c_dim();
-txt("ECART REF - MIX", g_sx + 6 * gsc, g_dy + 3 * gsc, 160 * gsc, 14 * gsc, 4);
-txt("+6", g_sx + g_sw - 26 * gsc, g_dy + g_dh / 4 - 14 * gsc, 24 * gsc, 14 * gsc, 4);
-txt("-6", g_sx + g_sw - 26 * gsc, g_dy + g_dh * 3 / 4 + 1, 24 * gsc, 14 * gsc, 4);
+(g_dval && slider30 < 0.5) ? (
+  sprintf(#dt, "ECART REF - MIX   centre (niveau moyen ref %s%.1f dB)", g_moy >= 0 ? "+" : "", g_moy);
+) : strcpy(#dt, "ECART REF - MIX");
+txt(#dt, g_sx + 52 * gsc, g_dy + 3 * gsc, g_sw - 300 * gsc, 14 * gsc, 4);
+g_bw2 = 70 * gsc; g_bh2 = 16 * gsc; g_bx2 = g_sx + g_sw - 3 * (g_bw2 + 2 * gsc) - 2 * gsc; g_by2 = g_dy + 3 * gsc;
+btn(g_bx2, g_by2, g_bw2, g_bh2, slider30 < 0.5 ? "CENTRE" : "ABSOLU", 0) ? do_cmd(46);
+g_bx2 += g_bw2 + 2 * gsc;
+g_sc = floor(slider31 + 0.5);
+g_sc == 0 ? sprintf(#b, "AUTO %d", g_drng) : sprintf(#b, "+/- %d dB", g_drng);
+btn(g_bx2, g_by2, g_bw2, g_bh2, #b, 0) ? do_cmd(47);
+g_bx2 += g_bw2 + 2 * gsc;
+g_lz = floor(slider32 + 0.5);
+g_lz == 0 ? strcpy(#b, "LISS. SPECTRE") : g_lz == 1 ? strcpy(#b, "LISS. 1/6") : g_lz == 2 ? strcpy(#b, "LISS. 1/3") : strcpy(#b, "LISS. 1 OCT");
+btn(g_bx2, g_by2, g_bw2, g_bh2, #b, 0) ? do_cmd(48);
 
 // survol : lecture des valeurs
-hit(g_sx, g_sy, g_sw, g_sh + ggap + g_dh) ? (
+(hit(g_sx, g_sy, g_sw, g_sh + ggap + g_dh) && !hit(g_bx2 - 2 * (g_bw2 + 2 * gsc), g_by2, 3 * (g_bw2 + 2 * gsc), g_bh2)) ? (
   g_i = min(max(floor(mouse_x - g_sx), 0), g_sw - 1);
   g_f = 20 * exp(g_i / (g_sw - 1) * log(1000));
   cla(1, 1, 1, 0.25); gfx_rect(g_sx + g_i, g_sy, 1, g_sh); gfx_rect(g_sx + g_i, g_dy, 1, g_dh);
   g_f < 1000 ? sprintf(#fq, "%d Hz", g_f) : sprintf(#fq, "%.2f kHz", g_f / 1000);
-  g_refon ? sprintf(#hv, "%s    MIX %.1f    REF %.1f    ECART %.1f dB", #fq, PXM[g_i], PXR[g_i], PXR[g_i] - PXM[g_i])
+  (g_refon && g_dval && DXM[g_i]) ? sprintf(#hv, "%s    MIX %.1f    REF %.1f    ECART %s%.1f dB", #fq, PXM[g_i], PXR[g_i], DXS[g_i] - g_off >= 0 ? "+" : "", DXS[g_i] - g_off) :
+  g_refon ? sprintf(#hv, "%s    MIX %.1f    REF %.1f", #fq, PXM[g_i], PXR[g_i])
           : sprintf(#hv, "%s    MIX %.1f dB", #fq, PXM[g_i]);
   gfx_setfont(2); c_text(); txt(#hv, g_sx + 8 * gsc, g_sy + 5 * gsc, g_sw - 170 * gsc, 16 * gsc, 4);
 );
@@ -1033,6 +1527,52 @@ g_eh > 30 * gsc ? (
   gfx_setfont(2); c_dim(); txt("LU", g_mx + g_mw - 46 * gsc, g_y + 18 * gsc, 40 * gsc, g_eh - 20 * gsc, 4);
 );
 
+// ---------------- isolation de bandes + mode d'ecoute ----------------
+g_iy = g_my0 + g_mainH + ggap;
+c_panel(); gfx_rect(gpad, g_iy, gW - 2 * gpad, g_ih);
+iso_eff ? ( cl(ACR, ACG, ACB); gfx_rect(gpad, g_iy, 2 * gsc, g_ih); );
+gfx_setfont(2); c_dim(); txt("BANDES", gpad + 10 * gsc, g_iy, 60 * gsc, g_ih, 4);
+g_mbw = 52 * gsc; g_fullw = 52 * gsc;
+g_bw = floor((gW - 2 * gpad - 70 * gsc - g_fullw - 6 * gsc - 24 * gsc - 56 * gsc - 5 * (g_mbw + 2 * gsc) - 4 * 2 * gsc - 8 * gsc) / 5);
+g_x = gpad + 70 * gsc; g_y = g_iy + 3 * gsc; g_h = g_ih - 6 * gsc;
+g_k = 1;
+loop(5,
+  g_k == 1 ? strcpy(#bn, "GRAVES") : g_k == 2 ? strcpy(#bn, "BAS-MED") : g_k == 3 ? strcpy(#bn, "MEDIUM") :
+  g_k == 4 ? strcpy(#bn, "HAUT-MED") : strcpy(#bn, "AIGUS");
+  g_k == 1 ? ( hzfmt(#h2, xo1); sprintf(#bl, "< %s Hz", #h2); ) :
+  g_k == 5 ? ( hzfmt(#h1, xo4); sprintf(#bl, "> %s Hz", #h1); ) : (
+    hzfmt(#h1, g_k == 2 ? xo1 : g_k == 3 ? xo2 : xo3);
+    hzfmt(#h2, g_k == 2 ? xo2 : g_k == 3 ? xo3 : xo4);
+    sprintf(#bl, "%s - %s Hz", #h1, #h2);
+  );
+  g_st = bsel(g_k) >= 0.5 ? (slider19 >= 0.5 ? 1 : 2) : 0;
+  btn3(g_x, g_y, g_bw, g_h, "", g_st);
+  g_st == 1 ? cl(0.05, 0.05, 0.06) : g_st == 2 ? cl(ACR, ACG, ACB) : hit(g_x, g_y, g_bw, g_h) ? cl(0.95, 0.95, 0.96) : cl(0.70, 0.72, 0.76);
+  gfx_setfont(2); txt(#bn, g_x, g_y + 2 * gsc, g_bw, 15 * gsc, 5);
+  g_st == 1 ? cla(0.05, 0.05, 0.06, 0.75) : c_dim();
+  gfx_setfont(5); txt(#bl, g_x, g_y + 15 * gsc, g_bw, 13 * gsc, 5);
+  hit(g_x, g_y, g_bw, g_h) ? (
+    g_lc ? ( (g_mc & 4) || (g_mc & 8) ? solo_toggle(g_k) : solo_excl(g_k); );
+    g_rc ? solo_toggle(g_k);
+  );
+  g_x += g_bw + 2 * gsc;
+  g_k += 1;
+);
+g_x += 4 * gsc;
+btn3(g_x, g_y, g_fullw, g_h, "FULL", iso_eff ? 0 : 1) && g_lc ? (
+  nsolo() > 0 ? do_cmd(30);
+);
+g_x += g_fullw + 24 * gsc;
+gfx_setfont(2); c_dim(); txt("SORTIE", g_x, g_iy, 56 * gsc, g_ih, 4); g_x += 56 * gsc;
+g_k = 0;
+loop(5,
+  g_k == 0 ? strcpy(#b, "STEREO") : g_k == 1 ? strcpy(#b, "MONO") : g_k == 2 ? strcpy(#b, "SIDE") :
+  g_k == 3 ? strcpy(#b, "G") : strcpy(#b, "D");
+  btn(g_x, g_y, g_mbw, g_h, #b, floor(slider29 + 0.5) == g_k) ? ( slider29 = g_k; sliderchange(slider29); );
+  g_x += g_mbw + 2 * gsc;
+  g_k += 1;
+);
+
 // ---------------- pied de page ----------------
 g_fy = gH - gpad - g_foot + 2 * gsc;
 g_x = gW - gpad - 92 * gsc;
@@ -1047,7 +1587,8 @@ txt(#ft, gpad, g_fy, 200 * gsc, g_foot, 4);
   txt("Companion inactif : lancer l'action Todoroki Companion", gpad + 170 * gsc, g_fy, 380 * gsc, g_foot, 4);
 ) : (
   c_dim();
-  txt("A : MIX/REF   1-4 : ref   L : boucle   P : lecture   V/R : vitesse/reset spectre", gpad + 170 * gsc, g_fy, g_x - gpad - 180 * gsc, g_foot, 4);
+  txt("A MIX/REF  1-4 ref  L boucle  P lecture  V/R spectre  F1-F5 bandes  I isolation  M sortie  E echelle",
+      gpad + 170 * gsc, g_fy, g_x - gpad - 180 * gsc, g_foot, 4);
 );
 
 g_lmc = g_mc;
