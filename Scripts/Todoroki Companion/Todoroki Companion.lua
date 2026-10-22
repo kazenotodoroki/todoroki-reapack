@@ -1,40 +1,42 @@
--- @description Todoroki Companion (service d'arriere-plan partage)
+-- @description Todoroki Companion (shared background service)
 -- @author Todoroki
--- @version 1.0
+-- @version 1.1
 -- @changelog
---   Premiere version : service partage, modules, API Lua, autostart.
+--   - Everything in English (messages, actions, documentation)
+--   - "Etat et modules" action renamed "Status and modules"
 -- @provides
 --   [main] .
---   [main] Todoroki Companion - *.lua
+--   [main] Todoroki Companion - Autostart (on-off).lua
+--   [main] Todoroki Companion - Status and modules.lua
 --   [nomain] Todoroki_Companion_API.lua
---   Todoroki Companion LISEZMOI.md
+--   Todoroki Companion README.md
 -- @about
 --   # Todoroki Companion
 --
---   Service d'arriere-plan unique, partage par les scripts et JSFX Todoroki.
---   Il charge des **modules** (`Todoroki_Companion_Module_*.lua`) installes par les
---   autres paquets du depot, et offre une **API Lua** aux scripts.
+--   A single background service shared by the Todoroki scripts and JSFX.
+--   It loads **modules** (`Todoroki_Companion_Module_*.lua`) installed by the
+--   other packages of the repository, and offers a **Lua API** to scripts.
 --
---   - Lancer l'action **Todoroki Companion** (relancer = arreter)
---   - **Todoroki Companion - Autostart (on-off)** : demarrage avec REAPER
---   - Compatible REAPER portable (chemins relatifs au dossier REAPER)
+--   - Run the **Todoroki Companion** action (run it again = stop)
+--   - **Todoroki Companion - Autostart (on-off)**: start together with REAPER
+--   - Works with portable REAPER (paths relative to the REAPER folder)
 --
---   Documentation developpeur : `Todoroki Companion LISEZMOI.md`.
+--   Developer documentation: `Todoroki Companion README.md`.
 
 local VERSION = "1.0"
-local SEC     = "Todoroki_Companion"          -- section ExtState
+local SEC     = "Todoroki_Companion"          -- ExtState section
 local SEP     = package.config:sub(1, 1)
 local RES     = reaper.GetResourcePath()
 local _, SELF, SECTION_ID, CMD_ID = reaper.get_action_context()
 local HERE    = SELF:match("^(.*[\\/])") or (RES .. SEP)
 
 ----------------------------------------------------------------------------------------------
--- instance unique
+-- single instance
 ----------------------------------------------------------------------------------------------
-if reaper.set_action_options then reaper.set_action_options(1) end   -- relancer = arreter
+if reaper.set_action_options then reaper.set_action_options(1) end   -- run again = stop
 local TOKEN = string.format("%.6f-%d", reaper.time_precise(), math.random(1, 1000000000))
 reaper.SetExtState(SEC, "token", TOKEN, false)
-reaper.SetExtState("RefLab", "companion", "todoroki", false)          -- arrete l'ancien RefLab_Companion v1.1
+reaper.SetExtState("RefLab", "companion", "todoroki", false)          -- stops the old RefLab_Companion v1.1
 
 if CMD_ID and CMD_ID > 0 then
   local named = reaper.ReverseNamedCommandLookup(CMD_ID)
@@ -46,7 +48,7 @@ reaper.SetExtState(SEC, "dir", HERE, true)
 reaper.SetExtState(SEC, "version", VERSION, false)
 
 ----------------------------------------------------------------------------------------------
--- boite a outils passee aux modules (C)
+-- toolbox passed to the modules (C)
 ----------------------------------------------------------------------------------------------
 local C = { version = VERSION, sep = SEP, res = RES, dir = HERE, section = SEC }
 local logs = {}
@@ -94,7 +96,7 @@ local function ext_ok(name, exts)
   return e ~= nil and exts[e:lower()] == true
 end
 
--- liste (non recursive) des fichiers d'un dossier, triee, cache de REAPER vide
+-- (non recursive) sorted list of the files of a folder, REAPER cache cleared
 function C.list_files(dir, exts)
   local out, i = {}, 0
   reaper.EnumerateFiles(dir, -1)
@@ -120,13 +122,13 @@ function C.list_dirs(dir)
   return out
 end
 
--- extensions audio usuelles
+-- common audio extensions
 C.AUDIO_EXT = { wav = true, flac = true, mp3 = true, ogg = true, aif = true, aiff = true, wv = true, opus = true }
 
--- scan recursif ASYNCHRONE (ne bloque jamais REAPER) : pour les grosses librairies de samples.
+-- ASYNCHRONOUS recursive scan (never blocks REAPER): for big sample libraries.
 --   opts = { exts = C.AUDIO_EXT, max_depth = 12, on_file = function(path, name) end,
 --            on_done = function(files, job) end }
---   renvoie un job : job.done, job.files (chemins complets), job.dirs_done, job.cancel()
+--   returns a job: job.done, job.files (full paths), job.dirs_done, job.cancel()
 local jobs = {}
 function C.scan(root, opts)
   opts = opts or {}
@@ -166,7 +168,7 @@ local function run_jobs(budget)
   end
 end
 
--- gmem : chaines (1 caractere par case, 0 final)
+-- gmem: strings (1 character per slot, 0 terminated)
 function C.gmem_write_string(base, s, maxlen)
   maxlen = maxlen or 256
   local n = math.min(#s, maxlen - 1)
@@ -189,7 +191,7 @@ end
 ----------------------------------------------------------------------------------------------
 local modules, order = {}, {}
 
--- racine de recherche : dossier du depot (…/Scripts/Todoroki), sinon dossier du Companion
+-- search root: the repository folder (.../Scripts/Todoroki), otherwise the Companion folder
 local function search_root()
   local r = HERE:gsub("[\\/]$", "")
   local up2 = r:match("^(.*)[\\/][^\\/]+[\\/][^\\/]+$")
@@ -221,9 +223,9 @@ local function safe(M, fname, ...)
   if M.gmem then reaper.gmem_attach(M.gmem) end
   local ok, a = pcall(fn, C, ...)
   if not ok then
-    C.log(M.name, fname .. " : " .. tostring(a))
+    C.log(M.name, fname .. ": " .. tostring(a))
     M._errors = (M._errors or 0) + 1
-    if M._errors >= 20 then M._disabled = true; C.log(M.name, "desactive apres 20 erreurs") end
+    if M._errors >= 20 then M._disabled = true; C.log(M.name, "disabled after 20 errors") end
   end
   return ok, a
 end
@@ -242,9 +244,9 @@ local function load_modules()
       modules[M.name] = M
       order[#order + 1] = M
       safe(M, "init")
-      C.log("core", "module charge : " .. M.name)
+      C.log("core", "module loaded: " .. M.name)
     elseif not ok then
-      C.log("core", "erreur de chargement " .. path .. " : " .. tostring(M))
+      C.log("core", "loading error " .. path .. ": " .. tostring(M))
     end
   end
   local names = {}
@@ -255,7 +257,7 @@ C.reload = load_modules
 C.module = function(name) return modules[name] end
 
 ----------------------------------------------------------------------------------------------
--- messagerie Lua (API) : ExtState "inbox" -> reponses "r_<id>"
+-- Lua messaging (API): ExtState "inbox" -> replies "r_<id>"
 ----------------------------------------------------------------------------------------------
 local function dec(s) return (s:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)) end
 local function enc(s) return (tostring(s):gsub("[%%\t\r\n]", function(c) return string.format("%%%02X", c:byte()) end)) end
@@ -290,7 +292,7 @@ local function handle_inbox()
         end
       end
       local reply
-      if not fn then reply = "error\tcommande inconnue : " .. mod .. "." .. cmd
+      if not fn then reply = "error\tunknown command: " .. mod .. "." .. cmd
       elseif ok then reply = "ok\t" .. enc(res == nil and "" or res)
       else reply = "error\t" .. enc(res) end
       if id ~= "" then reaper.SetExtState(SEC, "r_" .. id, reply, false) end
@@ -299,7 +301,7 @@ local function handle_inbox()
 end
 
 ----------------------------------------------------------------------------------------------
--- boucle
+-- main loop
 ----------------------------------------------------------------------------------------------
 local function shutdown()
   unload_all()
@@ -314,7 +316,7 @@ local function shutdown()
 end
 
 local function loop()
-  if reaper.GetExtState(SEC, "token") ~= TOKEN then return end     -- une autre instance a pris la main
+  if reaper.GetExtState(SEC, "token") ~= TOKEN then return end     -- another instance took over
   local now = reaper.time_precise()
   reaper.SetExtState(SEC, "hb", string.format("%.3f", now), false)
 

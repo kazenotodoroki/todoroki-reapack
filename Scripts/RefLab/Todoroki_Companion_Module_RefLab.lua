@@ -1,35 +1,82 @@
--- @description RefLab - actions et module Companion
+-- @description RefLab - actions and Companion module
 -- @author Todoroki
--- @version 1.3
+-- @version 1.4
 -- @changelog
---   - Memoire par projet : references, boucles et reference selectionnee enregistrees dans le
---     projet (.rpp) et rechargees a l'ouverture ou au changement d'onglet, meme quand RefLab
---     est dans le Monitoring FX
---   - Nouvelles actions : isolation de bandes (solo exclusif / cumulable par bande, full,
---     on/off), modes d'ecoute (stereo, mono, side, gauche, droite), vitesses du spectre,
---     courbe d'ecart (centrage, echelle, lissage), match, pente, lissage, trim
+--   - Everything in English; the actions were renamed (re-assign the shortcuts made in 1.3)
+--   - Spectrum speed actions: Fast, Medium, Slow, Very slow, Infinite average
 -- @provides
 --   [nomain] .
---   [main] RefLab - *.lua
---   RefLab LISEZMOI.md
+--   [main] RefLab - Back to loop start on Play on-off.lua
+--   [main] RefLab - Band solo - band 1 Low add-remove.lua
+--   [main] RefLab - Band solo - band 1 Low solo.lua
+--   [main] RefLab - Band solo - band 2 Low-mid add-remove.lua
+--   [main] RefLab - Band solo - band 2 Low-mid solo.lua
+--   [main] RefLab - Band solo - band 3 Mid add-remove.lua
+--   [main] RefLab - Band solo - band 3 Mid solo.lua
+--   [main] RefLab - Band solo - band 4 High-mid add-remove.lua
+--   [main] RefLab - Band solo - band 4 High-mid solo.lua
+--   [main] RefLab - Band solo - band 5 High add-remove.lua
+--   [main] RefLab - Band solo - band 5 High solo.lua
+--   [main] RefLab - Band solo - full (no band).lua
+--   [main] RefLab - Band solo on-off.lua
+--   [main] RefLab - Difference - centered or absolute.lua
+--   [main] RefLab - Difference - next scale.lua
+--   [main] RefLab - Difference - next smoothing.lua
+--   [main] RefLab - Independent playback on-off.lua
+--   [main] RefLab - Listen to MIX.lua
+--   [main] RefLab - Listen to REF.lua
+--   [main] RefLab - Loudness match - Integrated.lua
+--   [main] RefLab - Loudness match - Off.lua
+--   [main] RefLab - Loudness match - Short-term.lua
+--   [main] RefLab - Loudness match - next mode.lua
+--   [main] RefLab - Next reference.lua
+--   [main] RefLab - Open references folder.lua
+--   [main] RefLab - Output - Left.lua
+--   [main] RefLab - Output - Mono.lua
+--   [main] RefLab - Output - Right.lua
+--   [main] RefLab - Output - Side.lua
+--   [main] RefLab - Output - Stereo.lua
+--   [main] RefLab - Output - next mode.lua
+--   [main] RefLab - Previous reference.lua
+--   [main] RefLab - Reference 1.lua
+--   [main] RefLab - Reference 2.lua
+--   [main] RefLab - Reference 3.lua
+--   [main] RefLab - Reference 4.lua
+--   [main] RefLab - Reference trim +0.5 dB.lua
+--   [main] RefLab - Reference trim -0.5 dB.lua
+--   [main] RefLab - Reference trim 0 dB.lua
+--   [main] RefLab - Refresh references list.lua
+--   [main] RefLab - Reset integrated loudness.lua
+--   [main] RefLab - Spectrum - next slope.lua
+--   [main] RefLab - Spectrum - next smoothing.lua
+--   [main] RefLab - Spectrum - reset average.lua
+--   [main] RefLab - Spectrum speed - Fast.lua
+--   [main] RefLab - Spectrum speed - Infinite average.lua
+--   [main] RefLab - Spectrum speed - Medium.lua
+--   [main] RefLab - Spectrum speed - Slow.lua
+--   [main] RefLab - Spectrum speed - Very slow.lua
+--   [main] RefLab - Spectrum speed - next.lua
+--   [main] RefLab - Toggle MIX-REF.lua
+--   [main] RefLab - Toggle loop.lua
+--   RefLab README.md
 -- @about
---   # RefLab - actions et module Companion
+--   # RefLab - actions and Companion module
 --
---   A installer avec les paquets **RefLab** (JSFX) et **Todoroki Companion**.
+--   Install together with the **RefLab** (JSFX) and **Todoroki Companion** packages.
 --
---   - Actions "RefLab - ..." : a assigner a des touches ou a un controleur MIDI
---   - Module Companion : ouvre `<REAPER>/Data/references`, tient la liste des fichiers a jour
---     et memorise les references de chaque projet
+--   - "RefLab - ..." actions: map them to keys or to a MIDI controller
+--   - Companion module: opens `<REAPER>/Data/references`, keeps the file list up to date
+--     and remembers the references of each project
 
--- Protocole gmem "RefLab" (partage avec RefLab.jsfx) :
---   [0] battement de coeur      [1] requete du plugin (1 ouvrir dossier, 2 actualiser, 3 etat projet)
---   [2] commande des actions    [3] version de la liste   [4] nombre de fichiers
---   [10] compteur de publication (plugin)   [11] ref selectionnee (0-3)
---   [12] compteur de restauration (module)  [13] ref a selectionner  [15] accuse du plugin
---   [16] 1 = donnees a restaurer presentes
---   [20 + 4k ..] etat publie : actif, boucle on, debut, fin     [70000 + k*256] nom publie
---   [40 + 4k ..] etat a restaurer                                [71024 + k*256] nom a restaurer
---   [100 + i*256 ...] liste des fichiers (1 caractere par case, 0 final)
+-- "RefLab" gmem protocol (shared with RefLab.jsfx):
+--   [0] heartbeat              [1] request from the plugin (1 open folder, 2 refresh, 3 project state)
+--   [2] command from actions   [3] list version   [4] number of files
+--   [10] publish counter (plugin)   [11] selected ref (0-3)
+--   [12] restore counter (module)   [13] ref to select   [15] plugin acknowledgment
+--   [16] 1 = data to restore present
+--   [20 + 4k ..] published state: active, loop on, start, end   [70000 + k*256] published name
+--   [40 + 4k ..] state to restore                                [71024 + k*256] name to restore
+--   [100 + i*256 ...] file list (1 character per slot, 0 terminated)
 
 local M = { name = "RefLab", gmem = "RefLab", interval = 1.5 }
 local MAXF, NAMEW, BASE = 250, 256, 100
@@ -39,7 +86,7 @@ local dir, last_sig, hb = nil, nil, 0
 local last_proj, last_pub, stored_body, last_push = nil, nil, nil, 0
 
 ----------------------------------------------------------------------------------------------
--- liste des fichiers de reference
+-- reference file list
 ----------------------------------------------------------------------------------------------
 local function publish(C, force)
   local list = {}
@@ -57,8 +104,8 @@ local function publish(C, force)
 end
 
 ----------------------------------------------------------------------------------------------
--- memoire par projet
---   format : "v1|<ref>|<actif>,<boucle>,<debut>,<fin>,<nom>;... (4 emplacements)"
+-- per-project memory
+--   format: "v1|<ref>|<active>,<loop>,<start>,<end>,<name>;... (4 slots)"
 ----------------------------------------------------------------------------------------------
 local function pct(s) return (s:gsub("[%%|;,\r\n]", function(c) return string.format("%%%02X", c:byte()) end)) end
 local function unpct(s) return (s:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)) end
@@ -80,7 +127,7 @@ local function get_stored()
   return s or ""
 end
 
--- pousse l'etat du projet courant vers le plugin
+-- pushes the current project state to the plugin
 local function push(C)
   local s = get_stored()
   local sel, body = s:match("^v1|(%-?%d+)|(.*)$")
@@ -110,18 +157,18 @@ local function push(C)
   last_push = C.now()
 end
 
--- enregistre dans le projet ce que le plugin publie
+-- stores in the project what the plugin publishes
 local function poll_published(C)
   local pub = reaper.gmem_read(10)
   if pub == last_pub then return end
   last_pub = pub
-  -- n'accepter que ce qui suit la derniere restauration (evite d'ecrire l'etat d'un ancien projet)
+  -- only accept what follows the last restore (avoids writing the state of a previous project)
   if reaper.gmem_read(15) ~= reaper.gmem_read(12) then return end
   local body, sel = read_published(C)
   local s = "v1|" .. sel .. "|" .. body
   if s ~= get_stored() then
     reaper.SetProjExtState(0, EXT_SEC, EXT_KEY, s)
-    -- projet "modifie" seulement pour un vrai changement de l'utilisateur (pas l'echo d'une restauration)
+    -- mark the project "modified" only for a real user change (not the echo of a restore)
     if body ~= stored_body and C.now() - last_push > 2 then reaper.MarkProjectDirty(0) end
     stored_body = body
   end

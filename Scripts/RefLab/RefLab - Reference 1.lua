@@ -1,6 +1,6 @@
 -- @noindex
--- RefLab : Reference 1
--- Assignable a une touche ou un controleur MIDI depuis la liste d'actions.
+-- RefLab: Reference 1
+-- Can be mapped to a key or a MIDI controller from the action list.
 reaper.gmem_attach("RefLab")
 reaper.gmem_write(2, 11)
 reaper.defer(function() end)

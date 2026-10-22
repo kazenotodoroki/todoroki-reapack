@@ -47,4 +47,4 @@ TODOROKI COMPANION (service partage)
   il ajoute un module  Todoroki_Companion_Module_<Nom>.lua  dans son dossier
   et le declare dans son @provides (sans [main]).
   Modele, API Lua et convention gmem :
-    Scripts/Todoroki Companion/Todoroki Companion LISEZMOI.md
+    Scripts/Todoroki Companion/Todoroki Companion README.md

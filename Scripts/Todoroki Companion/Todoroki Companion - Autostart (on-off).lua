@@ -1,7 +1,7 @@
 -- @noindex
--- Todoroki Companion : active / desactive le demarrage automatique avec REAPER.
--- Ecrit une ligne dans Scripts/__startup.lua, en chemin relatif au dossier REAPER
--- (fonctionne en portable meme si la lettre de la cle USB change).
+-- Todoroki Companion: turns automatic start with REAPER on / off.
+-- Writes a line in Scripts/__startup.lua, with a path relative to the REAPER folder
+-- (works with portable REAPER even if the USB drive letter changes).
 
 local SEP  = package.config:sub(1, 1)
 local RES  = reaper.GetResourcePath()
@@ -18,7 +18,7 @@ local lines, enabled = {}, false
 for l in ((read(STARTUP) or "") .. "\n"):gmatch("(.-)\r?\n") do
   if l:find(MARK, 1, true) then
     enabled = true
-  elseif not l:find("RefLab Companion", 1, true) then          -- ancienne ligne RefLab v1.1
+  elseif not l:find("RefLab Companion", 1, true) then          -- old RefLab v1.1 line
     lines[#lines + 1] = l
   end
 end
@@ -26,23 +26,23 @@ while #lines > 0 and lines[#lines] == "" do lines[#lines] = nil end
 
 local msg
 if enabled then
-  msg = "Demarrage automatique du Todoroki Companion DESACTIVE."
+  msg = "Todoroki Companion automatic start is now OFF."
 else
-  local rel = COMP:sub(1, #RES):lower() == RES:lower() and COMP:sub(#RES + 1) or nil   -- separateurs natifs : meme ID d'action que ReaPack
+  local rel = COMP:sub(1, #RES):lower() == RES:lower() and COMP:sub(#RES + 1) or nil   -- native separators: same action ID as ReaPack
   local expr = rel and ("reaper.GetResourcePath() .. [[" .. rel .. "]]") or ("[[" .. COMP .. "]]")
   lines[#lines + 1] = "do local id = reaper.AddRemoveReaScript(true, 0, " .. expr ..
                       ", true) if id ~= 0 then reaper.Main_OnCommand(id, 0) end end " .. MARK
-  msg = "Demarrage automatique du Todoroki Companion ACTIVE."
-  if not rel then msg = msg .. "\n\nAttention : le Companion n'est pas dans le dossier REAPER, chemin absolu utilise." end
+  msg = "Todoroki Companion automatic start is now ON."
+  if not rel then msg = msg .. "\n\nWarning: the Companion is not inside the REAPER folder, an absolute path is used." end
   local hb = tonumber(reaper.GetExtState("Todoroki_Companion", "hb")) or 0
   if reaper.time_precise() - hb > 2 then
     local id = reaper.AddRemoveReaScript(true, 0, COMP, true)
-    if id ~= 0 then reaper.Main_OnCommand(id, 0); msg = msg .. "\nCompanion demarre." end
+    if id ~= 0 then reaper.Main_OnCommand(id, 0); msg = msg .. "\nCompanion started." end
   end
 end
 
 if not write(STARTUP, table.concat(lines, "\n") .. "\n") then
-  msg = "Impossible d'ecrire " .. STARTUP
+  msg = "Cannot write " .. STARTUP
 else
   reaper.SetToggleCommandState(SECTION_ID, CMD_ID, enabled and 0 or 1)
   reaper.RefreshToolbar2(SECTION_ID, CMD_ID)

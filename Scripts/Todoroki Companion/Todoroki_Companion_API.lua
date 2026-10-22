@@ -1,8 +1,8 @@
 -- @noindex
 --[[
-  Todoroki Companion - API pour les scripts Lua
+  Todoroki Companion - API for Lua scripts
 
-  Chargement depuis n'importe quel script :
+  Loading it from any script:
 
     local api_path = reaper.GetExtState("Todoroki_Companion", "dir")
     if api_path == "" then
@@ -10,19 +10,19 @@
     end
     local TC = dofile(api_path .. "Todoroki_Companion_API.lua")
 
-  Fonctions :
-    TC.running()                      -> true si le Companion tourne
-    TC.start()                        -> demarre le Companion s'il ne tourne pas (true si ok)
-    TC.modules()                      -> { "RefLab", ... } modules charges
-    TC.has(name)                      -> true si le module est charge
-    TC.call(module, cmd, arg)         -> id de requete (asynchrone)
-    TC.result(id)                     -> "pending" | "ok", valeur | "error", message
+  Functions:
+    TC.running()                      -> true if the Companion is running
+    TC.start()                        -> starts the Companion if it is not running (true if ok)
+    TC.modules()                      -> { "RefLab", ... } loaded modules
+    TC.has(name)                      -> true if the module is loaded
+    TC.call(module, cmd, arg)         -> request id (asynchronous)
+    TC.result(id)                     -> "pending" | "ok", value | "error", message
     TC.request(module, cmd, arg, cb, timeout)
-                                      -> appelle cb(ok, valeur) quand la reponse arrive
-                                         (utilise reaper.defer, timeout en s, 3 par defaut)
-    TC.open_folder(path)              -> ouvre un dossier dans l'explorateur (via le Companion)
+                                      -> calls cb(ok, value) when the reply arrives
+                                         (uses reaper.defer, timeout in s, 3 by default)
+    TC.open_folder(path)              -> opens a folder in the file explorer (through the Companion)
 
-  module = "core" pour les commandes du Companion : ping, version, reload, modules,
+  module = "core" for the Companion's own commands: ping, version, reload, modules,
   open_folder, log.
 ]]
 
@@ -80,7 +80,7 @@ end
 
 function TC.request(module, cmd, arg, cb, timeout)
   if not TC.running() then
-    if cb then cb(false, "Todoroki Companion inactif") end
+    if cb then cb(false, "Todoroki Companion not running") end
     return
   end
   local id = TC.call(module, cmd, arg)
@@ -90,7 +90,7 @@ function TC.request(module, cmd, arg, cb, timeout)
     if status ~= "pending" then
       if cb then cb(status == "ok", val) end
     elseif reaper.time_precise() > t_end then
-      if cb then cb(false, "delai depasse") end
+      if cb then cb(false, "timeout") end
     else
       reaper.defer(poll)
     end

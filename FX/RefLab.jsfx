@@ -1,74 +1,69 @@
-// @description RefLab - referencing multi-pistes (spectre, LUFS, match loudness, boucles)
+// @description RefLab - multi-track referencing (spectrum, LUFS, loudness match, loops, band solo)
 // @author Todoroki
-// @version 1.3
+// @version 1.4
 // @changelog
-//   - Les references, boucles et la reference selectionnee sont memorisees DANS LE PROJET
-//     (via le Todoroki Companion), meme quand RefLab est dans le Monitoring FX
-//   - Sauvegarde interne du plugin plus robuste (ordre de chargement, version du format)
-//   - Spectre : nouvelles vitesses ULTRA LENT (15 s) et GLACIAL (45 s), glissement doux en dB,
-//     gel automatique quand la lecture s'arrete
-//   - Isolation de bandes facon ISOL8 : 5 bandes (crossovers Linkwitz-Riley, somme a plat),
-//     solo exclusif / cumulable, crossovers deplacables sur le spectre
-//   - Modes d'ecoute : stereo, mono, side, gauche, droite (sur le mix ET les references)
-//   - Courbe d'ecart lisible : centrage sur l'ecart moyen, echelle auto ou fixe, lissage dedie
-//   - Tous les nouveaux reglages assignables en MIDI (Param > Learn) et via des actions
+//   - Everything in English: interface, parameters, menus, actions and documentation
+//   - Spectrum speeds simplified: FAST, MEDIUM, SLOW, VERY SLOW, INFINITE AVERAGE
+//     (ULTRA SLOW and GLACIAL removed; SLOW keeps the smooth dB glide)
+//   - Note: the reference actions were renamed; re-assign any shortcut you made in 1.3
 // @about
 //   # RefLab
 //
-//   Comparaison mix / references dans REAPER, en JSFX (compatible REAPER portable).
+//   Mix / reference comparison inside REAPER, as a JSFX (works with portable REAPER).
 //
-//   - 4 references, chargees depuis `<REAPER>/Data/references`
-//   - Spectre mix + reference superposes, courbe d'ecart, vitesse de mesure reglable
-//   - Isolation de bandes (5 bandes) et modes d'ecoute stereo / mono / side / G / D
-//   - LUFS momentary / short-term / integre (BS.1770), match loudness automatique
-//   - Boucle par reference (glisser sur la forme d'onde)
-//   - Tous les reglages assignables en MIDI (Param > Learn) ou via les actions "RefLab - ..."
+//   - 4 references, loaded from `<REAPER>/Data/references`
+//   - Mix and reference spectrums overlaid, difference curve, adjustable measuring speed
+//   - Band solo (5 bands, ISOL8 style) and monitoring modes stereo / mono / side / L / R
+//   - Momentary / short-term / integrated LUFS (BS.1770), automatic loudness match
+//   - One loop per reference (drag on the waveform)
+//   - References remembered per project (with the Todoroki Companion)
+//   - Every setting can be mapped to MIDI (Param > Learn) or to the "RefLab - ..." actions
 //
-//   A placer dans le Monitoring FX. Le paquet **Todoroki Companion** ajoute
-//   l'ouverture du dossier des references et la mise a jour automatique de la liste.
-desc:RefLab - Referencing multi-pistes (spectre, LUFS, match loudness, boucles)
+//   Put it in the Monitoring FX. The **Todoroki Companion** package adds opening the
+//   references folder, live refresh of the file list and the per-project memory.
+desc:RefLab - Multi-track referencing (spectrum, LUFS, loudness match, loops, band solo)
 //tags: analysis reference loudness LUFS spectrum
 
-slider1:0<0,1,1{MIX,REF}>-Ecoute
-slider2:1<1,4,1>-Reference selectionnee
-slider3:1<0,2,1{Off,Mix integre,Mix short-term}>-Match loudness
-slider4:0<-24,24,0.1>-Trim reference (dB)
-slider5:3<0,6,0.5>-Pente spectre (dB/oct)
-slider6:2<0,3,1{1/24,1/12,1/6,1/3}>-Lissage spectre (oct)
-slider7:1<0,1,1{Non,Oui}>-Retour au debut de boucle au Play
-slider8:0<0,1,1{Non,Oui}>-Lecture independante
-slider9:0<0,1,1>-[Bouton] Bascule MIX/REF
-slider10:0<0,1,1>-[Bouton] Reference suivante
-slider11:0<0,1,1>-[Bouton] Reference precedente
-slider12:0<0,1,1>-[Bouton] Bascule boucle
-slider13:0<0,1,1>-[Bouton] Reset loudness integre
-slider14:0<0,1,1>-[Bouton] Mode match suivant
-slider15:1<0,6,1{Rapide,Moyen,Lent,Tres lent,Ultra lent,Glacial,Moyenne infinie}>-Vitesse spectre
+slider1:0<0,1,1{MIX,REF}>-Listen
+slider2:1<1,4,1>-Selected reference
+slider3:1<0,2,1{Off,Mix integrated,Mix short-term}>-Loudness match
+slider4:0<-24,24,0.1>-Reference trim (dB)
+slider5:3<0,6,0.5>-Spectrum slope (dB/oct)
+slider6:2<0,3,1{1/24,1/12,1/6,1/3}>-Spectrum smoothing (oct)
+slider7:1<0,1,1{No,Yes}>-Back to loop start on Play
+slider8:0<0,1,1{No,Yes}>-Independent playback
+slider9:0<0,1,1>-[Button] Toggle MIX/REF
+slider10:0<0,1,1>-[Button] Next reference
+slider11:0<0,1,1>-[Button] Previous reference
+slider12:0<0,1,1>-[Button] Toggle loop
+slider13:0<0,1,1>-[Button] Reset integrated loudness
+slider14:0<0,1,1>-[Button] Next match mode
+slider15:1<0,4,1{Fast,Medium,Slow,Very slow,Infinite average}>-Spectrum speed
 slider16:/references:none:-enum
-slider17:0<0,1,1>-[Bouton] Vitesse spectre suivante
-slider18:0<0,1,1>-[Bouton] Reset moyenne spectre
-slider19:1<0,1,1{Off,On}>-Isolation active
-slider20:0<0,1,1{Off,Solo}>-Bande 1 Graves solo
-slider21:0<0,1,1{Off,Solo}>-Bande 2 Bas-medium solo
-slider22:0<0,1,1{Off,Solo}>-Bande 3 Medium solo
-slider23:0<0,1,1{Off,Solo}>-Bande 4 Haut-medium solo
-slider24:0<0,1,1{Off,Solo}>-Bande 5 Aigus solo
-slider25:120<30,600,1>-Coupure 1 (Hz)
-slider26:500<150,3000,1>-Coupure 2 (Hz)
-slider27:2000<600,9000,1>-Coupure 3 (Hz)
-slider28:6000<2000,18000,1>-Coupure 4 (Hz)
-slider29:0<0,4,1{Stereo,Mono,Side,Gauche,Droite}>-Mode d'ecoute
-slider30:0<0,1,1{Centre,Absolu}>-Ecart : reference
-slider31:0<0,4,1{Auto,3 dB,6 dB,12 dB,24 dB}>-Ecart : echelle
-slider32:2<0,3,1{Comme spectre,1/6 oct,1/3 oct,1 oct}>-Ecart : lissage
-slider33:0<0,1,1>-[Bouton] Isolation on/off
-slider34:0<0,1,1>-[Bouton] Mode d'ecoute suivant
-slider35:0<0,1,1>-[Bouton] Solo exclusif bande 1
-slider36:0<0,1,1>-[Bouton] Solo exclusif bande 2
-slider37:0<0,1,1>-[Bouton] Solo exclusif bande 3
-slider38:0<0,1,1>-[Bouton] Solo exclusif bande 4
-slider39:0<0,1,1>-[Bouton] Solo exclusif bande 5
-slider40:0<0,1,1>-[Bouton] Ecart : echelle suivante
+slider17:0<0,1,1>-[Button] Next spectrum speed
+slider18:0<0,1,1>-[Button] Reset spectrum average
+slider19:1<0,1,1{Off,On}>-Band solo active
+slider20:0<0,1,1{Off,Solo}>-Band 1 Low solo
+slider21:0<0,1,1{Off,Solo}>-Band 2 Low-mid solo
+slider22:0<0,1,1{Off,Solo}>-Band 3 Mid solo
+slider23:0<0,1,1{Off,Solo}>-Band 4 High-mid solo
+slider24:0<0,1,1{Off,Solo}>-Band 5 High solo
+slider25:120<30,600,1>-Crossover 1 (Hz)
+slider26:500<150,3000,1>-Crossover 2 (Hz)
+slider27:2000<600,9000,1>-Crossover 3 (Hz)
+slider28:6000<2000,18000,1>-Crossover 4 (Hz)
+slider29:0<0,4,1{Stereo,Mono,Side,Left,Right}>-Output mode
+slider30:0<0,1,1{Centered,Absolute}>-Difference: reference
+slider31:0<0,4,1{Auto,3 dB,6 dB,12 dB,24 dB}>-Difference: scale
+slider32:2<0,3,1{Same as spectrum,1/6 oct,1/3 oct,1 oct}>-Difference: smoothing
+slider33:0<0,1,1>-[Button] Band solo on/off
+slider34:0<0,1,1>-[Button] Next output mode
+slider35:0<0,1,1>-[Button] Exclusive solo band 1
+slider36:0<0,1,1>-[Button] Exclusive solo band 2
+slider37:0<0,1,1>-[Button] Exclusive solo band 3
+slider38:0<0,1,1>-[Button] Exclusive solo band 4
+slider39:0<0,1,1>-[Button] Exclusive solo band 5
+slider40:0<0,1,1>-[Button] Next difference scale
 
 in_pin:Left
 in_pin:Right
@@ -81,7 +76,7 @@ options:maxmem=33554432 gmem=RefLab
 ext_noinit = 1;
 gfx_ext_retina = 1;
 
-// ---------- memoire ----------
+// ---------- memory ----------
 N = 8192; NH = 4096; HN = 800;
 R_START=1000; R_LEN=1010; R_SR=1020; R_READY=1030; R_KEY=1040; R_POS=1050;
 R_IFULL=1060; R_IEFF=1070; R_BLKS=1080; R_BLKN=1090; R_SBL=1100; R_LOOPON=1110;
@@ -90,18 +85,18 @@ R_RECALC=1180; R_PROG=1190; R_ACT=900; R_REQ=910;
 MRING=1200; MHIST=1300; RRING=3000; RHIST=3100;
 PEAK=8192; WIN=16384; SMIX=24576; SREF=28672; CMIX=32768; CREF=36872;
 PXM=40976; PXR=45080;
-QXM=213000; QXR=217104;                                   // spectres lisses en dB (vitesses lentes)
-DXA=221400; DXM=225504; DXC=229608; DXD=233712; DXS=237816; // courbe d'ecart
-// Etat relu a l'ouverture : zone tampon fixe 600..640 (+ #pf0..3), appliquee dans le bloc audio.
-// gmem "RefLab" : [10] publication, [11] ref choisie, [12] restauration, [13] ref, [15] accuse,
-//                 [16] donnees presentes, [20..35] etat publie, [40..55] etat a restaurer,
-//                 [70000..] noms publies, [71024..] noms a restaurer
+QXM=213000; QXR=217104;                                   // spectrums smoothed in dB (slow speeds)
+DXA=221400; DXM=225504; DXC=229608; DXD=233712; DXS=237816; // difference curve
+// State read when opening: fixed buffer 600..640 (+ #pf0..3), applied in the audio block.
+// gmem "RefLab": [10] publish counter, [11] selected ref, [12] restore counter, [13] ref, [15] ack,
+//                [16] data present, [20..35] published state, [40..55] state to restore,
+//                [70000..] published names, [71024..] names to restore
 FMIX=65536; FREF=131072; RMIX=196608; RREF=204800;
 BLK=262144; BLKCAP=65536; SCR=327680; SCRN=65536; AUD=393216;
 AUDCAP = __memtop() - AUD;
 ABSG = 10^((-70 + 0.691) / 10);
 
-// ---------- couleurs ----------
+// ---------- colors ----------
 ACR = 1.0; ACG = 0.46; ACB = 0.12;       // accent (reference)
 MXR = 0.56; MXG = 0.78; MXB = 1.0;       // mix
 
@@ -173,7 +168,7 @@ function km_integ() instance(hist) local(i, sum, n, rel, rb)
   ) : -200;
 );
 
-// ---------- integrated loudness d'une region de reference ----------
+// ---------- integrated loudness of a reference region ----------
 function integ(k, f0, f1) local(sb, base, s0, s1, j, e, sum, n, rel)
 (
   sb = R_SBL[k]; base = BLK + R_BLKS[k];
@@ -196,10 +191,10 @@ function integ(k, f0, f1) local(sb, base, s0, s1, j, e, sum, n, rel)
   ) : -200;
 );
 
-// ---------- acces sliders ----------
+// ---------- slider access ----------
 function sfile(k) ( k == 0 ? #sf0 : k == 1 ? #sf1 : k == 2 ? #sf2 : #sf3; );
 
-// ---------- bornes de lecture (boucle ou fichier entier) ----------
+// ---------- playback bounds (loop or whole file) ----------
 function bnds(k) local(lo)
 (
   lo = R_LOOPON[k] && (R_LE[k] - R_LS[k]) >= 0.25;
@@ -208,7 +203,7 @@ function bnds(k) local(lo)
   b_le <= b_ls + 16 ? ( b_ls = 0; b_le = R_LEN[k]; );
 );
 
-// ---------- stockage : 2 echantillons 24 bits par case ----------
+// ---------- storage: two 24-bit samples per slot ----------
 function unp(v) local(q)
 (
   q = floor(v / 16777216);
@@ -223,7 +218,7 @@ function herm(xm1, x0, x1, x2, t) local(c1, c2, c3)
   ((c3 * t + c2) * t + c1) * t + x0;
 );
 
-// ---------- defragmentation memoire ----------
+// ---------- memory defragmentation ----------
 function compact() local(j, best, bs, lastS, w, wb)
 (
   w = 0; wb = 0; lastS = -1;
@@ -244,7 +239,7 @@ function compact() local(j, best, bs, lastS, w, wb)
   aud_used = w; blk_used = wb;
 );
 
-// ---------- chargement par morceaux ----------
+// ---------- chunked loading ----------
 function load_frames(nf) local(i, p, dst, xl, xr, ql, qr, t, u, bi, v)
 (
   p = SCR; dst = AUD + R_START[ld_slot] + ld_w; i = 0;
@@ -287,7 +282,7 @@ function finish_load() local(k)
   );
 );
 
-// ---------- (de)serialisation d'une chaine via file_var (file_string n'est pas fiable en @serialize) ----------
+// ---------- string (de)serialization through file_var (file_string is not reliable in @serialize) ----------
 function ser_str(str) local(len, i, ch)
 (
   s_rd ? (
@@ -301,7 +296,7 @@ function ser_str(str) local(len, i, ch)
   );
 );
 
-// ---------- etat des emplacements : application sans recharger si rien n'a change ----------
+// ---------- slot state: applied without reloading when nothing changed ----------
 function pfile(k) ( k == 0 ? #pf0 : k == 1 ? #pf1 : k == 2 ? #pf2 : #pf3; );
 function apply_slot(k, act, nm, lo, ls, le) local(same)
 (
@@ -327,7 +322,7 @@ function gm_wr(base, src) local(j, n, ch)
   gmem[base + n] = 0;
 );
 
-// ---------- isolation de bandes : biquads (crossovers Linkwitz-Riley 4e ordre) ----------
+// ---------- band solo: biquads (4th order Linkwitz-Riley crossovers) ----------
 function bq(x) instance(b0 b1 b2 a1 a2 z1 z2) local(y)
 (
   y = b0 * x + z1; z1 = b1 * x - a1 * y + z2; z2 = b2 * x - a2 * y; y;
@@ -408,7 +403,7 @@ function iso_coefs()
 );
 function hz_x(f) ( g_sx + log(f / 20) / log(1000) * (g_sw - 1); );
 
-// ---------- bandes : acces aux sliders ----------
+// ---------- bands: slider access ----------
 function bsel(k) ( k == 1 ? slider20 : k == 2 ? slider21 : k == 3 ? slider22 : k == 4 ? slider23 : slider24; );
 function bset(k, v)
 (
@@ -432,7 +427,7 @@ function solo_excl(k) local(j)
 function solo_toggle(k) ( bset(k, bsel(k) >= 0.5 ? 0 : 1); iso_on(); );
 function solo_clear() local(j) ( j = 1; loop(5, bset(j, 0); j += 1; ); );
 
-// ---------- commandes (boutons assignables / actions REAPER) ----------
+// ---------- commands (mappable buttons / REAPER actions) ----------
 function do_cmd(c) local(jj, ss, dn, kk)
 (
   c == 1 ? ( slider1 = slider1 >= 0.5 ? 0 : 1; sliderchange(slider1); ) :
@@ -453,7 +448,7 @@ function do_cmd(c) local(jj, ss, dn, kk)
   c == 5 ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); ) :
   c == 6 ? ( mix_reset = 1; ) :
   c == 7 ? ( slider3 = (floor(slider3 + 0.5) + 1) % 3; sliderchange(slider3); ) :
-  c == 8 ? ( slider15 = (floor(slider15 + 0.5) + 1) % 7; sliderchange(slider15); spec_reset = 1; ) :
+  c == 8 ? ( slider15 = (floor(slider15 + 0.5) + 1) % 5; sliderchange(slider15); spec_reset = 1; ) :
   c == 9 ? ( spec_reset = 1; ) :
   (c >= 11 && c <= 14) ? ( slider2 = c - 10; sliderchange(slider2); ) :
   c == 20 ? ( slider1 = 0; sliderchange(slider1); ) :
@@ -467,7 +462,7 @@ function do_cmd(c) local(jj, ss, dn, kk)
   c == 46 ? ( slider30 = slider30 >= 0.5 ? 0 : 1; sliderchange(slider30); ) :
   c == 47 ? ( slider31 = (floor(slider31 + 0.5) + 1) % 5; sliderchange(slider31); ) :
   c == 48 ? ( slider32 = (floor(slider32 + 0.5) + 1) % 4; sliderchange(slider32); ) :
-  (c >= 50 && c <= 56) ? ( slider15 = c - 50; sliderchange(slider15); spec_reset = 1; ) :
+  (c >= 50 && c <= 54) ? ( slider15 = c - 50; sliderchange(slider15); spec_reset = 1; ) :
   (c >= 60 && c <= 62) ? ( slider3 = c - 60; sliderchange(slider3); ) :
   c == 63 ? ( slider5 = slider5 < 1.5 ? 3 : slider5 < 3.5 ? 4.5 : 0; sliderchange(slider5); ) :
   c == 64 ? ( slider6 = (floor(slider6 + 0.5) + 1) % 4; sliderchange(slider6); ) :
@@ -477,7 +472,7 @@ function do_cmd(c) local(jj, ss, dn, kk)
   c == 68 ? ( slider7 = slider7 >= 0.5 ? 0 : 1; sliderchange(slider7); );
 );
 
-// ---------- init (premiere fois seulement) ----------
+// ---------- init (first time only) ----------
 !inited ? (
   inited = 1;
   memset(900, 0, 7100);
@@ -503,7 +498,7 @@ mixm.km_init(MRING, MHIST);
 refm.km_init(RRING, RHIST);
 xrate = 1 / (0.015 * srate);
 mrate = 1 - exp(-1 / (0.012 * srate));
-xo_sr = 0;   // force le recalcul des crossovers
+xo_sr = 0;   // forces the crossover update
 spnorm = 16 / (N * N);
 
 @slider
@@ -525,20 +520,20 @@ slider39 >= 0.5 ? ( slider39 = 0; sliderchange(slider39); do_cmd(45); );
 slider40 >= 0.5 ? ( slider40 = 0; sliderchange(slider40); do_cmd(47); );
 
 @block
-// commandes envoyees par les actions REAPER (scripts RefLab)
+// commands sent by the REAPER actions (RefLab scripts)
 gmem[2] != 0 ? ( gcmd = gmem[2]; gmem[2] = 0; do_cmd(gcmd); );
 
-// ---- etat relu a l'ouverture (zone tampon) : applique ici, quel que soit l'ordre d'appel ----
+// ---- state read when opening (buffer): applied here, whatever the call order ----
 ser_pending ? (
   ser_pending = 0;
   k = 0;
   loop(4, apply_slot(k, 600[k], pfile(k), 610[k], 620[k], 630[k]); k += 1; );
 );
 
-// ---- memoire par projet (Todoroki Companion) ----
-// 1) au demarrage : demander l'etat du projet courant
+// ---- per-project memory (Todoroki Companion) ----
+// 1) at startup: ask for the current project state
 (st_need && gmem[1] == 0) ? ( gmem[1] = 3; st_need = 0; );
-// 2) le Companion pousse l'etat du projet (ouverture, changement d'onglet...)
+// 2) the Companion pushes the project state (opening, tab change...)
 gmem[12] != st_rcv ? (
   st_rcv = gmem[12]; st_sync = 1;
   gmem[16] > 0 ? (
@@ -552,7 +547,7 @@ gmem[12] != st_rcv ? (
   );
   st_last = -1;
 );
-// 3) publier l'etat quand il change (le Companion l'enregistre dans le projet)
+// 3) publish the state when it changes (the Companion stores it in the project)
 st_sum = floor(slider2 + 0.5) * 101; k = 0;
 loop(4,
   st_sum += (k + 1) * (R_ACT[k] * 3 + R_REQ[k] * 7 + R_LOOPON[k] * 13 + R_LS[k] * 17 + R_LE[k] * 19);
@@ -572,13 +567,13 @@ loop(4,
   gmem[10] += 1;
 );
 
-// ---- ecoute : matrice et isolation de bandes ----
+// ---- monitoring: output matrix and band solo ----
 mmo = floor(slider29 + 0.5);
 mt00 = mmo == 0 ? 1 : mmo == 1 ? 0.5 : mmo == 2 ? 0.5 : mmo == 3 ? 1 : 0;
 mt01 = mmo == 0 ? 0 : mmo == 1 ? 0.5 : mmo == 2 ? -0.5 : mmo == 3 ? 0 : 1;
 mt10 = mmo == 0 ? 0 : mmo == 1 ? 0.5 : mmo == 2 ? 0.5 : mmo == 3 ? 1 : 0;
 mt11 = mmo == 0 ? 1 : mmo == 1 ? 0.5 : mmo == 2 ? -0.5 : mmo == 3 ? 0 : 1;
-// crossovers ordonnes (ecart mini 1/3 d'octave)
+// ordered crossovers (at least 1/3 octave apart)
 xo1 = min(max(slider25, 30), 600);
 xo2 = min(max(slider26, xo1 * 1.26), 3000);
 xo3 = min(max(slider27, xo2 * 1.26), 9000);
@@ -593,10 +588,10 @@ bt3 = iso_eff ? slider22 >= 0.5 : 1; bt4 = iso_eff ? slider23 >= 0.5 : 1;
 bt5 = iso_eff ? slider24 >= 0.5 : 1;
 (iso_eff && !iso_run) ? ( iso_reset(); iso_run = 1; isomix = 0; );
 
-// position du slot courant -> tableau
+// current slot position -> array
 cur_ready ? R_POS[sel_cur] = cur_pos;
 
-// ---- detection des changements de fichiers ----
+// ---- file change detection ----
 k = 0;
 loop(4,
   key = R_ACT[k] ? R_REQ[k] : -1;
@@ -608,7 +603,7 @@ loop(4,
   k += 1;
 );
 
-// ---- demarrage d'un chargement ----
+// ---- start loading ----
 ld_slot < 0 ? (
   found = -1; k = 0;
   loop(4, (found < 0 && R_PEND[k]) ? found = k; k += 1; );
@@ -652,7 +647,7 @@ ld_slot < 0 ? (
   );
 );
 
-// ---- poursuite du chargement (budget limite par bloc) ----
+// ---- continue loading (limited budget per block) ----
 ld_slot >= 0 ? (
   budget = (play_state & 1) ? samplesblock * 32 : samplesblock * 256;
   ld_done = 0;
@@ -669,13 +664,13 @@ ld_slot >= 0 ? (
   ld_done ? finish_load();
 );
 
-// ---- deplacement de lecture demande par l'interface ----
+// ---- playback seek requested by the interface ----
 seek_flag ? (
   seek_flag = 0;
   R_READY[seek_slot] ? R_POS[seek_slot] = seek_pos;
 );
 
-// ---- loudness de la boucle ----
+// ---- loop loudness ----
 k = 0;
 loop(4,
   (R_RECALC[k] && R_READY[k]) ? (
@@ -699,7 +694,7 @@ pnow = play_state & 1;
 was_play = pnow;
 playing = pnow || slider8 >= 0.5;
 
-// les references non selectionnees avancent en parallele
+// references that are not selected keep running in parallel
 playing ? (
   k = 0;
   loop(4,
@@ -714,7 +709,7 @@ playing ? (
   );
 );
 
-// ---- mesures ----
+// ---- measurements ----
 mix_reset ? ( mix_reset = 0; mixm.km_reset(); );
 mixI = mixm.km_integ();
 mixM = ldb(mixm.mom); mixS = ldb(mixm.st);
@@ -727,7 +722,7 @@ mixS > -70 ? (
 sel_req = min(max(floor(slider2 + 0.5) - 1, 0), 3);
 (sel_req != sel_cur && sel_env <= 0) ? sel_cur = sel_req;
 
-// ---- slot courant pour @sample ----
+// ---- current slot for @sample ----
 k = sel_cur;
 cur_ready = R_READY[k] && R_LEN[k] > 64;
 cur_ready ? (
@@ -786,12 +781,12 @@ rp = (rp + 1) & 8191;
 xf = slider1 >= 0.5 ? min(1, xf + xrate) : max(0, xf - xrate);
 o0 = l + (rl - l) * xf;
 o1 = r + (rr - r) * xf;
-// matrice d'ecoute (stereo / mono / side / gauche / droite), transitions douces
+// output matrix (stereo / mono / side / left / right), smooth transitions
 mc00 += (mt00 - mc00) * mrate; mc01 += (mt01 - mc01) * mrate;
 mc10 += (mt10 - mc10) * mrate; mc11 += (mt11 - mc11) * mrate;
 m0 = mc00 * o0 + mc01 * o1;
 m1 = mc10 * o0 + mc11 * o1;
-// isolation de bandes (calculee seulement quand elle sert : sinon signal intact)
+// band solo (only computed when used: otherwise the signal is untouched)
 iso_run ? (
   bg1 += (bt1 - bg1) * mrate; bg2 += (bt2 - bg2) * mrate; bg3 += (bt3 - bg3) * mrate;
   bg4 += (bt4 - bg4) * mrate; bg5 += (bt5 - bg5) * mrate;
@@ -818,9 +813,9 @@ spl0 = m0;
 spl1 = m1;
 
 @serialize
-// Format v2 : [magie 52763, version] puis, par emplacement : actif, nom, boucle on, debut, fin.
-// La lecture remplit une zone tampon (600..640 + #pf0..3) appliquee dans @block :
-// fonctionne que REAPER appelle @serialize avant ou apres @init.
+// Format v2: [magic 52763, version] then, per slot: active, name, loop on, start, end.
+// Reading fills a buffer (600..640 + #pf0..3) applied in @block:
+// works whether REAPER calls @serialize before or after @init.
 s_rd = file_avail(0) >= 0;
 s_rd ? (
   s_mag = 0; file_var(0, s_mag);
@@ -836,7 +831,7 @@ s_rd ? (
       s_k += 1;
     );
   ) : (
-    // ancien format (1.1 / 1.2) : actif, nom, boucle, debut, fin, nom precedent
+    // old format (1.1 / 1.2): active, name, loop, start, end, previous name
     loop(4,
       s_k == 0 ? ( s_v = s_mag; ) : ( s_v = 0; file_var(0, s_v); );
       600[s_k] = s_v;
@@ -868,7 +863,7 @@ s_rd ? (
 );
 
 @gfx 980 700
-// ================= helpers UI (uniquement appeles depuis @gfx) =================
+// ================= UI helpers (only called from @gfx) =================
 function cl(r, g, b) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = 1; );
 function cla(r, g, b, a) ( gfx_r = r; gfx_g = g; gfx_b = b; gfx_a = a; );
 function hit(x, y, w, h) ( mouse_x >= x && mouse_x < x + w && mouse_y >= y && mouse_y < y + h; );
@@ -947,10 +942,10 @@ function slot_menu(k) local(i, done, res, n, base)
     strcat(#menu, #fnb); strcat(#menu, "|");
     i += 1;
   );
-  n == 0 ? strcat(#menu, "#Aucun fichier dans REAPER/Data/references|");
-  comp_alive ? strcat(#menu, "|Ouvrir le dossier references|Actualiser la liste")
-             : strcat(#menu, "|#Ouvrir le dossier (companion inactif)|#Actualiser (companion inactif)");
-  strcat(#menu, "||Vider l'emplacement|Supprimer la boucle");
+  n == 0 ? strcat(#menu, "#No file in REAPER/Data/references|");
+  comp_alive ? strcat(#menu, "|Open the references folder|Refresh the list")
+             : strcat(#menu, "|#Open the folder (Companion not running)|#Refresh (Companion not running)");
+  strcat(#menu, "||Clear the slot|Remove the loop");
   base = max(n, 1);
   gfx_x = mouse_x; gfx_y = mouse_y;
   res = gfx_showmenu(#menu);
@@ -1017,7 +1012,7 @@ function hzfmt(dst, f)
   ) : sprintf(dst, "%d", floor(f + 0.5));
   dst;
 );
-// bouton a 3 etats : 0 eteint, 1 allume, 2 arme (allume mais isolation en pause)
+// 3-state button: 0 off, 1 on, 2 armed (on but band solo paused)
 function btn3(x, y, w, h, s, st) local(hv)
 (
   hv = hit(x, y, w, h);
@@ -1047,7 +1042,7 @@ gfx_setfont(3, "Segoe UI", 22 * gsc, 'b');
 gfx_setfont(4, "Segoe UI", 15 * gsc, 'b');
 gfx_setfont(5, "Segoe UI", 10 * gsc);
 
-// le companion incremente gmem[0] en continu : vivant si ca bouge
+// the Companion keeps incrementing gmem[0]: alive if it moves
 g_now = time_precise();
 gmem[0] != g_hbv ? ( g_hbv = gmem[0]; g_hbt = g_now; g_hbn += 1; );
 g_now - g_hbt > 2.5 ? g_hbn = 0;
@@ -1058,7 +1053,7 @@ g_lc = (g_mc & 1) && !(g_lmc & 1);
 g_rc = (g_mc & 2) && !(g_lmc & 2);
 g_lr = !(g_mc & 1) && (g_lmc & 1);
 
-// clavier
+// keyboard
 while ((g_ch = gfx_getchar()) > 0) (
   (g_ch == 'a' || g_ch == 'A') ? ( slider1 = slider1 >= 0.5 ? 0 : 1; sliderchange(slider1); );
   (g_ch >= '1' && g_ch <= '4') ? ( slider2 = g_ch - '0'; sliderchange(slider2); );
@@ -1070,7 +1065,7 @@ while ((g_ch = gfx_getchar()) > 0) (
   (g_ch == 'i' || g_ch == 'I') ? do_cmd(30);
   (g_ch == 'm' || g_ch == 'M') ? do_cmd(22);
   (g_ch == 'e' || g_ch == 'E') ? do_cmd(47);
-  // F1-F5 : solo exclusif de la bande (Maj ou Ctrl : cumuler). REAPER renvoie 'f1'..'f5'.
+  // F1-F5: exclusive band solo (Shift or Ctrl: add). REAPER returns 'f1'..'f5'.
   g_bk = (g_ch >= 'f1' && g_ch <= 'f5') ? g_ch - 'f1' + 1 :
          ((g_ch & 255) == 'f' && (g_ch >> 8) >= '1' && (g_ch >> 8) <= '5') ? (g_ch >> 8) - '0' : 0;
   g_bk > 0 ? ( (mouse_cap & 8) || (mouse_cap & 4) ? solo_toggle(g_bk) : solo_excl(g_bk); );
@@ -1084,12 +1079,12 @@ g_hh = 26 * gsc; g_y = gpad; g_x = gpad;
 cl(ACR, ACG, ACB); gfx_rect(g_x, g_y + g_hh / 2 - 4 * gsc, 8 * gsc, 8 * gsc);
 gfx_setfont(4); c_text(); txt("REFLAB", g_x + 16 * gsc, g_y, 80 * gsc, g_hh, 4);
 g_x += 104 * gsc;
-gfx_setfont(2); c_dim(); txt("ECOUTE", g_x, g_y, 56 * gsc, g_hh, 4); g_x += 58 * gsc;
+gfx_setfont(2); c_dim(); txt("LISTEN", g_x, g_y, 56 * gsc, g_hh, 4); g_x += 58 * gsc;
 btn(g_x, g_y, 56 * gsc, g_hh, "MIX", slider1 < 0.5) ? ( slider1 = 0; sliderchange(slider1); ); g_x += 58 * gsc;
 btn(g_x, g_y, 56 * gsc, g_hh, "REF", slider1 >= 0.5) ? ( slider1 = 1; sliderchange(slider1); ); g_x += 56 * gsc + 22 * gsc;
 gfx_setfont(2); c_dim(); txt("MATCH", g_x, g_y, 48 * gsc, g_hh, 4); g_x += 48 * gsc;
 btn(g_x, g_y, 44 * gsc, g_hh, "OFF", slider3 < 0.5) ? ( slider3 = 0; sliderchange(slider3); ); g_x += 46 * gsc;
-btn(g_x, g_y, 72 * gsc, g_hh, "INTEGRE", slider3 >= 0.5 && slider3 < 1.5) ? ( slider3 = 1; sliderchange(slider3); ); g_x += 74 * gsc;
+btn(g_x, g_y, 86 * gsc, g_hh, "INTEGRATED", slider3 >= 0.5 && slider3 < 1.5) ? ( slider3 = 1; sliderchange(slider3); ); g_x += 88 * gsc;
 btn(g_x, g_y, 72 * gsc, g_hh, "SHORT-T", slider3 >= 1.5) ? ( slider3 = 2; sliderchange(slider3); ); g_x += 72 * gsc;
 
 g_x = gW - gpad;
@@ -1097,17 +1092,16 @@ g_w = 70 * gsc; g_x -= g_w;
 slider6 < 0.5 ? strcpy(#b, "1/24 OCT") : slider6 < 1.5 ? strcpy(#b, "1/12 OCT") : slider6 < 2.5 ? strcpy(#b, "1/6 OCT") : strcpy(#b, "1/3 OCT");
 btn(g_x, g_y, g_w, g_hh, #b, 0) ? ( slider6 = (floor(slider6 + 0.5) + 1) % 4; sliderchange(slider6); );
 g_w = 82 * gsc; g_x -= g_w + 2 * gsc;
-sprintf(#b, "PENTE %.1f", slider5);
+sprintf(#b, "SLOPE %.1f", slider5);
 btn(g_x, g_y, g_w, g_hh, #b, 0) ? ( slider5 = slider5 < 1.5 ? 3 : slider5 < 3.5 ? 4.5 : 0; sliderchange(slider5); );
 g_w = 92 * gsc; g_x -= g_w + 2 * gsc;
 g_vb = floor(slider15 + 0.5);
-g_vb == 0 ? strcpy(#b, "RAPIDE") : g_vb == 1 ? strcpy(#b, "MOYEN") : g_vb == 2 ? strcpy(#b, "LENT") :
-g_vb == 3 ? strcpy(#b, "TRES LENT") : g_vb == 4 ? strcpy(#b, "ULTRA LENT") : g_vb == 5 ? strcpy(#b, "GLACIAL") :
-strcpy(#b, "MOY. INF");
+g_vb == 0 ? strcpy(#b, "FAST") : g_vb == 1 ? strcpy(#b, "MEDIUM") : g_vb == 2 ? strcpy(#b, "SLOW") :
+g_vb == 3 ? strcpy(#b, "VERY SLOW") : strcpy(#b, "INF. AVG");
 hit(g_x, g_y, g_w, g_hh) && g_rc ? spec_reset = 1;
-btn(g_x, g_y, g_w, g_hh, #b, g_vb >= 4) ? do_cmd(8);
+btn(g_x, g_y, g_w, g_hh, #b, g_vb >= 2) ? do_cmd(8);
 g_w = 74 * gsc; g_x -= g_w + 10 * gsc;
-btn(g_x, g_y, g_w, g_hh, "LECTURE", slider8 >= 0.5) ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); );
+btn(g_x, g_y, g_w, g_hh, "PLAY", slider8 >= 0.5) ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); );
 playing ? ( cl(ACR, ACG, ACB); gfx_rect(g_x - 10 * gsc, g_y + g_hh / 2 - 3 * gsc, 6 * gsc, 6 * gsc); );
 
 // ---------------- slots ----------------
@@ -1127,19 +1121,19 @@ loop(4,
   g_has = R_ACT[g_k];
   gfx_setfont(1);
   g_has ? ( c_text(); txt(fitname(sfile(g_k), g_cw - 66 * gsc), g_x + 30 * gsc, g_sy0 + 7 * gsc, g_cw - 60 * gsc, 18 * gsc, 4); )
-        : ( c_dim(); txt("Vide", g_x + 30 * gsc, g_sy0 + 7 * gsc, g_cw - 60 * gsc, 18 * gsc, 4); );
+        : ( c_dim(); txt("Empty", g_x + 30 * gsc, g_sy0 + 7 * gsc, g_cw - 60 * gsc, 18 * gsc, 4); );
   gfx_setfont(2);
   (ld_slot == g_k || R_PEND[g_k]) ? (
-    cl(ACR, ACG, ACB); sprintf(#st, "CHARGEMENT %d%%", floor(R_PROG[g_k] * 100));
+    cl(ACR, ACG, ACB); sprintf(#st, "LOADING %d%%", floor(R_PROG[g_k] * 100));
   ) : R_ERR[g_k] ? (
-    cl(1, 0.35, 0.3); strcpy(#st, "ERREUR : illisible ou memoire pleine");
+    cl(1, 0.35, 0.3); strcpy(#st, "ERROR: unreadable or memory full");
   ) : !g_has ? (
-    c_dim(); strcpy(#st, "Clic pour charger un fichier");
+    c_dim(); strcpy(#st, "Click to load a file");
   ) : (
     c_dim();
     R_IEFF[g_k] > -70 ? sprintf(#st, "%.1f LUFS", R_IEFF[g_k]) : strcpy(#st, "-- LUFS");
-    R_LOOPON[g_k] ? strcat(#st, "   |   BOUCLE");
-    R_TRUNC[g_k] ? strcat(#st, "   |   TRONQUE");
+    R_LOOPON[g_k] ? strcat(#st, "   |   LOOP");
+    R_TRUNC[g_k] ? strcat(#st, "   |   TRUNCATED");
   );
   txt(#st, g_x + 30 * gsc, g_sy0 + 27 * gsc, g_cw - 60 * gsc, 16 * gsc, 4);
   g_mz = g_x + g_cw - 28 * gsc;
@@ -1152,7 +1146,7 @@ loop(4,
   g_k += 1;
 );
 
-// ---------------- forme d'onde / boucle ----------------
+// ---------------- waveform / loop ----------------
 g_wy = g_sy0 + g_sh0 + ggap; g_wh = 64 * gsc; g_wx = gpad; g_ww = gW - 2 * gpad;
 c_panel(); gfx_rect(g_wx, g_wy, g_ww, g_wh);
 g_k = sel_req;
@@ -1172,30 +1166,30 @@ R_READY[g_k] && R_LEN[g_k] > 0 ? (
     g_i += 1;
   );
   g_lo ? ( cl(ACR, ACG, ACB); gfx_rect(g_lx0, g_wy, 1 * gsc, g_wh); gfx_rect(g_lx1 - 1 * gsc, g_wy, 1 * gsc, g_wh); );
-  // selection en cours
+  // current selection
   (g_drag && g_dsel) ? (
     cla(1, 1, 1, 0.12); gfx_rect(min(g_dx0, mouse_x), g_wy, abs(mouse_x - g_dx0), g_wh);
   );
-  // tete de lecture
+  // playhead
   g_ph = (g_k == sel_cur && cur_ready) ? cur_pos : R_POS[g_k];
   cl(1, 1, 1); gfx_rect(g_wx + g_ph / g_len * g_ww, g_wy, max(1, gsc), g_wh);
-  // temps
+  // time
   gfx_setfont(2); c_text();
   tfmt(#t1, g_ph / R_SR[g_k]); tfmt(#t2, g_dur);
   sprintf(#tt, "%s / %s", #t1, #t2);
   txt(#tt, g_wx + 8 * gsc, g_wy + g_wh - 18 * gsc, 200 * gsc, 16 * gsc, 4);
   g_lo ? (
     tfmt(#t1, R_LS[g_k]); tfmt(#t2, R_LE[g_k]);
-    sprintf(#tt, "BOUCLE %s - %s", #t1, #t2); cl(ACR, ACG, ACB);
+    sprintf(#tt, "LOOP %s - %s", #t1, #t2); cl(ACR, ACG, ACB);
     txt(#tt, g_wx + 8 * gsc, g_wy + 4 * gsc, 220 * gsc, 16 * gsc, 4);
   );
-  // bouton boucle
+  // loop button
   g_lbw = 64 * gsc; g_lbx = g_wx + g_ww - g_lbw - 6 * gsc; g_lby = g_wy + 6 * gsc;
   g_onbtn = hit(g_lbx, g_lby, g_lbw, 20 * gsc);
-  btn(g_lbx, g_lby, g_lbw, 20 * gsc, "BOUCLE", g_lo) ? (
+  btn(g_lbx, g_lby, g_lbw, 20 * gsc, "LOOP", g_lo) ? (
     (R_LE[g_k] - R_LS[g_k]) >= 0.25 ? ( R_LOOPON[g_k] = !R_LOOPON[g_k]; R_RECALC[g_k] = 1; );
   );
-  // interactions : clic = position, glisser = boucle, clic droit = boucle off
+  // interactions: click = position, drag = loop, right click = loop off
   (g_lc && !g_onbtn && hit(g_wx, g_wy, g_ww, g_wh)) ? ( g_drag = 1; g_dsel = 0; g_dx0 = mouse_x; );
   (g_drag && (g_mc & 1) && abs(mouse_x - g_dx0) > 4 * gsc) ? g_dsel = 1;
   (g_drag && g_lr) ? (
@@ -1213,10 +1207,10 @@ R_READY[g_k] && R_LEN[g_k] > 0 ? (
 ) : (
   g_drag = 0;
   gfx_setfont(2); c_dim();
-  txt("Aucune reference chargee dans cet emplacement", g_wx, g_wy, g_ww, g_wh, 5);
+  txt("No reference loaded in this slot", g_wx, g_wy, g_ww, g_wh, 5);
 );
 
-// ---------------- zones principales ----------------
+// ---------------- main areas ----------------
 g_foot = 20 * gsc;
 g_my0 = g_wy + g_wh + ggap;
 g_ih = 36 * gsc;
@@ -1228,36 +1222,36 @@ g_sy = g_my0; g_sh = g_mainH - g_dh - ggap;
 g_dy = g_sy + g_sh + ggap;
 g_sw = min(g_sw, 4000);
 
-// spectres : moyenne temporelle independante du nombre d'images/s
+// spectrums: time averaging independent of the frame rate
 g_rps = rp;
 g_tn = time_precise();
 g_dt = min(max(g_tn - g_tprev, 0.005), 0.5); g_tprev = g_tn;
 g_vit = floor(slider15 + 0.5);
-g_inf = g_vit == 6;
-g_tau = g_vit == 0 ? 0.12 : g_vit == 1 ? 0.4 : g_vit == 2 ? 1.5 : g_vit == 3 ? 5 : g_vit == 4 ? 15 : 45;
+g_inf = g_vit >= 4;
+g_tau = g_vit == 0 ? 0.12 : g_vit == 1 ? 0.4 : g_vit == 2 ? 1.5 : 5;
 g_slow = !g_inf && g_tau > 0.4;
 (g_vit != g_vitp || sel_cur != g_selp || spec_reset || g_sw != g_swp) ? (
   g_cntM = 0; g_cntR = 0; g_tavgM = 0; g_vitp = g_vit; g_selp = sel_cur; spec_reset = 0;
   g_swp = g_sw; g_warmM = 0; g_warmR = 0;
 );
-// signal present dans la fenetre FFT ? (> -70 dBFS)
+// signal present in the FFT window? (> -70 dBFS)
 g_sigM = winms(RMIX) > 0.0000001;
 g_sigR = winms(RREF) > 0.0000001;
 g_inf ? (
-  // moyenne infinie : seulement quand il y a du signal
+  // infinite average: only while there is signal
   g_sigM ? ( g_cntM += 1; g_aM = 1 / g_cntM; g_tavgM += g_dt; ) : g_aM = 0;
   g_sigR ? ( g_cntR += 1; g_aR = 1 / g_cntR; ) : g_aR = 0;
 ) : (
-  // etage 1 : moyenne en puissance (courte) ; etage 2 (vitesses lentes) : glissement en dB
+  // stage 1: power average (short); stage 2 (slow speeds): glide in dB
   g_tau1 = g_tau <= 0.4 ? g_tau : g_tau <= 1.5 ? 0.4 : 1;
   g_aM = g_aR = 1 - exp(-g_dt / g_tau1);
   g_a2 = 1 - exp(-g_dt / g_tau);
   g_a2M = g_a2R = g_a2;
-  // vitesses lentes : la courbe se fige quand le signal s'arrete
+  // slow speeds: the curve freezes when the signal stops
   g_slow ? (
     !g_sigM ? ( g_aM = 0; g_a2M = 0; ) : g_warmM += g_dt;
     !g_sigR ? ( g_aR = 0; g_a2R = 0; ) : g_warmR += g_dt;
-    // demarrage : suivi rapide le temps que la fenetre d'analyse soit pleine, puis glissement lent
+    // start: fast tracking until the analysis window is full, then slow glide
     g_warmM < 1.5 ? g_a2M = 1;
     g_warmR < 1.5 ? g_a2R = 1;
   );
@@ -1283,7 +1277,7 @@ loop(g_sw,
   g_i += 1;
 );
 
-// molette : niveau / ctrl+molette : plage
+// wheel: level / ctrl+wheel: range
 (mouse_wheel != 0 && hit(g_sx, g_sy, g_sw, g_sh + ggap + g_dh)) ? (
   (g_mc & 4) ? dbRange = min(max(dbRange - (mouse_wheel > 0 ? 6 : -6), 24), 120)
              : dbTop = min(max(dbTop + (mouse_wheel > 0 ? -3 : 3), -80), 20);
@@ -1291,7 +1285,7 @@ loop(g_sw,
 mouse_wheel = 0;
 
 c_panel(); gfx_rect(g_sx, g_sy, g_sw, g_sh);
-// grille frequences
+// frequency grid
 gfx_setfont(2);
 g_f = 20;
 loop(10,
@@ -1301,7 +1295,7 @@ loop(10,
   g_px < g_sx + g_sw - 26 * gsc ? ( c_dim(); txt(#fl, g_px + 3 * gsc, g_sy + g_sh - 16 * gsc, 40 * gsc, 14 * gsc, 4); );
   g_f = floor(g_f / 10^floor(log10(g_f) + 0.000000001) + 0.5) == 2 ? g_f * 2.5 : g_f * 2;
 );
-// grille dB
+// dB grid
 g_d = floor(dbTop / 10) * 10;
 while (g_d > dbTop - dbRange) (
   g_py = ydb(g_d);
@@ -1311,13 +1305,13 @@ while (g_d > dbTop - dbRange) (
   );
   g_d -= 10;
 );
-// mix : remplissage + trait
+// mix: fill + line
 g_bot = g_sy + g_sh;
 cla(MXR, MXG, MXB, 0.10);
 g_i = 0; loop(g_sw, g_py = ydb(PXM[g_i]); gfx_rect(g_sx + g_i, g_py, 1, g_bot - g_py); g_i += 1; );
 cla(MXR, MXG, MXB, 0.95);
 g_i = 1; loop(g_sw - 1, gfx_line(g_sx + g_i - 1, ydb(PXM[g_i - 1]), g_sx + g_i, ydb(PXM[g_i]), 1); g_i += 1; );
-// reference : trait epais
+// reference: thick line
 g_refon = R_READY[sel_cur] && refS > -90;
 g_refon ? (
   cl(ACR, ACG, ACB);
@@ -1328,7 +1322,7 @@ g_refon ? (
     g_i += 1;
   );
 );
-// isolation : bandes non ecoutees assombries + crossovers deplacables
+// band solo: bands not heard are darkened + draggable crossovers
 iso_eff ? (
   g_k = 1;
   loop(5,
@@ -1368,7 +1362,7 @@ g_xdrag ? (
   ) : g_xdrag = 0;
 );
 
-// legende
+// legend
 gfx_setfont(2);
 g_lgx = g_sx + g_sw - 150 * gsc;
 cl(MXR, MXG, MXB); gfx_rect(g_lgx, g_sy + 12 * gsc, 10 * gsc, 2 * gsc);
@@ -1377,15 +1371,15 @@ cl(ACR, ACG, ACB); gfx_rect(g_lgx + 60 * gsc, g_sy + 12 * gsc, 10 * gsc, 2 * gsc
 sprintf(#lg, "REF %d", sel_cur + 1); c_text(); txt(#lg, g_lgx + 76 * gsc, g_sy + 5 * gsc, 60 * gsc, 16 * gsc, 4);
 g_inf ? (
   cl(ACR, ACG, ACB);
-  sprintf(#lg, "MOYENNE  %d:%02d   (R : remise a zero)", floor(g_tavgM / 60), floor(g_tavgM) % 60);
+  sprintf(#lg, "AVERAGE  %d:%02d   (R: reset)", floor(g_tavgM / 60), floor(g_tavgM) % 60);
   txt(#lg, g_lgx - 240 * gsc, g_sy + 5 * gsc, 230 * gsc, 16 * gsc, 6);
 ) : g_slow ? (
   cl(ACR, ACG, ACB);
-  sprintf(#lg, "LISSAGE %d s%s", g_tau, (!g_sigM && !g_sigR) ? "  (fige)" : "");
+  sprintf(#lg, "SMOOTHING %.1f s%s", g_tau, (!g_sigM && !g_sigR) ? "  (frozen)" : "");
   txt(#lg, g_lgx - 240 * gsc, g_sy + 5 * gsc, 230 * gsc, 16 * gsc, 6);
 );
 
-// ecart REF - MIX : masque, lissage dedie, centrage sur l'ecart moyen, echelle auto
+// difference REF - MIX: mask, own smoothing, centered on the average difference, auto scale
 c_panel(); gfx_rect(g_sx, g_dy, g_sw, g_dh);
 g_dval = g_refon && mixS > -70;
 g_dmid = g_dy + g_dh / 2;
@@ -1414,7 +1408,7 @@ g_dval ? (
   );
   g_moy = g_n1 > 0 ? g_s1 / g_n1 : 0;
   g_off = slider30 < 0.5 ? g_moy : 0;
-  // pic de la courbe (40 Hz - 14 kHz) pour l'echelle automatique
+  // curve peak (40 Hz - 14 kHz) for the auto scale
   g_i = g_ilo; g_pk = 0;
   loop(g_ihi - g_ilo + 1,
     DXM[g_i] ? g_pk = max(g_pk, abs(DXS[g_i] - g_off));
@@ -1425,10 +1419,10 @@ g_dval ? (
     g_want = g_pk * 1.1 <= 3 ? 3 : g_pk * 1.1 <= 6 ? 6 : g_pk * 1.1 <= 12 ? 12 : 24;
     g_want >= g_drng ? ( g_drng = g_want; g_dlow = g_tn; ) : ( g_tn - g_dlow > 3 ? ( g_drng = g_want; g_dlow = g_tn; ); );
   ) : g_drng = g_sc == 1 ? 3 : g_sc == 2 ? 6 : g_sc == 3 ? 12 : 24;
-  // grille
+  // grid
   c_line(); gfx_rect(g_sx, g_dy + g_dh / 4, g_sw, 1); gfx_rect(g_sx, g_dy + g_dh * 3 / 4, g_sw, 1);
   cl(0.26, 0.27, 0.30); gfx_rect(g_sx, g_dmid, g_sw, 1);
-  // courbe
+  // curve
   g_hh2 = g_dh / 2 - 3 * gsc;
   g_i = 0; g_pyp = g_dmid;
   loop(g_sw,
@@ -1453,38 +1447,38 @@ g_dval ? (
   sprintf(#dl, "-%d dB", g_drng); txt(#dl, g_sx + 6 * gsc, g_dy + g_dh - 16 * gsc, 60 * gsc, 14 * gsc, 4);
 ) : (
   c_line(); gfx_rect(g_sx, g_dmid, g_sw, 1);
-  gfx_setfont(2); c_dim(); txt("lecture de la reference + du mix requise", g_sx, g_dy, g_sw, g_dh, 5);
+  gfx_setfont(2); c_dim(); txt("play the reference and the mix to see the difference", g_sx, g_dy, g_sw, g_dh, 5);
 );
-// titre + reglages de la courbe d'ecart
+// title + difference curve settings
 gfx_setfont(2); c_dim();
 (g_dval && slider30 < 0.5) ? (
-  sprintf(#dt, "ECART REF - MIX   centre (niveau moyen ref %s%.1f dB)", g_moy >= 0 ? "+" : "", g_moy);
-) : strcpy(#dt, "ECART REF - MIX");
-txt(#dt, g_sx + 52 * gsc, g_dy + 3 * gsc, g_sw - 300 * gsc, 14 * gsc, 4);
-g_bw2 = 70 * gsc; g_bh2 = 16 * gsc; g_bx2 = g_sx + g_sw - 3 * (g_bw2 + 2 * gsc) - 2 * gsc; g_by2 = g_dy + 3 * gsc;
-btn(g_bx2, g_by2, g_bw2, g_bh2, slider30 < 0.5 ? "CENTRE" : "ABSOLU", 0) ? do_cmd(46);
+  sprintf(#dt, "DIFFERENCE REF - MIX   centered (average ref level %s%.1f dB)", g_moy >= 0 ? "+" : "", g_moy);
+) : strcpy(#dt, "DIFFERENCE REF - MIX");
+txt(#dt, g_sx + 52 * gsc, g_dy + 3 * gsc, g_sw - 320 * gsc, 14 * gsc, 4);
+g_bw2 = 84 * gsc; g_bh2 = 16 * gsc; g_bx2 = g_sx + g_sw - 3 * (g_bw2 + 2 * gsc) - 2 * gsc; g_by2 = g_dy + 3 * gsc;
+btn(g_bx2, g_by2, g_bw2, g_bh2, slider30 < 0.5 ? "CENTERED" : "ABSOLUTE", 0) ? do_cmd(46);
 g_bx2 += g_bw2 + 2 * gsc;
 g_sc = floor(slider31 + 0.5);
 g_sc == 0 ? sprintf(#b, "AUTO %d", g_drng) : sprintf(#b, "+/- %d dB", g_drng);
 btn(g_bx2, g_by2, g_bw2, g_bh2, #b, 0) ? do_cmd(47);
 g_bx2 += g_bw2 + 2 * gsc;
 g_lz = floor(slider32 + 0.5);
-g_lz == 0 ? strcpy(#b, "LISS. SPECTRE") : g_lz == 1 ? strcpy(#b, "LISS. 1/6") : g_lz == 2 ? strcpy(#b, "LISS. 1/3") : strcpy(#b, "LISS. 1 OCT");
+g_lz == 0 ? strcpy(#b, "SMOOTH SPECTR.") : g_lz == 1 ? strcpy(#b, "SMOOTH 1/6") : g_lz == 2 ? strcpy(#b, "SMOOTH 1/3") : strcpy(#b, "SMOOTH 1 OCT");
 btn(g_bx2, g_by2, g_bw2, g_bh2, #b, 0) ? do_cmd(48);
 
-// survol : lecture des valeurs
+// hover: value readout
 (hit(g_sx, g_sy, g_sw, g_sh + ggap + g_dh) && !hit(g_bx2 - 2 * (g_bw2 + 2 * gsc), g_by2, 3 * (g_bw2 + 2 * gsc), g_bh2)) ? (
   g_i = min(max(floor(mouse_x - g_sx), 0), g_sw - 1);
   g_f = 20 * exp(g_i / (g_sw - 1) * log(1000));
   cla(1, 1, 1, 0.25); gfx_rect(g_sx + g_i, g_sy, 1, g_sh); gfx_rect(g_sx + g_i, g_dy, 1, g_dh);
   g_f < 1000 ? sprintf(#fq, "%d Hz", g_f) : sprintf(#fq, "%.2f kHz", g_f / 1000);
-  (g_refon && g_dval && DXM[g_i]) ? sprintf(#hv, "%s    MIX %.1f    REF %.1f    ECART %s%.1f dB", #fq, PXM[g_i], PXR[g_i], DXS[g_i] - g_off >= 0 ? "+" : "", DXS[g_i] - g_off) :
+  (g_refon && g_dval && DXM[g_i]) ? sprintf(#hv, "%s    MIX %.1f    REF %.1f    DIFF %s%.1f dB", #fq, PXM[g_i], PXR[g_i], DXS[g_i] - g_off >= 0 ? "+" : "", DXS[g_i] - g_off) :
   g_refon ? sprintf(#hv, "%s    MIX %.1f    REF %.1f", #fq, PXM[g_i], PXR[g_i])
           : sprintf(#hv, "%s    MIX %.1f dB", #fq, PXM[g_i]);
   gfx_setfont(2); c_text(); txt(#hv, g_sx + 8 * gsc, g_sy + 5 * gsc, g_sw - 170 * gsc, 16 * gsc, 4);
 );
 
-// ---------------- colonne mesures ----------------
+// ---------------- meters column ----------------
 g_mx = g_sx + g_sw + ggap; g_rh = 34 * gsc; g_th = 28 * gsc;
 // MIX
 g_y = g_my0;
@@ -1495,7 +1489,7 @@ btn(g_mx + g_mw - 62 * gsc, g_y + 5 * gsc, 54 * gsc, 18 * gsc, "RESET I", 0) ? m
 g_y += g_th;
 mrow(g_mx, g_y, g_mw, g_rh, "MOMENTARY", lfmt(mixM), "LUFS"); g_y += g_rh;
 mrow(g_mx, g_y, g_mw, g_rh, "SHORT-TERM", lfmt(mixS), "LUFS"); g_y += g_rh;
-mrow(g_mx, g_y, g_mw, g_rh, "INTEGRE", lfmt(mixI), "LUFS"); g_y += g_rh;
+mrow(g_mx, g_y, g_mw, g_rh, "INTEGRATED", lfmt(mixI), "LUFS"); g_y += g_rh;
 g_y += 6 * gsc + ggap;
 // REF
 g_ph2 = g_th + 4 * g_rh + 6 * gsc;
@@ -1508,16 +1502,16 @@ R_ACT[sel_cur] ? txt(fitname(sfile(sel_cur), g_mw - 84 * gsc), g_mx + 72 * gsc, 
 g_y += g_th;
 mrow(g_mx, g_y, g_mw, g_rh, "MOMENTARY", lfmt(refM), "LUFS"); g_y += g_rh;
 mrow(g_mx, g_y, g_mw, g_rh, "SHORT-TERM", lfmt(refS), "LUFS"); g_y += g_rh;
-mrow(g_mx, g_y, g_mw, g_rh, R_LOOPON[sel_cur] ? "INTEGRE BOUCLE" : "INTEGRE FICHIER",
+mrow(g_mx, g_y, g_mw, g_rh, R_LOOPON[sel_cur] ? "INTEGRATED LOOP" : "INTEGRATED FILE",
      lfmt(cur_ready ? R_IEFF[sel_cur] : -200), "LUFS"); g_y += g_rh;
 g_db >= 0 ? sprintf(#gn, "+%.1f", g_db) : sprintf(#gn, "%.1f", g_db);
-mrow(g_mx, g_y, g_mw, g_rh, slider3 >= 0.5 ? "GAIN AUTO" : "GAIN", #gn, "dB"); g_y += g_rh;
+mrow(g_mx, g_y, g_mw, g_rh, slider3 >= 0.5 ? "AUTO GAIN" : "GAIN", #gn, "dB"); g_y += g_rh;
 g_y += 6 * gsc + ggap;
-// ECART
+// DIFFERENCE
 g_eh = g_my0 + g_mainH - g_y;
 g_eh > 30 * gsc ? (
   c_panel(); gfx_rect(g_mx, g_y, g_mw, g_eh);
-  gfx_setfont(2); c_dim(); txt("ECART SHORT-TERM  REF - MIX", g_mx + 12 * gsc, g_y + 4 * gsc, g_mw, 16 * gsc, 4);
+  gfx_setfont(2); c_dim(); txt("SHORT-TERM DIFF.  REF - MIX", g_mx + 12 * gsc, g_y + 4 * gsc, g_mw, 16 * gsc, 4);
   (refS > -70 && mixS > -70) ? (
     g_dv = refS - mixS;
     g_dv >= 0 ? sprintf(#ev, "+%.1f", g_dv) : sprintf(#ev, "%.1f", g_dv);
@@ -1527,18 +1521,18 @@ g_eh > 30 * gsc ? (
   gfx_setfont(2); c_dim(); txt("LU", g_mx + g_mw - 46 * gsc, g_y + 18 * gsc, 40 * gsc, g_eh - 20 * gsc, 4);
 );
 
-// ---------------- isolation de bandes + mode d'ecoute ----------------
+// ---------------- band solo + output mode ----------------
 g_iy = g_my0 + g_mainH + ggap;
 c_panel(); gfx_rect(gpad, g_iy, gW - 2 * gpad, g_ih);
 iso_eff ? ( cl(ACR, ACG, ACB); gfx_rect(gpad, g_iy, 2 * gsc, g_ih); );
-gfx_setfont(2); c_dim(); txt("BANDES", gpad + 10 * gsc, g_iy, 60 * gsc, g_ih, 4);
+gfx_setfont(2); c_dim(); txt("BANDS", gpad + 10 * gsc, g_iy, 60 * gsc, g_ih, 4);
 g_mbw = 52 * gsc; g_fullw = 52 * gsc;
 g_bw = floor((gW - 2 * gpad - 70 * gsc - g_fullw - 6 * gsc - 24 * gsc - 56 * gsc - 5 * (g_mbw + 2 * gsc) - 4 * 2 * gsc - 8 * gsc) / 5);
 g_x = gpad + 70 * gsc; g_y = g_iy + 3 * gsc; g_h = g_ih - 6 * gsc;
 g_k = 1;
 loop(5,
-  g_k == 1 ? strcpy(#bn, "GRAVES") : g_k == 2 ? strcpy(#bn, "BAS-MED") : g_k == 3 ? strcpy(#bn, "MEDIUM") :
-  g_k == 4 ? strcpy(#bn, "HAUT-MED") : strcpy(#bn, "AIGUS");
+  g_k == 1 ? strcpy(#bn, "LOW") : g_k == 2 ? strcpy(#bn, "LOW-MID") : g_k == 3 ? strcpy(#bn, "MID") :
+  g_k == 4 ? strcpy(#bn, "HIGH-MID") : strcpy(#bn, "HIGH");
   g_k == 1 ? ( hzfmt(#h2, xo1); sprintf(#bl, "< %s Hz", #h2); ) :
   g_k == 5 ? ( hzfmt(#h1, xo4); sprintf(#bl, "> %s Hz", #h1); ) : (
     hzfmt(#h1, g_k == 2 ? xo1 : g_k == 3 ? xo2 : xo3);
@@ -1563,31 +1557,31 @@ btn3(g_x, g_y, g_fullw, g_h, "FULL", iso_eff ? 0 : 1) && g_lc ? (
   nsolo() > 0 ? do_cmd(30);
 );
 g_x += g_fullw + 24 * gsc;
-gfx_setfont(2); c_dim(); txt("SORTIE", g_x, g_iy, 56 * gsc, g_ih, 4); g_x += 56 * gsc;
+gfx_setfont(2); c_dim(); txt("OUTPUT", g_x, g_iy, 56 * gsc, g_ih, 4); g_x += 56 * gsc;
 g_k = 0;
 loop(5,
   g_k == 0 ? strcpy(#b, "STEREO") : g_k == 1 ? strcpy(#b, "MONO") : g_k == 2 ? strcpy(#b, "SIDE") :
-  g_k == 3 ? strcpy(#b, "G") : strcpy(#b, "D");
+  g_k == 3 ? strcpy(#b, "L") : strcpy(#b, "R");
   btn(g_x, g_y, g_mbw, g_h, #b, floor(slider29 + 0.5) == g_k) ? ( slider29 = g_k; sliderchange(slider29); );
   g_x += g_mbw + 2 * gsc;
   g_k += 1;
 );
 
-// ---------------- pied de page ----------------
+// ---------------- footer ----------------
 g_fy = gH - gpad - g_foot + 2 * gsc;
 g_x = gW - gpad - 92 * gsc;
-btn(g_x, g_fy, 92 * gsc, g_foot, "ACTUALISER", 0) ? ( gmem[1] = 2; g_note = time_precise(); );
+btn(g_x, g_fy, 92 * gsc, g_foot, "REFRESH", 0) ? ( gmem[1] = 2; g_note = time_precise(); );
 g_x -= 96 * gsc;
-btn(g_x, g_fy, 94 * gsc, g_foot, "DOSSIER REFS", 0) ? ( gmem[1] = 1; g_note = time_precise(); );
+btn(g_x, g_fy, 94 * gsc, g_foot, "REFS FOLDER", 0) ? ( gmem[1] = 1; g_note = time_precise(); );
 gfx_setfont(2); c_dim();
-sprintf(#ft, "MEMOIRE %d%%   |   %.0f Hz", floor((aud_used + (ld_slot >= 0 ? ld_w : 0)) / AUDCAP * 100), srate);
+sprintf(#ft, "MEMORY %d%%   |   %.0f Hz", floor((aud_used + (ld_slot >= 0 ? ld_w : 0)) / AUDCAP * 100), srate);
 txt(#ft, gpad, g_fy, 200 * gsc, g_foot, 4);
 (!comp_alive && time_precise() - g_note < 4) ? (
   cl(1, 0.35, 0.3);
-  txt("Companion inactif : lancer l'action Todoroki Companion", gpad + 170 * gsc, g_fy, 380 * gsc, g_foot, 4);
+  txt("Companion not running: run the Todoroki Companion action", gpad + 170 * gsc, g_fy, 380 * gsc, g_foot, 4);
 ) : (
   c_dim();
-  txt("A MIX/REF  1-4 ref  L boucle  P lecture  V/R spectre  F1-F5 bandes  I isolation  M sortie  E echelle",
+  txt("A MIX/REF  1-4 ref  L loop  P play  V/R spectrum  F1-F5 bands  I band solo  M output  E scale",
       gpad + 170 * gsc, g_fy, g_x - gpad - 180 * gsc, g_foot, 4);
 );
 
