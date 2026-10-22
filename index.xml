@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Todoroki" commit="1c6331afc4eea14bc64748bc6c201c857f395690">
+<index version="1" name="Todoroki" commit="64609e4a61db85643c2bb434c87c87cc15299f06">
   <category name="FX">
     <reapack name="RefLab.jsfx" type="effect" desc="RefLab - Referencing multi-pistes (spectre, LUFS, match loudness, boucles)">
       <metadata>
@@ -11,6 +11,7 @@
 {\pard \ql \f0 \sa180 \li0 \fi0 Comparaison mix / references dans REAPER, en JSFX (compatible REAPER portable).\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab 4 references, chargees depuis {\f1 <REAPER>/Data/references}\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Spectre mix + reference superposes, courbe d'ecart, vitesse de mesure reglable\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Isolation de bandes (5 bandes) et modes d'ecoute stereo / mono / side / G / D\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab LUFS momentary / short-term / integre (BS.1770), match loudness automatique\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Boucle par reference (glisser sur la forme d'onde)\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Tous les reglages assignables en MIDI (Param > Learn) ou via les actions "RefLab - ..."\sa180\par}
@@ -24,6 +25,19 @@
 - Deux nouveaux parametres assignables : vitesse suivante, reset moyenne spectre
 - Fonctionne avec le Todoroki Companion (dossier references, actualisation)]]></changelog>
         <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/FX/RefLab.jsfx</source>
+      </version>
+      <version name="1.3" author="Todoroki" time="2026-10-22T18:17:42Z">
+        <changelog><![CDATA[- Les references, boucles et la reference selectionnee sont memorisees DANS LE PROJET
+  (via le Todoroki Companion), meme quand RefLab est dans le Monitoring FX
+- Sauvegarde interne du plugin plus robuste (ordre de chargement, version du format)
+- Spectre : nouvelles vitesses ULTRA LENT (15 s) et GLACIAL (45 s), glissement doux en dB,
+  gel automatique quand la lecture s'arrete
+- Isolation de bandes facon ISOL8 : 5 bandes (crossovers Linkwitz-Riley, somme a plat),
+  solo exclusif / cumulable, crossovers deplacables sur le spectre
+- Modes d'ecoute : stereo, mono, side, gauche, droite (sur le mix ET les references)
+- Courbe d'ecart lisible : centrage sur l'ecart moyen, echelle auto ou fixe, lissage dedie
+- Tous les nouveaux reglages assignables en MIDI (Param > Learn) et via des actions]]></changelog>
+        <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/FX/RefLab.jsfx</source>
       </version>
     </reapack>
   </category>
@@ -260,7 +274,7 @@
 {\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 RefLab - actions et module Companion\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 A installer avec les paquets {\b RefLab} (JSFX) et {\b Todoroki Companion}.\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Actions "RefLab - ..." : a assigner a des touches ou a un controleur MIDI\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Module Companion : ouvre {\f1 <REAPER>/Data/references} et tient la liste des fichiers a jour dans le plugin\sa180\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Module Companion : ouvre {\f1 <REAPER>/Data/references}, tient la liste des fichiers a jour et memorise les references de chaque projet\sa180\par}
 }
 ]]></description>
       </metadata>
@@ -287,6 +301,70 @@
         <source main="main" file="RefLab - Spectre reset moyenne.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Spectre%20reset%20moyenne.lua</source>
         <source main="main" file="RefLab - Spectre vitesse suivante.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20-%20Spectre%20vitesse%20suivante.lua</source>
         <source file="RefLab LISEZMOI.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/1c6331afc4eea14bc64748bc6c201c857f395690/Scripts/RefLab/RefLab%20LISEZMOI.md</source>
+      </version>
+      <version name="1.3" author="Todoroki" time="2026-10-22T18:17:42Z">
+        <changelog><![CDATA[- Memoire par projet : references, boucles et reference selectionnee enregistrees dans le
+  projet (.rpp) et rechargees a l'ouverture ou au changement d'onglet, meme quand RefLab
+  est dans le Monitoring FX
+- Nouvelles actions : isolation de bandes (solo exclusif / cumulable par bande, full,
+  on/off), modes d'ecoute (stereo, mono, side, gauche, droite), vitesses du spectre,
+  courbe d'ecart (centrage, echelle, lissage), match, pente, lissage, trim]]></changelog>
+        <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/Todoroki_Companion_Module_RefLab.lua</source>
+        <source main="main" file="RefLab - Actualiser la liste des references.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Actualiser%20la%20liste%20des%20references.lua</source>
+        <source main="main" file="RefLab - Basculer MIX-REF.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Basculer%20MIX-REF.lua</source>
+        <source main="main" file="RefLab - Basculer boucle.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Basculer%20boucle.lua</source>
+        <source main="main" file="RefLab - Ecart - centre ou absolu.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Ecart%20-%20centre%20ou%20absolu.lua</source>
+        <source main="main" file="RefLab - Ecart - echelle suivante.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Ecart%20-%20echelle%20suivante.lua</source>
+        <source main="main" file="RefLab - Ecart - lissage suivant.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Ecart%20-%20lissage%20suivant.lua</source>
+        <source main="main" file="RefLab - Ecouter MIX.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Ecouter%20MIX.lua</source>
+        <source main="main" file="RefLab - Ecouter REF.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Ecouter%20REF.lua</source>
+        <source main="main" file="RefLab - Isolation - bande 1 Graves ajouter-retirer.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20bande%201%20Graves%20ajouter-retirer.lua</source>
+        <source main="main" file="RefLab - Isolation - bande 1 Graves solo.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20bande%201%20Graves%20solo.lua</source>
+        <source main="main" file="RefLab - Isolation - bande 2 Bas-medium ajouter-retirer.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20bande%202%20Bas-medium%20ajouter-retirer.lua</source>
+        <source main="main" file="RefLab - Isolation - bande 2 Bas-medium solo.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20bande%202%20Bas-medium%20solo.lua</source>
+        <source main="main" file="RefLab - Isolation - bande 3 Medium ajouter-retirer.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20bande%203%20Medium%20ajouter-retirer.lua</source>
+        <source main="main" file="RefLab - Isolation - bande 3 Medium solo.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20bande%203%20Medium%20solo.lua</source>
+        <source main="main" file="RefLab - Isolation - bande 4 Haut-medium ajouter-retirer.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20bande%204%20Haut-medium%20ajouter-retirer.lua</source>
+        <source main="main" file="RefLab - Isolation - bande 4 Haut-medium solo.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20bande%204%20Haut-medium%20solo.lua</source>
+        <source main="main" file="RefLab - Isolation - bande 5 Aigus ajouter-retirer.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20bande%205%20Aigus%20ajouter-retirer.lua</source>
+        <source main="main" file="RefLab - Isolation - bande 5 Aigus solo.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20bande%205%20Aigus%20solo.lua</source>
+        <source main="main" file="RefLab - Isolation - full (aucune bande).lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20-%20full%20(aucune%20bande).lua</source>
+        <source main="main" file="RefLab - Isolation on-off.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Isolation%20on-off.lua</source>
+        <source main="main" file="RefLab - Lecture independante on-off.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Lecture%20independante%20on-off.lua</source>
+        <source main="main" file="RefLab - Match loudness - Integre.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Match%20loudness%20-%20Integre.lua</source>
+        <source main="main" file="RefLab - Match loudness - Off.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Match%20loudness%20-%20Off.lua</source>
+        <source main="main" file="RefLab - Match loudness - Short-term.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Match%20loudness%20-%20Short-term.lua</source>
+        <source main="main" file="RefLab - Match loudness mode suivant.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Match%20loudness%20mode%20suivant.lua</source>
+        <source main="main" file="RefLab - Ouvrir le dossier references.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Ouvrir%20le%20dossier%20references.lua</source>
+        <source main="main" file="RefLab - Reference 1.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Reference%201.lua</source>
+        <source main="main" file="RefLab - Reference 2.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Reference%202.lua</source>
+        <source main="main" file="RefLab - Reference 3.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Reference%203.lua</source>
+        <source main="main" file="RefLab - Reference 4.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Reference%204.lua</source>
+        <source main="main" file="RefLab - Reference precedente.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Reference%20precedente.lua</source>
+        <source main="main" file="RefLab - Reference suivante.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Reference%20suivante.lua</source>
+        <source main="main" file="RefLab - Reset loudness integre.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Reset%20loudness%20integre.lua</source>
+        <source main="main" file="RefLab - Retour au debut de boucle au Play on-off.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Retour%20au%20debut%20de%20boucle%20au%20Play%20on-off.lua</source>
+        <source main="main" file="RefLab - Sortie - Droite.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Sortie%20-%20Droite.lua</source>
+        <source main="main" file="RefLab - Sortie - Gauche.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Sortie%20-%20Gauche.lua</source>
+        <source main="main" file="RefLab - Sortie - Mono.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Sortie%20-%20Mono.lua</source>
+        <source main="main" file="RefLab - Sortie - Side.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Sortie%20-%20Side.lua</source>
+        <source main="main" file="RefLab - Sortie - Stereo.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Sortie%20-%20Stereo.lua</source>
+        <source main="main" file="RefLab - Sortie - mode suivant.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Sortie%20-%20mode%20suivant.lua</source>
+        <source main="main" file="RefLab - Spectre lissage suivant.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20lissage%20suivant.lua</source>
+        <source main="main" file="RefLab - Spectre pente suivante.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20pente%20suivante.lua</source>
+        <source main="main" file="RefLab - Spectre reset moyenne.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20reset%20moyenne.lua</source>
+        <source main="main" file="RefLab - Spectre vitesse - Glacial.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20vitesse%20-%20Glacial.lua</source>
+        <source main="main" file="RefLab - Spectre vitesse - Lent.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20vitesse%20-%20Lent.lua</source>
+        <source main="main" file="RefLab - Spectre vitesse - Moyen.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20vitesse%20-%20Moyen.lua</source>
+        <source main="main" file="RefLab - Spectre vitesse - Moyenne infinie.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20vitesse%20-%20Moyenne%20infinie.lua</source>
+        <source main="main" file="RefLab - Spectre vitesse - Rapide.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20vitesse%20-%20Rapide.lua</source>
+        <source main="main" file="RefLab - Spectre vitesse - Tres lent.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20vitesse%20-%20Tres%20lent.lua</source>
+        <source main="main" file="RefLab - Spectre vitesse - Ultra lent.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20vitesse%20-%20Ultra%20lent.lua</source>
+        <source main="main" file="RefLab - Spectre vitesse suivante.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Spectre%20vitesse%20suivante.lua</source>
+        <source main="main" file="RefLab - Trim reference +0.5 dB.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Trim%20reference%20+0.5%20dB.lua</source>
+        <source main="main" file="RefLab - Trim reference -0.5 dB.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Trim%20reference%20-0.5%20dB.lua</source>
+        <source main="main" file="RefLab - Trim reference 0 dB.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Trim%20reference%200%20dB.lua</source>
+        <source file="RefLab LISEZMOI.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20LISEZMOI.md</source>
       </version>
     </reapack>
   </category>
