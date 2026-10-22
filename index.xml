@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Todoroki" commit="64609e4a61db85643c2bb434c87c87cc15299f06">
+<index version="1" name="Todoroki" commit="287125830a49dd130fcaf735d80b3637f1f88959">
   <category name="FX">
     <reapack name="RefLab.jsfx" type="effect" desc="RefLab - Referencing multi-pistes (spectre, LUFS, match loudness, boucles)">
       <metadata>
@@ -38,6 +38,31 @@
 - Courbe d'ecart lisible : centrage sur l'ecart moyen, echelle auto ou fixe, lissage dedie
 - Tous les nouveaux reglages assignables en MIDI (Param > Learn) et via des actions]]></changelog>
         <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/FX/RefLab.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="RS Trig Sampler.jsfx" type="effect" desc="RS Trig Sampler - 8-slot multi-velocity / round-robin drum sampler">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 RS Trig Sampler\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Drum replacement sampler in JSFX (portable REAPER friendly), meant to sit after a trigger (MIDI) tool. One instance = one drum element, up to 8 samples played in parallel.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab 8 slots, each with multi-velocity / round-robin kits (.rsk.wav) or plain audio files\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Per slot: volume, pan, pitch, attack / hold / decay / curve, velocity target + sensitivity, voices, round robin cycle / random, choke groups, 8 stereo outputs, mute / solo\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Samples are stored in the project and in REAPER presets (one preset = a full layered kit)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Library in {\f1 <REAPER>/Data/RSampler}, filled by the {\b RS Trig Kit Builder} script (Slate Trigger 2 .tci import, WAV folders, auto-organised by element / instrument)\sa180\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.4" author="Todoroki" time="2026-10-22T19:22:49Z">
+        <changelog><![CDATA[- VELOCITY target per slot: play a fixed velocity (VEL SENS 0%) or follow the drummer's
+  dynamics around it (VEL SENS 100%), clipped to 127
+- Clicking an empty slot opens the browser directly
+- Folder browser (Element / Instrument / mic), search across the whole library, >4000 files
+- English UI
+- Time-based drum envelope (attack / hold / decay / curve), anti-click fades, voice limit]]></changelog>
+        <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/287125830a49dd130fcaf735d80b3637f1f88959/FX/RS%20Trig%20Sampler.jsfx</source>
       </version>
     </reapack>
   </category>
@@ -365,6 +390,36 @@
         <source main="main" file="RefLab - Trim reference -0.5 dB.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Trim%20reference%20-0.5%20dB.lua</source>
         <source main="main" file="RefLab - Trim reference 0 dB.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20-%20Trim%20reference%200%20dB.lua</source>
         <source file="RefLab LISEZMOI.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/64609e4a61db85643c2bb434c87c87cc15299f06/Scripts/RefLab/RefLab%20LISEZMOI.md</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="Scripts/RS Trig Sampler">
+    <reapack name="RS Trig Kit Builder.lua" type="script" desc="RS Trig Kit Builder - TCI import, kit builder and library for RS Trig Sampler">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 RS Trig Kit Builder\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Companion script of the {\b RS Trig Sampler} JSFX (install both packages).\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Import .tci files from a Slate Trigger 2 library (one file or a whole folder tree)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Build multi-velocity / round-robin kits from WAV folders\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Everything lands in {\f1 <REAPER>/Data/RSampler}, sorted as Element / Instrument\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab "RS Trig Rescan Library" refreshes the list shown in the sampler's browser\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Pure Lua, no extension required (portable REAPER friendly).\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.4" author="Todoroki" time="2026-10-22T19:22:49Z">
+        <changelog><![CDATA[- Import Slate Trigger 2 .tci files (bit-exact decoding, velocity layers and round robins kept)
+- Automatic library organisation: <Element>/<Instrument>/<name>.rsk.wav
+- Build kits from WAV folders (V01_RR1, Vel3, name_025_01 and untagged conventions)
+- Unpack kits to WAV, rescan the library, demo kit installed on first run
+- English UI]]></changelog>
+        <source main="main">https://github.com/kazenotodoroki/todoroki-reapack/raw/287125830a49dd130fcaf735d80b3637f1f88959/Scripts/RS%20Trig%20Sampler/RS%20Trig%20Kit%20Builder.lua</source>
+        <source main="main" file="RS Trig Rescan Library.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/287125830a49dd130fcaf735d80b3637f1f88959/Scripts/RS%20Trig%20Sampler/RS%20Trig%20Rescan%20Library.lua</source>
+        <source file="RS Trig Demo Kick.rsk.wav">https://github.com/kazenotodoroki/todoroki-reapack/raw/287125830a49dd130fcaf735d80b3637f1f88959/Scripts/RS%20Trig%20Sampler/RS%20Trig%20Demo%20Kick.rsk.wav</source>
+        <source file="RS Trig Sampler README.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/287125830a49dd130fcaf735d80b3637f1f88959/Scripts/RS%20Trig%20Sampler/RS%20Trig%20Sampler%20README.md</source>
       </version>
     </reapack>
   </category>
