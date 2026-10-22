@@ -1,11 +1,10 @@
 // @description RefLab - multi-track referencing (spectrum, LUFS, loudness match, loops, band solo)
 // @author Todoroki
-// @version 1.4
+// @version 1.5
 // @changelog
-//   - Everything in English: interface, parameters, menus, actions and documentation
-//   - Spectrum speeds simplified: FAST, MEDIUM, SLOW, VERY SLOW, INFINITE AVERAGE
-//     (ULTRA SLOW and GLACIAL removed; SLOW keeps the smooth dB glide)
-//   - Note: the reference actions were renamed; re-assign any shortcut you made in 1.3
+//   - Spectrum speeds: FAST, MEDIUM, SLOW (smooth dB glide), INFINITE AVERAGE (VERY SLOW removed)
+//   - Difference curve smoothing: 1/48, 1/24, 1/12, 1/6, 1/3 or 1 octave
+//   - Actions renamed with the Todoroki_ prefix (re-assign the shortcuts made before)
 // @about
 //   # RefLab
 //
@@ -17,7 +16,7 @@
 //   - Momentary / short-term / integrated LUFS (BS.1770), automatic loudness match
 //   - One loop per reference (drag on the waveform)
 //   - References remembered per project (with the Todoroki Companion)
-//   - Every setting can be mapped to MIDI (Param > Learn) or to the "RefLab - ..." actions
+//   - Every setting can be mapped to MIDI (Param > Learn) or to the "Todoroki_RefLab ..." actions
 //
 //   Put it in the Monitoring FX. The **Todoroki Companion** package adds opening the
 //   references folder, live refresh of the file list and the per-project memory.
@@ -38,7 +37,7 @@ slider11:0<0,1,1>-[Button] Previous reference
 slider12:0<0,1,1>-[Button] Toggle loop
 slider13:0<0,1,1>-[Button] Reset integrated loudness
 slider14:0<0,1,1>-[Button] Next match mode
-slider15:1<0,4,1{Fast,Medium,Slow,Very slow,Infinite average}>-Spectrum speed
+slider15:1<0,3,1{Fast,Medium,Slow,Infinite average}>-Spectrum speed
 slider16:/references:none:-enum
 slider17:0<0,1,1>-[Button] Next spectrum speed
 slider18:0<0,1,1>-[Button] Reset spectrum average
@@ -55,7 +54,7 @@ slider28:6000<2000,18000,1>-Crossover 4 (Hz)
 slider29:0<0,4,1{Stereo,Mono,Side,Left,Right}>-Output mode
 slider30:0<0,1,1{Centered,Absolute}>-Difference: reference
 slider31:0<0,4,1{Auto,3 dB,6 dB,12 dB,24 dB}>-Difference: scale
-slider32:2<0,3,1{Same as spectrum,1/6 oct,1/3 oct,1 oct}>-Difference: smoothing
+slider32:4<0,5,1{1/48 oct,1/24 oct,1/12 oct,1/6 oct,1/3 oct,1 oct}>-Difference: smoothing
 slider33:0<0,1,1>-[Button] Band solo on/off
 slider34:0<0,1,1>-[Button] Next output mode
 slider35:0<0,1,1>-[Button] Exclusive solo band 1
@@ -448,7 +447,7 @@ function do_cmd(c) local(jj, ss, dn, kk)
   c == 5 ? ( slider8 = slider8 >= 0.5 ? 0 : 1; sliderchange(slider8); ) :
   c == 6 ? ( mix_reset = 1; ) :
   c == 7 ? ( slider3 = (floor(slider3 + 0.5) + 1) % 3; sliderchange(slider3); ) :
-  c == 8 ? ( slider15 = (floor(slider15 + 0.5) + 1) % 5; sliderchange(slider15); spec_reset = 1; ) :
+  c == 8 ? ( slider15 = (floor(slider15 + 0.5) + 1) % 4; sliderchange(slider15); spec_reset = 1; ) :
   c == 9 ? ( spec_reset = 1; ) :
   (c >= 11 && c <= 14) ? ( slider2 = c - 10; sliderchange(slider2); ) :
   c == 20 ? ( slider1 = 0; sliderchange(slider1); ) :
@@ -461,8 +460,8 @@ function do_cmd(c) local(jj, ss, dn, kk)
   (c >= 41 && c <= 45) ? solo_excl(c - 40) :
   c == 46 ? ( slider30 = slider30 >= 0.5 ? 0 : 1; sliderchange(slider30); ) :
   c == 47 ? ( slider31 = (floor(slider31 + 0.5) + 1) % 5; sliderchange(slider31); ) :
-  c == 48 ? ( slider32 = (floor(slider32 + 0.5) + 1) % 4; sliderchange(slider32); ) :
-  (c >= 50 && c <= 54) ? ( slider15 = c - 50; sliderchange(slider15); spec_reset = 1; ) :
+  c == 48 ? ( slider32 = (floor(slider32 + 0.5) + 1) % 6; sliderchange(slider32); ) :
+  (c >= 50 && c <= 53) ? ( slider15 = c - 50; sliderchange(slider15); spec_reset = 1; ) :
   (c >= 60 && c <= 62) ? ( slider3 = c - 60; sliderchange(slider3); ) :
   c == 63 ? ( slider5 = slider5 < 1.5 ? 3 : slider5 < 3.5 ? 4.5 : 0; sliderchange(slider5); ) :
   c == 64 ? ( slider6 = (floor(slider6 + 0.5) + 1) % 4; sliderchange(slider6); ) :
@@ -1097,7 +1096,7 @@ btn(g_x, g_y, g_w, g_hh, #b, 0) ? ( slider5 = slider5 < 1.5 ? 3 : slider5 < 3.5 
 g_w = 92 * gsc; g_x -= g_w + 2 * gsc;
 g_vb = floor(slider15 + 0.5);
 g_vb == 0 ? strcpy(#b, "FAST") : g_vb == 1 ? strcpy(#b, "MEDIUM") : g_vb == 2 ? strcpy(#b, "SLOW") :
-g_vb == 3 ? strcpy(#b, "VERY SLOW") : strcpy(#b, "INF. AVG");
+strcpy(#b, "INF. AVG");
 hit(g_x, g_y, g_w, g_hh) && g_rc ? spec_reset = 1;
 btn(g_x, g_y, g_w, g_hh, #b, g_vb >= 2) ? do_cmd(8);
 g_w = 74 * gsc; g_x -= g_w + 10 * gsc;
@@ -1227,8 +1226,8 @@ g_rps = rp;
 g_tn = time_precise();
 g_dt = min(max(g_tn - g_tprev, 0.005), 0.5); g_tprev = g_tn;
 g_vit = floor(slider15 + 0.5);
-g_inf = g_vit >= 4;
-g_tau = g_vit == 0 ? 0.12 : g_vit == 1 ? 0.4 : g_vit == 2 ? 1.5 : 5;
+g_inf = g_vit >= 3;
+g_tau = g_vit == 0 ? 0.12 : g_vit == 1 ? 0.4 : 1.5;
 g_slow = !g_inf && g_tau > 0.4;
 (g_vit != g_vitp || sel_cur != g_selp || spec_reset || g_sw != g_swp) ? (
   g_cntM = 0; g_cntR = 0; g_tavgM = 0; g_vitp = g_vit; g_selp = sel_cur; spec_reset = 0;
@@ -1394,7 +1393,7 @@ g_dval ? (
     g_i += 1;
   );
   g_lz = floor(slider32 + 0.5);
-  g_oct = g_lz == 1 ? 1/6 : g_lz == 2 ? 1/3 : g_lz == 3 ? 1 : 0;
+  g_oct = g_lz == 0 ? 1/48 : g_lz == 1 ? 1/24 : g_lz == 2 ? 1/12 : g_lz == 3 ? 1/6 : g_lz == 4 ? 1/3 : 1;
   g_hw = floor(g_oct * 0.5 * (g_sw - 1) / (log(1000) / log(2)));
   g_ilo = floor(log(40 / 20) / log(1000) * (g_sw - 1));
   g_ihi = floor(log(14000 / 20) / log(1000) * (g_sw - 1));
@@ -1463,7 +1462,8 @@ g_sc == 0 ? sprintf(#b, "AUTO %d", g_drng) : sprintf(#b, "+/- %d dB", g_drng);
 btn(g_bx2, g_by2, g_bw2, g_bh2, #b, 0) ? do_cmd(47);
 g_bx2 += g_bw2 + 2 * gsc;
 g_lz = floor(slider32 + 0.5);
-g_lz == 0 ? strcpy(#b, "SMOOTH SPECTR.") : g_lz == 1 ? strcpy(#b, "SMOOTH 1/6") : g_lz == 2 ? strcpy(#b, "SMOOTH 1/3") : strcpy(#b, "SMOOTH 1 OCT");
+g_lz == 0 ? strcpy(#b, "SMOOTH 1/48") : g_lz == 1 ? strcpy(#b, "SMOOTH 1/24") : g_lz == 2 ? strcpy(#b, "SMOOTH 1/12") :
+g_lz == 3 ? strcpy(#b, "SMOOTH 1/6") : g_lz == 4 ? strcpy(#b, "SMOOTH 1/3") : strcpy(#b, "SMOOTH 1 OCT");
 btn(g_bx2, g_by2, g_bw2, g_bh2, #b, 0) ? do_cmd(48);
 
 // hover: value readout
@@ -1578,7 +1578,7 @@ sprintf(#ft, "MEMORY %d%%   |   %.0f Hz", floor((aud_used + (ld_slot >= 0 ? ld_w
 txt(#ft, gpad, g_fy, 200 * gsc, g_foot, 4);
 (!comp_alive && time_precise() - g_note < 4) ? (
   cl(1, 0.35, 0.3);
-  txt("Companion not running: run the Todoroki Companion action", gpad + 170 * gsc, g_fy, 380 * gsc, g_foot, 4);
+  txt("Companion not running: run the Todoroki_Companion action", gpad + 170 * gsc, g_fy, 380 * gsc, g_foot, 4);
 ) : (
   c_dim();
   txt("A MIX/REF  1-4 ref  L loop  P play  V/R spectrum  F1-F5 bands  I band solo  M output  E scale",

@@ -1,70 +1,69 @@
 -- @description RefLab - actions and Companion module
 -- @author Todoroki
--- @version 1.4
+-- @version 1.5
 -- @changelog
---   - Everything in English; the actions were renamed (re-assign the shortcuts made in 1.3)
---   - Spectrum speed actions: Fast, Medium, Slow, Very slow, Infinite average
+--   - Actions renamed with the Todoroki_ prefix ("Todoroki_RefLab ..."): re-assign your shortcuts
+--   - Spectrum speed actions: Fast, Medium, Slow, Infinite average (Very slow removed)
 -- @provides
 --   [nomain] .
---   [main] RefLab - Back to loop start on Play on-off.lua
---   [main] RefLab - Band solo - band 1 Low add-remove.lua
---   [main] RefLab - Band solo - band 1 Low solo.lua
---   [main] RefLab - Band solo - band 2 Low-mid add-remove.lua
---   [main] RefLab - Band solo - band 2 Low-mid solo.lua
---   [main] RefLab - Band solo - band 3 Mid add-remove.lua
---   [main] RefLab - Band solo - band 3 Mid solo.lua
---   [main] RefLab - Band solo - band 4 High-mid add-remove.lua
---   [main] RefLab - Band solo - band 4 High-mid solo.lua
---   [main] RefLab - Band solo - band 5 High add-remove.lua
---   [main] RefLab - Band solo - band 5 High solo.lua
---   [main] RefLab - Band solo - full (no band).lua
---   [main] RefLab - Band solo on-off.lua
---   [main] RefLab - Difference - centered or absolute.lua
---   [main] RefLab - Difference - next scale.lua
---   [main] RefLab - Difference - next smoothing.lua
---   [main] RefLab - Independent playback on-off.lua
---   [main] RefLab - Listen to MIX.lua
---   [main] RefLab - Listen to REF.lua
---   [main] RefLab - Loudness match - Integrated.lua
---   [main] RefLab - Loudness match - Off.lua
---   [main] RefLab - Loudness match - Short-term.lua
---   [main] RefLab - Loudness match - next mode.lua
---   [main] RefLab - Next reference.lua
---   [main] RefLab - Open references folder.lua
---   [main] RefLab - Output - Left.lua
---   [main] RefLab - Output - Mono.lua
---   [main] RefLab - Output - Right.lua
---   [main] RefLab - Output - Side.lua
---   [main] RefLab - Output - Stereo.lua
---   [main] RefLab - Output - next mode.lua
---   [main] RefLab - Previous reference.lua
---   [main] RefLab - Reference 1.lua
---   [main] RefLab - Reference 2.lua
---   [main] RefLab - Reference 3.lua
---   [main] RefLab - Reference 4.lua
---   [main] RefLab - Reference trim +0.5 dB.lua
---   [main] RefLab - Reference trim -0.5 dB.lua
---   [main] RefLab - Reference trim 0 dB.lua
---   [main] RefLab - Refresh references list.lua
---   [main] RefLab - Reset integrated loudness.lua
---   [main] RefLab - Spectrum - next slope.lua
---   [main] RefLab - Spectrum - next smoothing.lua
---   [main] RefLab - Spectrum - reset average.lua
---   [main] RefLab - Spectrum speed - Fast.lua
---   [main] RefLab - Spectrum speed - Infinite average.lua
---   [main] RefLab - Spectrum speed - Medium.lua
---   [main] RefLab - Spectrum speed - Slow.lua
---   [main] RefLab - Spectrum speed - Very slow.lua
---   [main] RefLab - Spectrum speed - next.lua
---   [main] RefLab - Toggle MIX-REF.lua
---   [main] RefLab - Toggle loop.lua
---   RefLab README.md
+--   [main] Todoroki_RefLab back to loop start on Play on-off.lua
+--   [main] Todoroki_RefLab band solo - band 1 Low add-remove.lua
+--   [main] Todoroki_RefLab band solo - band 1 Low solo.lua
+--   [main] Todoroki_RefLab band solo - band 2 Low-mid add-remove.lua
+--   [main] Todoroki_RefLab band solo - band 2 Low-mid solo.lua
+--   [main] Todoroki_RefLab band solo - band 3 Mid add-remove.lua
+--   [main] Todoroki_RefLab band solo - band 3 Mid solo.lua
+--   [main] Todoroki_RefLab band solo - band 4 High-mid add-remove.lua
+--   [main] Todoroki_RefLab band solo - band 4 High-mid solo.lua
+--   [main] Todoroki_RefLab band solo - band 5 High add-remove.lua
+--   [main] Todoroki_RefLab band solo - band 5 High solo.lua
+--   [main] Todoroki_RefLab band solo - full (no band).lua
+--   [main] Todoroki_RefLab band solo on-off.lua
+--   [main] Todoroki_RefLab difference - centered or absolute.lua
+--   [main] Todoroki_RefLab difference - next scale.lua
+--   [main] Todoroki_RefLab difference - next smoothing.lua
+--   [main] Todoroki_RefLab independent playback on-off.lua
+--   [main] Todoroki_RefLab listen to MIX.lua
+--   [main] Todoroki_RefLab listen to REF.lua
+--   [main] Todoroki_RefLab loudness match - Integrated.lua
+--   [main] Todoroki_RefLab loudness match - next mode.lua
+--   [main] Todoroki_RefLab loudness match - Off.lua
+--   [main] Todoroki_RefLab loudness match - Short-term.lua
+--   [main] Todoroki_RefLab next reference.lua
+--   [main] Todoroki_RefLab open references folder.lua
+--   [main] Todoroki_RefLab output - Left.lua
+--   [main] Todoroki_RefLab output - Mono.lua
+--   [main] Todoroki_RefLab output - next mode.lua
+--   [main] Todoroki_RefLab output - Right.lua
+--   [main] Todoroki_RefLab output - Side.lua
+--   [main] Todoroki_RefLab output - Stereo.lua
+--   [main] Todoroki_RefLab previous reference.lua
+--   [main] Todoroki_RefLab reference 1.lua
+--   [main] Todoroki_RefLab reference 2.lua
+--   [main] Todoroki_RefLab reference 3.lua
+--   [main] Todoroki_RefLab reference 4.lua
+--   [main] Todoroki_RefLab reference trim +0.5 dB.lua
+--   [main] Todoroki_RefLab reference trim -0.5 dB.lua
+--   [main] Todoroki_RefLab reference trim 0 dB.lua
+--   [main] Todoroki_RefLab refresh references list.lua
+--   [main] Todoroki_RefLab reset integrated loudness.lua
+--   [main] Todoroki_RefLab spectrum - next slope.lua
+--   [main] Todoroki_RefLab spectrum - next smoothing.lua
+--   [main] Todoroki_RefLab spectrum - reset average.lua
+--   [main] Todoroki_RefLab spectrum speed - Fast.lua
+--   [main] Todoroki_RefLab spectrum speed - Infinite average.lua
+--   [main] Todoroki_RefLab spectrum speed - Medium.lua
+--   [main] Todoroki_RefLab spectrum speed - next.lua
+--   [main] Todoroki_RefLab spectrum speed - Slow.lua
+--   [main] Todoroki_RefLab toggle loop.lua
+--   [main] Todoroki_RefLab toggle MIX-REF.lua
+--   Todoroki_RefLab README.md
 -- @about
 --   # RefLab - actions and Companion module
 --
 --   Install together with the **RefLab** (JSFX) and **Todoroki Companion** packages.
 --
---   - "RefLab - ..." actions: map them to keys or to a MIDI controller
+--   - "Todoroki_RefLab ..." actions: map them to keys or to a MIDI controller
 --   - Companion module: opens `<REAPER>/Data/references`, keeps the file list up to date
 --     and remembers the references of each project
 

@@ -43,7 +43,7 @@ function TC.start()
   if id == 0 then
     local dir = reaper.GetExtState(SEC, "dir")
     if dir == "" then dir = reaper.GetResourcePath() .. "/Scripts/Todoroki/Scripts/Todoroki Companion/" end
-    id = reaper.AddRemoveReaScript(true, 0, dir .. "Todoroki Companion.lua", true)
+    id = reaper.AddRemoveReaScript(true, 0, dir .. "Todoroki_Companion.lua", true)
   end
   if id ~= 0 then reaper.Main_OnCommand(id, 0); return true end
   return false

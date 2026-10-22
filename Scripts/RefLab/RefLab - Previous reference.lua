@@ -1,6 +1,0 @@
--- @noindex
--- RefLab: Previous reference
--- Can be mapped to a key or a MIDI controller from the action list.
-reaper.gmem_attach("RefLab")
-reaper.gmem_write(2, 3)
-reaper.defer(function() end)
