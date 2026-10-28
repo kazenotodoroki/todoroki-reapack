@@ -1,17 +1,17 @@
--- @description Todoroki Portable Backup - save, restore and clean the settings of a portable REAPER
+-- @description Todoroki Portable Backup - save, restore and clear the settings of a portable REAPER
 -- @author Todoroki
--- @version 1.0
+-- @version 1.1
 -- @changelog
---   - First version: replaces backup_reaper.bat / save_reaper.bat / restore_reaper.bat
---   - Pick what to save or restore (all selected by default) and where
---   - Includes RefLab references, RS Trig library and the User folders of NAM, Vital, Decent Sampler
---   - Restore waits for REAPER to quit, copies everything back, then relaunches REAPER
---   - Clean backups: delete old temporary / archived backups
---   - Minimal square toolbar icons (100 / 150 / 200 %), installed into Data/toolbar_icons on first run
+--   - New: Todoroki_Portable Clear user data - empty your personal data (settings, shortcuts, templates,
+--     RefLab references, RS Trig library, plugin User folders) so the next person gets a clean REAPER
+--     and restores their own backup. Saves a copy to the archive first (on by default).
+--     Portable mode, ReaPack and the Todoroki_Portable actions are always kept.
+--   - Poise removed from the plugin list
 -- @provides
 --   [main] .
 --   [main] Todoroki_Portable Restore.lua
 --   [main] Todoroki_Portable Clean backups.lua
+--   [main] Todoroki_Portable Clear user data.lua
 --   [nomain] Todoroki_Portable_core.lua
 --   [nomain] Todoroki_Portable Backup.png
 --   [nomain] Todoroki_Portable Backup (150).png
@@ -22,6 +22,9 @@
 --   [nomain] Todoroki_Portable Clean backups.png
 --   [nomain] Todoroki_Portable Clean backups (150).png
 --   [nomain] Todoroki_Portable Clean backups (200).png
+--   [nomain] Todoroki_Portable Clear user data.png
+--   [nomain] Todoroki_Portable Clear user data (150).png
+--   [nomain] Todoroki_Portable Clear user data (200).png
 --   Todoroki_Portable README.md
 -- @about
 --   # Todoroki Portable Backup
@@ -34,6 +37,8 @@
 --   - **Todoroki_Portable Restore**: choose a backup and the components to bring back;
 --     REAPER closes, files are restored, REAPER relaunches
 --   - **Todoroki_Portable Clean backups**: delete old backups
+--   - **Todoroki_Portable Clear user data**: empty your personal data before handing
+--     the REAPER to someone else (they then restore their own backup)
 --
 --   Also covers RefLab references (`Data/references`), the RS Trig library (`Data/RSampler*`)
 --   and the `User` folders of Neural Amp Modeler, Vital and Decent Sampler

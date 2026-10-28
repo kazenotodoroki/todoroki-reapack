@@ -198,6 +198,10 @@ function M.remember(path)
   M.set("LAST", path)
   local f = io.open(M.LAST_FILE, "w")
   if f then f:write(path) f:close() end
+  M.history_add(path)
+end
+
+function M.history_add(path)
   local h, seen = { path }, { [path:lower()] = true }
   for _, p in ipairs(M.history()) do
     if not seen[p:lower()] and #h < 40 then h[#h + 1] = p; seen[p:lower()] = true end
@@ -248,7 +252,7 @@ end
 ----------------------------------------------------------------------------------------------
 local function q(s) return "'" .. tostring(s):gsub("'", "''") .. "'" end
 
-local PS_HEAD = [[
+local PS_HEAD = [==[
 $ErrorActionPreference = 'Continue'
 $script:errors = 0
 function Title($t) { Write-Host ''; Write-Host ('  ' + $t) -ForegroundColor Cyan; Write-Host ('  ' + ('-' * $t.Length)) -ForegroundColor DarkCyan }
@@ -269,6 +273,31 @@ function CopyIni($src, $dst) {
   try { Get-ChildItem -LiteralPath $src -Filter *.ini -File | Copy-Item -Destination $dst -Force -ErrorAction Stop }
   catch { Fail $_.Exception.Message }
 }
+function ClearDir($dir, $keep, $keepLike) {
+  if (-not (Test-Path -LiteralPath $dir -PathType Container)) { Skip ('not found ' + $dir); return }
+  Get-ChildItem -LiteralPath $dir -Force | ForEach-Object {
+    $p = $_.FullName; $n = $_.Name
+    $exact = @($keep | Where-Object { $_ -ieq $p }).Count -gt 0
+    $exact = $exact -or (@($keepLike | Where-Object { $n -like $_ }).Count -gt 0)
+    $parent = @($keep | Where-Object { $_.StartsWith($p + '\', [StringComparison]::OrdinalIgnoreCase) }).Count -gt 0
+    if ($exact) { Info ('    kept: ' + $p) }
+    elseif ($parent -and $_.PSIsContainer) { ClearDir $p $keep $keepLike }
+    else { try { Remove-Item -LiteralPath $p -Recurse -Force -ErrorAction Stop } catch { Fail $_.Exception.Message } }
+  }
+}
+function ClearIni($res, $keepReapack, $allScr) {
+  $kb = Join-Path $res 'reaper-kb.ini'
+  $scr = @()
+  if (Test-Path -LiteralPath $kb) {
+    $scr = @([IO.File]::ReadAllLines($kb) | Where-Object { $_ -like 'SCR *' -and ($allScr -or $_ -like '*Todoroki_Portable*') })
+  }
+  Get-ChildItem -LiteralPath $res -Filter *.ini -File | Where-Object { -not ($keepReapack -and $_.Name -ieq 'reaper-reapack.ini') } | ForEach-Object {
+    try { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop } catch { Fail $_.Exception.Message }
+  }
+  [IO.File]::WriteAllLines((Join-Path $res 'reaper.ini'), [string[]]@('[REAPER]'))
+  if ($scr.Count -gt 0) { [IO.File]::WriteAllLines($kb, [string[]]$scr) }
+  Info ('    reaper.ini reset (portable mode kept), ' + $scr.Count + ' script action(s) kept in the Actions list')
+}
 function WaitReaper($exe) {
   $p = Get-Process -Name reaper -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
   if ($p) {
@@ -277,9 +306,9 @@ function WaitReaper($exe) {
     Start-Sleep -Milliseconds 800
   }
 }
-]]
+]==]
 
--- ops: list of { label=, fn="RoboDir"|"CopyIni", src=, dst=, xd={...} }
+-- ops: list of { label=, fn="RoboDir"|"CopyIni"|"ClearDir"|"ClearIni", src=, dst=, xd={...}, keep={...}, keep_like={...} }
 -- opts: title, wait_exe, relaunch_exe, footer, manifest = { path=, text= }
 function M.run_job(name, ops, opts)
   local L = { PS_HEAD }
@@ -292,6 +321,15 @@ function M.run_job(name, ops, opts)
     L[#L + 1] = "Step " .. q(o.label)
     if o.fn == "CopyIni" then
       L[#L + 1] = "CopyIni " .. q(o.src) .. " " .. q(o.dst)
+    elseif o.fn == "Raw" then
+      L[#L + 1] = o.raw
+    elseif o.fn == "ClearIni" then
+      L[#L + 1] = "ClearIni " .. q(o.dst) .. (o.keep_reapack and " $true" or " $false") .. (o.all_scr and " $true" or " $false")
+    elseif o.fn == "ClearDir" then
+      local k, kl = {}, {}
+      for _, x in ipairs(o.keep or {}) do k[#k + 1] = q(x) end
+      for _, x in ipairs(o.keep_like or {}) do kl[#kl + 1] = q(x) end
+      L[#L + 1] = "ClearDir " .. q(o.dst) .. " @(" .. table.concat(k, ",") .. ") @(" .. table.concat(kl, ",") .. ")"
     else
       local xd = {}
       for _, x in ipairs(o.xd or {}) do xd[#xd + 1] = q(x) end
@@ -344,7 +382,7 @@ end
 
 function M.install_icons(here)
   local base = M.join(M.RES, "Data", "toolbar_icons")
-  for _, n in ipairs({ "Todoroki_Portable Backup", "Todoroki_Portable Restore", "Todoroki_Portable Clean backups" }) do
+  for _, n in ipairs({ "Todoroki_Portable Backup", "Todoroki_Portable Restore", "Todoroki_Portable Clean backups", "Todoroki_Portable Clear user data" }) do
     for _, v in ipairs({ { "", base }, { " (150)", M.join(base, "150") }, { " (200)", M.join(base, "200") } }) do
       local src = here .. n .. v[1] .. ".png"
       if M.file_exists(src) then
@@ -525,6 +563,42 @@ function M.draw_components(ui, st, x0, y0, colw)
     col.y = col.y + 12
   end
   return math.max(cols[1].y, cols[2].y)
+end
+
+-- copy operations for a backup of the selected components into dst
+function M.backup_ops(st, dst)
+  local ops, ids = {}, {}
+  for _, c in ipairs(M.COMPONENTS) do
+    if st.sel[c.id] and st.avail[c.id] then
+      ids[#ids + 1] = c.id
+      if c.kind == "ini" then
+        ops[#ops + 1] = { label = c.label, fn = "CopyIni", src = M.RES, dst = dst }
+      elseif c.kind == "rdir" then
+        for _, d in ipairs(c.dirs) do
+          if M.dir_exists(M.join(M.RES, d)) then
+            local xd = {}
+            for _, x in ipairs(c.exclude or {}) do xd[#xd + 1] = M.join(M.RES, x) end
+            ops[#ops + 1] = { label = d, fn = "RoboDir", src = M.join(M.RES, d), dst = M.join(dst, d), xd = xd }
+          end
+        end
+      else
+        ops[#ops + 1] = { label = c.label .. " (User)", fn = "RoboDir", src = M.join(M.plugin_dir(c.plugin), "User"),
+          dst = M.join(dst, c.plugin.bdir) }
+      end
+    end
+  end
+  return ops, ids
+end
+
+function M.manifest_text(ids)
+  return "created=" .. os.date("%Y-%m-%d %H:%M:%S") .. "\nreaper=" .. reaper.GetAppVersion() ..
+    "\nsource=" .. M.RES .. "\ncomponents=" .. table.concat(ids, ",")
+end
+
+function M.forget_last()
+  M.set("LAST", "")
+  os.remove(M.LAST_FILE)
+  os.remove(M.TEMP .. "\\reaper_last_backup.txt")
 end
 
 function M.count_sel(st)
