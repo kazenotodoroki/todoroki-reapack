@@ -1,10 +1,9 @@
 // @description RefLab - multi-track referencing (spectrum, LUFS, loudness match, loops, band solo)
 // @author Todoroki
-// @version 1.5
+// @version 1.6
 // @changelog
-//   - Spectrum speeds: FAST, MEDIUM, SLOW (smooth dB glide), INFINITE AVERAGE (VERY SLOW removed)
-//   - Difference curve smoothing: 1/48, 1/24, 1/12, 1/6, 1/3 or 1 octave
-//   - Actions renamed with the Todoroki_ prefix (re-assign the shortcuts made before)
+//   - Listening always starts on the MIX when a project is opened (or when REAPER starts,
+//     or when switching project tabs), never on a reference
 // @about
 //   # RefLab
 //
@@ -477,7 +476,7 @@ function do_cmd(c) local(jj, ss, dn, kk)
   memset(900, 0, 7100);
   k = 0;
   loop(4, R_KEY[k] = -2; R_IFULL[k] = -200; R_IEFF[k] = -200; strcpy(sfile(k), ""); strcpy(20 + k, ""); k += 1; );
-  ld_slot = -1; sel_cur = 0; sel_req = 0; sel_env = 0; xf = slider1 >= 0.5;
+  ld_slot = -1; sel_cur = 0; sel_req = 0; sel_env = 0; xf = 0; force_mix = 1;
   rg = 1; rg_t = 1; g_db = 0; auto_g = 0;
   aud_used = 0; blk_used = 0; mixS_sm = -200;
   mixI = mixM = mixS = refM = refS = -200;
@@ -519,12 +518,19 @@ slider39 >= 0.5 ? ( slider39 = 0; sliderchange(slider39); do_cmd(45); );
 slider40 >= 0.5 ? ( slider40 = 0; sliderchange(slider40); do_cmd(47); );
 
 @block
+// ---- opening: always start by listening to the MIX ----
+force_mix ? (
+  force_mix = 0;
+  slider1 = 0; sliderchange(slider1); xf = 0;
+);
+
 // commands sent by the REAPER actions (RefLab scripts)
 gmem[2] != 0 ? ( gcmd = gmem[2]; gmem[2] = 0; do_cmd(gcmd); );
 
 // ---- state read when opening (buffer): applied here, whatever the call order ----
 ser_pending ? (
   ser_pending = 0;
+  force_mix = 1;
   k = 0;
   loop(4, apply_slot(k, 600[k], pfile(k), 610[k], 620[k], 630[k]); k += 1; );
 );
@@ -535,6 +541,7 @@ ser_pending ? (
 // 2) the Companion pushes the project state (opening, tab change...)
 gmem[12] != st_rcv ? (
   st_rcv = gmem[12]; st_sync = 1;
+  gmem[17] > 0 ? force_mix = 1;   // a project was opened (or the tab changed): back to the MIX
   gmem[16] > 0 ? (
     k = 0;
     loop(4,

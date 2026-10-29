@@ -21,6 +21,10 @@
                                       -> calls cb(ok, value) when the reply arrives
                                          (uses reaper.defer, timeout in s, 3 by default)
     TC.open_folder(path)              -> opens a folder in the file explorer (through the Companion)
+    TC.install_toolbar_icons(only_new)
+                                      -> copies the "toolbar_icons" folders of every Todoroki package
+                                         into <REAPER>/Data/toolbar_icons (100 %, 150 %, 200 %).
+                                         only_new = true: only missing or changed files. Returns the count.
 
   module = "core" for the Companion's own commands: ping, version, reload, modules,
   open_folder, log.
@@ -100,6 +104,58 @@ end
 
 function TC.open_folder(path)
   return TC.call("core", "open_folder", path)
+end
+
+-- toolbar icons --------------------------------------------------------------------------
+local API_DIR = (debug.getinfo(1, "S").source:sub(2)):match("^(.*[\\/])") or ""
+
+local function list(dir, dirs)
+  local out, i = {}, 0
+  if dirs then reaper.EnumerateSubdirectories(dir, -1) else reaper.EnumerateFiles(dir, -1) end
+  while true do
+    local f = dirs and reaper.EnumerateSubdirectories(dir, i) or reaper.EnumerateFiles(dir, i)
+    if not f then break end
+    out[#out + 1] = f; i = i + 1
+  end
+  return out
+end
+
+local function read_all(p) local f = io.open(p, "rb"); if not f then return nil end local d = f:read("*a"); f:close(); return d end
+
+function TC.install_toolbar_icons(only_new)
+  local SEP = package.config:sub(1, 1)
+  local res = reaper.GetResourcePath()
+  -- repository root = two levels above the Companion folder (.../Scripts/Todoroki)
+  local here = API_DIR:gsub("[\\/]$", "")
+  local root = here:match("^(.*)[\\/][^\\/]+[\\/][^\\/]+$") or here
+  local dest = res .. SEP .. "Data" .. SEP .. "toolbar_icons"
+  local count, stack = 0, { { root, 0 } }
+  while #stack > 0 do
+    local top = table.remove(stack)
+    for _, d in ipairs(list(top[1], true)) do
+      local full = top[1] .. SEP .. d
+      if d == "toolbar_icons" then
+        for _, sub in ipairs({ "", "150", "200" }) do
+          local src = sub == "" and full or (full .. SEP .. sub)
+          local dst = sub == "" and dest or (dest .. SEP .. sub)
+          reaper.RecursiveCreateDirectory(dst, 0)
+          for _, f in ipairs(list(src, false)) do
+            if f:lower():match("%.png$") then
+              local data = read_all(src .. SEP .. f)
+              local old = only_new and read_all(dst .. SEP .. f)
+              if data and data ~= old then
+                local o = io.open(dst .. SEP .. f, "wb")
+                if o then o:write(data); o:close(); count = count + 1 end
+              end
+            end
+          end
+        end
+      elseif top[2] < 4 then
+        stack[#stack + 1] = { full, top[2] + 1 }
+      end
+    end
+  end
+  return count
 end
 
 return TC

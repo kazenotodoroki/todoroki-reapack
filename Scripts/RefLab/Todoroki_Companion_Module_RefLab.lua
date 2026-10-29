@@ -1,7 +1,9 @@
 -- @description RefLab - actions and Companion module
 -- @author Todoroki
--- @version 1.5
+-- @version 1.6
 -- @changelog
+--   - The plugin goes back to listening to the MIX when a project is opened or the tab changes
+--   - Dark toolbar icons for every action (run "Todoroki_Companion install toolbar icons")
 --   - Actions renamed with the Todoroki_ prefix ("Todoroki_RefLab ..."): re-assign your shortcuts
 --   - Spectrum speed actions: Fast, Medium, Slow, Infinite average (Very slow removed)
 -- @provides
@@ -58,6 +60,9 @@
 --   [main] Todoroki_RefLab toggle loop.lua
 --   [main] Todoroki_RefLab toggle MIX-REF.lua
 --   Todoroki_RefLab README.md
+--   toolbar_icons/*.png
+--   toolbar_icons/150/*.png
+--   toolbar_icons/200/*.png
 -- @about
 --   # RefLab - actions and Companion module
 --
@@ -72,7 +77,7 @@
 --   [2] command from actions   [3] list version   [4] number of files
 --   [10] publish counter (plugin)   [11] selected ref (0-3)
 --   [12] restore counter (module)   [13] ref to select   [15] plugin acknowledgment
---   [16] 1 = data to restore present
+--   [16] 1 = data to restore present   [17] 1 = project opened (plugin switches to MIX)
 --   [20 + 4k ..] published state: active, loop on, start, end   [70000 + k*256] published name
 --   [40 + 4k ..] state to restore                                [71024 + k*256] name to restore
 --   [100 + i*256 ...] file list (1 character per slot, 0 terminated)
@@ -126,8 +131,8 @@ local function get_stored()
   return s or ""
 end
 
--- pushes the current project state to the plugin
-local function push(C)
+-- pushes the current project state to the plugin (opened = a project was opened / tab changed)
+local function push(C, opened)
   local s = get_stored()
   local sel, body = s:match("^v1|(%-?%d+)|(.*)$")
   if body then
@@ -152,6 +157,7 @@ local function push(C)
     reaper.gmem_write(16, 0)
     stored_body = nil
   end
+  reaper.gmem_write(17, opened and 1 or 0)
   reaper.gmem_write(12, reaper.gmem_read(12) + 1)
   last_push = C.now()
 end
@@ -175,7 +181,7 @@ end
 
 local function project_key()
   local proj, fn = reaper.EnumProjects(-1)
-  return tostring(proj) .. "|" .. tostring(fn or "")
+  return tostring(proj) .. "|" .. tostring(fn or ""), tostring(proj), tostring(fn or "")
 end
 
 ----------------------------------------------------------------------------------------------
@@ -185,7 +191,7 @@ function M.init(C)
   publish(C, true)
   last_pub = reaper.gmem_read(10)
   last_proj = project_key()
-  push(C)
+  push(C, true)
 end
 
 function M.tick(C)
@@ -196,17 +202,19 @@ function M.tick(C)
   if req ~= 0 then
     reaper.gmem_write(1, 0)
     if req == 3 then
-      push(C)
+      push(C, true)
     else
       if req == 1 then C.open_folder(dir) end
       publish(C, true)
     end
   end
 
-  local key = project_key()
+  local key, pkey, fn = project_key()
   if key ~= last_proj then
+    -- same project tab whose file name goes from "" to a name: first save, not an opening
+    local first_save = last_proj and last_proj == pkey .. "|" and fn ~= ""
     last_proj = key
-    push(C)
+    push(C, not first_save)
   end
 
   poll_published(C)
@@ -220,7 +228,7 @@ M.commands = {
   folder      = function() return dir end,
   send        = function(C, arg) reaper.gmem_write(2, tonumber(arg) or 0); return "ok" end,
   state       = function() return get_stored() end,
-  restore     = function(C) push(C); return "ok" end,
+  restore     = function(C) push(C, false); return "ok" end,
 }
 
 return M

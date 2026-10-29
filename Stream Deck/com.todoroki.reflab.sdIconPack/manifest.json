@@ -1,0 +1,14 @@
+{
+  "Name": "Todoroki RefLab",
+  "Version": "1.0",
+  "Author": "Todoroki",
+  "Description": "Dark keys for the RefLab and Todoroki Companion actions of REAPER.",
+  "URL": "https://github.com/kazenotodoroki/todoroki-reapack",
+  "Icon": "icon.png",
+  "Tags": [
+    "reaper",
+    "reflab",
+    "todoroki",
+    "mixing"
+  ]
+}

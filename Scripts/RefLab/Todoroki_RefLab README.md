@@ -90,6 +90,32 @@ Every setting can be mapped in two ways:
 - **"Todoroki_RefLab …" actions** (51 actions) in the action list: *Add shortcut*, then press the key or move
   the MIDI control (*Preferences > MIDI devices*: enable *Enable input for control messages*).
 
+## Opening a project
+
+RefLab always starts by listening to the **MIX** when a project is opened, when REAPER starts or when you
+switch project tabs, even if the project was saved while listening to a reference.
+
+## Toolbar icons (dark)
+
+Every "Todoroki_RefLab …" action has a dark toolbar icon (normal / mouse over / active, 100 %, 150 % and
+200 %). The Todoroki Companion copies them into `<REAPER>/Data/toolbar_icons` when it starts
+(or run **Todoroki_Companion install toolbar icons**).
+
+To use one: right click on a toolbar > *Customize toolbar…* > add the action > *Icon…* > pick the icon
+with the same name as the action. On/off actions (loop, band solo, MIX/REF…) light up in orange when active.
+
+## Stream Deck
+
+The repository folder `Stream Deck` contains a dark key pack (144 px) for all the actions, with an
+"(on)" version for the on/off ones:
+
+- double-click `Todoroki RefLab.streamDeckIconPack` to install it, or copy the
+  `com.todoroki.reflab.sdIconPack` folder into `%appdata%\Elgato\StreamDeck\IconPacks` and restart Stream Deck;
+- then pick the icons in the key's icon menu (*Icon library* > Todoroki RefLab).
+
+To trigger the actions from the Stream Deck, give each REAPER action a keyboard shortcut and use a
+*Hotkey* key, or use a Stream Deck plugin that runs REAPER actions by command ID.
+
 ## Upgrading
 
 - **From 1.3 / 1.4**: the actions are now named "Todoroki_RefLab …". ReaPack removes the old ones;

@@ -7,6 +7,8 @@ each tool adds its own **module** to it instead of starting its own background s
 - **Todoroki_Companion autostart (on-off)**: start together with REAPER (a line in `Scripts/__startup.lua`,
   path relative to the REAPER folder → fine with portable REAPER, even if the drive letter changes).
 - **Todoroki_Companion status and modules**: reloads the modules and prints the log in the console.
+- **Todoroki_Companion install toolbar icons**: copies the dark toolbar icons of every Todoroki package into
+  `<REAPER>/Data/toolbar_icons` (done automatically when the Companion starts, for missing or changed files).
 
 Debug: `reaper.SetExtState("Todoroki_Companion", "debug", "1", false)` prints the log live.
 
@@ -96,6 +98,7 @@ end)
 | `TC.call(module, cmd, arg)` → id, then `TC.result(id)` | manual asynchronous call |
 | `TC.request(module, cmd, arg, cb, timeout)` | call with a `cb(ok, value)` callback |
 | `TC.open_folder(path)` | open a folder |
+| `TC.install_toolbar_icons(only_new)` | copy the `toolbar_icons` folders of the packages into `Data/toolbar_icons` |
 
 Module `"core"`: `ping`, `version`, `reload`, `modules`, `open_folder`, `log`.
 
@@ -111,6 +114,13 @@ Recommended convention (the one RefLab uses):
 | `gmem[2]` | command from the REAPER actions to the JSFX (reset to 0 by the JSFX) |
 | `gmem[3…99]` | free (versions, counters…) |
 | `gmem[100…]` | data (strings: 1 character per slot, 0 terminated) |
+
+## Toolbar icons for a new tool
+
+Put the icons in a `toolbar_icons` folder next to the tool's scripts (`toolbar_icons/*.png` at 100 %,
+`toolbar_icons/150/` and `toolbar_icons/200/` for HiDPI; each file = 3 states side by side: normal,
+mouse over, active), and declare the three folders in the package's `@provides`. The Companion installs
+them by itself.
 
 To keep something **per project** (like RefLab's references), store it from the module with
 `reaper.SetProjExtState(0, "<Name>", key, value)`: it is saved in the .rpp file. Watch the

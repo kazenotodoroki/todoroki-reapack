@@ -1,15 +1,18 @@
 -- @description Todoroki Companion (shared background service)
 -- @author Todoroki
--- @version 1.2
+-- @version 1.3
 -- @changelog
---   - Scripts renamed with the Todoroki_ prefix: Todoroki_Companion, Todoroki_Companion autostart (on-off),
---     Todoroki_Companion status and modules
---   - If you installed the previous "Todoroki Companion" package: uninstall it in ReaPack (it is now
---     obsolete), then run "Todoroki_Companion autostart (on-off)" once to update the startup line
+--   - Dark toolbar icons for the Todoroki actions: installed automatically in Data/toolbar_icons
+--     when the Companion starts, or with "Todoroki_Companion install toolbar icons"
+--   - New API function: TC.install_toolbar_icons()
 -- @provides
 --   [main] .
 --   [main] Todoroki_Companion autostart (on-off).lua
 --   [main] Todoroki_Companion status and modules.lua
+--   [main] Todoroki_Companion install toolbar icons.lua
+--   toolbar_icons/*.png
+--   toolbar_icons/150/*.png
+--   toolbar_icons/200/*.png
 --   [nomain] Todoroki_Companion_API.lua
 --   Todoroki_Companion README.md
 -- @about
@@ -25,7 +28,7 @@
 --
 --   Developer documentation: `Todoroki_Companion README.md`.
 
-local VERSION = "1.2"
+local VERSION = "1.3"
 local SEC     = "Todoroki_Companion"          -- ExtState section
 local SEP     = package.config:sub(1, 1)
 local RES     = reaper.GetResourcePath()
@@ -338,4 +341,13 @@ end
 
 reaper.atexit(shutdown)
 load_modules()
+-- toolbar icons of every Todoroki package -> Data/toolbar_icons (only missing or changed files)
+do
+  local ok, TC = pcall(dofile, HERE .. "Todoroki_Companion_API.lua")
+  if ok and TC and TC.install_toolbar_icons then
+    local ok2, n = pcall(TC.install_toolbar_icons, true)
+    if ok2 and n > 0 then C.log("core", n .. " toolbar icon files installed") end
+    if not ok2 then C.log("core", "toolbar icons: " .. tostring(n)) end
+  end
+end
 loop()
