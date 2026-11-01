@@ -1,23 +1,23 @@
 -- @noindex
 --[[
-  ChordMachineGun — fenêtre Historique
-  Chaque accord joué par ChordMachineGun apparaît ici sous forme de bouton, avec ses voix.
-  Rejouer depuis l'historique n'ajoute rien à l'historique.
+  ChordMachineGun — History window
+  Every chord played by ChordMachineGun shows up here as a button, with its voices.
+  Replaying from the history does not add to the history.
 
-    clic / ← →          rejouer l'accord (↑ ↓ : rangée précédente / suivante)
-    Maj + clic / Entrée insérer (Maj+Entrée) — Entrée seule rejoue
-    Suppr / Retour arr. retirer l'accord focalisé
-    clic droit          menu (sur un accord) ou ancrer / détacher (zone vide)
+    click / ← →         replay the chord (↑ ↓: previous / next row)
+    Shift + click / Shift+Enter insert — Enter alone replays
+    Del / Backspace     remove the focused chord
+    right-click         menu (on a chord) or dock / undock (empty area)
 ]]
 
 local scriptPath = ({ reaper.get_action_context() })[2]:match("^(.*[/\\])")
 dofile(scriptPath .. "Todoroki_ChordMachineGun_core.lua")
 
-local TITLE = "ChordMachineGun — Historique"
+local TITLE = "ChordMachineGun — History"
 local EXT = "ChordMachineGun"
 
 ------------------------------------------------------------------------------
--- Thème et dessin (mêmes couleurs que la fenêtre principale, formes carrées)
+-- Theme and drawing (same colours as the main window, square shapes)
 ------------------------------------------------------------------------------
 
 local THEME = {
@@ -97,12 +97,12 @@ local function button(x, y, w, h, label, active)
 end
 
 ------------------------------------------------------------------------------
--- État
+-- State
 ------------------------------------------------------------------------------
 
 local ui = {
   list = {}, rev = -1, focus = 0, scroll = 0, contentH = 0,
-  cells = {},          -- positions calculées à chaque image (pour ↑ ↓)
+  cells = {},          -- positions computed every frame (for ↑ ↓)
   ensureVisible = false,
 }
 
@@ -135,7 +135,7 @@ local function removeEntry(index)
 end
 
 ------------------------------------------------------------------------------
--- Épingle (js_ReaScriptAPI)
+-- Pin (js_ReaScriptAPI)
 ------------------------------------------------------------------------------
 
 local function getPinned() return reaper.GetExtState(EXT, "historyPinned") == "1" end
@@ -146,7 +146,7 @@ local function applyPin()
 end
 local function togglePin()
   if not reaper.JS_Window_SetZOrder then
-    reaper.MB("Pour épingler la fenêtre, installe l'extension js_ReaScriptAPI (ReaPack).", "ChordMachineGun", 0)
+    reaper.MB("To pin the window, install the js_ReaScriptAPI extension (ReaPack).", "ChordMachineGun", 0)
     afterModal()
     return
   end
@@ -177,7 +177,7 @@ local function drawEntries(W, H)
   ui.cells = {}
 
   if #ui.list == 0 then
-    drawText("Aucun accord pour l'instant : joue des accords dans ChordMachineGun.", PAD, top, W - 2 * PAD, bottom - top, THEME.muted, F_BODY, 1)
+    drawText("No chords yet: play some chords in ChordMachineGun.", PAD, top, W - 2 * PAD, bottom - top, THEME.muted, F_BODY, 1)
     ui.contentH = 0
     return
   end
@@ -210,7 +210,7 @@ local function drawEntries(W, H)
         if clicked(x, y, w, CELL_H) then play(k, M.shift) end
         if rclicked(x, y, w, CELL_H) then
           gfx.x, gfx.y = gfx.mouse_x, gfx.mouse_y
-          local choice = gfx.showmenu("Rejouer|Insérer dans l'éditeur MIDI||Retirer de l'historique|Effacer tout l'historique")
+          local choice = gfx.showmenu("Replay|Insert into MIDI editor||Remove from history|Clear whole history")
           afterModal()
           if choice == 1 then play(k, false)
           elseif choice == 2 then play(k, true)
@@ -223,7 +223,7 @@ local function drawEntries(W, H)
   end
   ui.contentH = (y - ui.scroll) + CELL_H + 16 - top
 
-  -- garder l'accord focalisé visible
+  -- keep the focused chord visible
   if ui.ensureVisible and ui.cells[ui.focus] then
     local c = ui.cells[ui.focus]
     if c.y < top + 8 then ui.scroll = ui.scroll + (top + 8 - c.y)
@@ -234,10 +234,10 @@ end
 
 local function drawHeader(W)
   fillRect(0, 0, W, HEADER_H, THEME.bg)
-  drawText("Historique", PAD, 12, 120, 26, THEME.text, F_BOLD, 0)
-  drawText(#ui.list .. " accord" .. (#ui.list > 1 and "s" or ""), PAD + 110, 12, 120, 26, THEME.muted, F_SMALL, 0)
-  if button(W - PAD - 30 - 8 - 80, 12, 80, 26, "Effacer") then
-    if #ui.list > 0 and reaper.MB("Effacer tout l'historique ?", "ChordMachineGun", 4) == 6 then
+  drawText("History", PAD, 12, 120, 26, THEME.text, F_BOLD, 0)
+  drawText(#ui.list .. " chord" .. (#ui.list > 1 and "s" or ""), PAD + 110, 12, 120, 26, THEME.muted, F_SMALL, 0)
+  if button(W - PAD - 30 - 8 - 80, 12, 80, 26, "Clear") then
+    if #ui.list > 0 and reaper.MB("Clear the whole history?", "ChordMachineGun", 4) == 6 then
       clearHistory(); reload(); ui.focus = 0
     end
     afterModal()
@@ -248,12 +248,12 @@ end
 
 local function drawFooter(W, H)
   fillRect(0, H - FOOTER_H, W, FOOTER_H, THEME.bg)
-  drawText("clic / ← → ↑ ↓ : rejouer   ·   Maj : insérer   ·   Suppr : retirer   ·   clic droit : menu",
+  drawText("click / ← → ↑ ↓: replay   ·   Shift: insert   ·   Del: remove   ·   right-click: menu",
     PAD, H - FOOTER_H, W - 2 * PAD, FOOTER_H - 4, THEME.faint, F_SMALL, 0)
 end
 
 ------------------------------------------------------------------------------
--- Clavier
+-- Keyboard
 ------------------------------------------------------------------------------
 
 local function moveVertical(dir)
@@ -280,15 +280,15 @@ local function handleKey(char)
   elseif char == 1919379572 then play(math.min(n, ui.focus + 1), false)      -- →
   elseif char == 30064 then moveVertical(-1)                                 -- ↑
   elseif char == 1685026670 then moveVertical(1)                             -- ↓
-  elseif char == 1752132965 then play(1, false)                              -- Début
+  elseif char == 1752132965 then play(1, false)                              -- Home
   elseif char == 6647396 then play(n, false)                                 -- Fin
-  elseif char == 13 then play(ui.focus, shift)                               -- Entrée
-  elseif char == 6579564 or char == 8 then removeEntry(ui.focus)             -- Suppr / Retour
+  elseif char == 13 then play(ui.focus, shift)                               -- Enter
+  elseif char == 6579564 or char == 8 then removeEntry(ui.focus)             -- Del / Backspace
   elseif char == string.byte("0") then stopAllNotesFromPlaying() end
 end
 
 ------------------------------------------------------------------------------
--- Fenêtre
+-- Window
 ------------------------------------------------------------------------------
 
 local function saveWindow()
@@ -326,7 +326,7 @@ local function frame()
   reaper.SetExtState(EXT, "historyAlive", tostring(reaper.time_precise()), false)
   if not pinApplied then pinApplied = true; applyPin() end
 
-  -- la gamme a pu changer dans la fenêtre principale (noms de notes)
+  -- the scale may have changed in the main window (note names)
   local scaleKey = getScaleTonicNote() .. ":" .. getScaleType()
   if scaleKey ~= ui.scaleKey then ui.scaleKey = scaleKey; updateScaleData() end
   reload()
@@ -347,7 +347,7 @@ local function frame()
   if M.rclick and not M.rconsumed then
     local docked = gfx.dock(-1) > 0
     gfx.x, gfx.y = gfx.mouse_x, gfx.mouse_y
-    local i = gfx.showmenu(docked and "Détacher la fenêtre" or "Ancrer la fenêtre")
+    local i = gfx.showmenu(docked and "Undock window" or "Dock window")
     afterModal()
     if i == 1 then
       saveWindow()

@@ -1,5 +1,5 @@
 -- @noindex
--- ChordMachineGun — borrowed scale chord 2 (degré 2 de la gamme de l'accord sélectionné)
+-- ChordMachineGun — borrowed scale chord 2 (degree 2 of the selected chord's scale)
 local path = ({ reaper.get_action_context() })[2]:match("^(.*[/\\])")
 dofile(path .. "Todoroki_ChordMachineGun_core.lua")
 

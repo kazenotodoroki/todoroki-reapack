@@ -1,48 +1,48 @@
 -- @description ChordMachineGun
 -- @author Todoroki
--- @version 1.0
+-- @version 1.1
 -- @changelog
---   Première version publique.
---   - Conduite de voix live (clavier MIDI, lecture, item) et positions personnalisées
---   - Degrés de la gamme de l'accord (Ctrl) et transformations néo-riemanniennes explorables (Alt)
---   - Split MIDI par voix (aucun / toutes les voix / basse seule / par voix) et doublures
---   - Fenêtre Historique, curseurs CC et vélocité, épinglage des fenêtres
+--   - New: drone. Pick one or more fixed notes played under every chord; voice leading ignores them.
+--     Optional hold between chords, own MIDI channel, "toggle drone" action.
+--   - Whole script translated to English (interface, messages, README).
 -- @provides
 --   [main=main,midi_editor] .
 --   [main=main,midi_editor] Todoroki_ChordMachineGun *.lua
 --   Todoroki_ChordMachineGun_core.lua
---   Todoroki_ChordMachineGun LISEZMOI.md
+--   Todoroki_ChordMachineGun README.md
 --   LICENSE.md
 -- @about
 --   # ChordMachineGun
 --
---   Générateur d'accords pour REAPER, dérivé de **ChordGun** de pandabot (licence MIT).
---   Il s'installe à côté de ChordGun sans le modifier.
+--   Chord generator for REAPER, based on **ChordGun** by pandabot (MIT licence).
+--   Installs next to ChordGun without changing it.
 --
---   - Grille d'accords de la gamme, insertion dans l'éditeur MIDI ou jeu en direct
---   - Conduite de voix (règles classiques), analysée en continu depuis le clavier MIDI, la lecture ou l'item
---   - Positions personnalisées (ex. `1 5 3 13 9`), renversement automatique
---   - **Ctrl** : degrés de la gamme de l'accord sélectionné (accords d'emprunt)
---   - **Alt** : transformations néo-riemanniennes P, L, R, N, S, H, PR, explorables sans fin
---   - Split MIDI par voix, choix du canal de chaque voix, doublures (octave, quinte, tierce…)
---   - Fenêtre Historique, deux curseurs CC et un curseur de vélocité (souris ou contrôleur MIDI)
+--   - Scale chord grid: insert into the MIDI editor or play live
+--   - Voice leading (classical rules), analysed live from the MIDI keyboard, playback or the MIDI item
+--   - Custom positions (e.g. `1 5 3 13 9`), automatic inversion
+--   - **Ctrl**: degrees of the selected chord's scale (borrowed chords)
+--   - **Alt**: neo-Riemannian transformations P, L, R, N, S, H, PR, explorable endlessly
+--   - MIDI split per voice, channel per voice, doublings (octave, fifth, third…)
+--   - Drone: fixed notes under every chord, ignored by voice leading
+--   - History window, two CC sliders and a velocity slider (mouse or MIDI controller)
 --
---   Recommandé : l'extension **js_ReaScriptAPI** (ReaPack), pour Ctrl/Alt + chiffres et l'épinglage des fenêtres.
+--   Recommended: the **js_ReaScriptAPI** extension (ReaPack), for Ctrl/Alt + digits and window pinning.
 --
---   Mode d'emploi complet : `Todoroki_ChordMachineGun LISEZMOI.md`, installé avec le script.
+--   Full manual: `Todoroki_ChordMachineGun README.md`, installed with the script.
 --
---   Licence MIT. ChordGun © 2018 pandabot (Ben Johnson), ChordMachineGun © 2026 Todoroki.
+--   MIT licence. ChordGun © 2018 pandabot (Ben Johnson), ChordMachineGun © 2026 Todoroki.
 
 --[[
-  ChordMachineGun — fenêtre principale. Nécessite Todoroki_ChordMachineGun_core.lua dans le même dossier.
+  ChordMachineGun — main window. Needs Todoroki_ChordMachineGun_core.lua in the same folder.
 
-  Souris
-    clic                : écouter l'accord
-    Maj + clic          : insérer l'accord (ou remplacer les notes sélectionnées)
-    clic droit (vide)   : ancrer / détacher la fenêtre
-    molette sur panneau : faire défiler le panneau de droite
-  Clavier : 1-7 écouter, Maj+1-7 insérer, flèches sélectionner, Entrée jouer, +/- octave,
-            Ctrl+1-7 degrés de la gamme de l'accord, Alt+1-7 transformations PLR
+  Mouse
+    click               : play the chord
+    Shift + click       : insert the chord (or replace the selected notes)
+    right-click (empty) : dock / undock the window
+    wheel over panel    : scroll the right panel
+  Keys
+    1-7 play, Shift+1-7 insert, arrows select, Enter play, +/- octave,
+    Ctrl+1-7 degrees of the chord's scale, Alt+1-7 PLR transformations
 ]]
 
 local scriptPath = ({ reaper.get_action_context() })[2]:match("^(.*[/\\])")
@@ -51,7 +51,7 @@ dofile(scriptPath .. "Todoroki_ChordMachineGun_core.lua")
 updateScaleData()
 
 ------------------------------------------------------------------------------
--- Thème
+-- Theme
 ------------------------------------------------------------------------------
 
 local THEME = {
@@ -94,7 +94,7 @@ end
 local M = { x = 0, y = 0, prev = false, rprev = false, click = false, rclick = false, shift = false, consumed = false, rconsumed = false, wheel = 0 }
 
 local IS_MAC = reaper.GetOS():match("OSX") ~= nil or reaper.GetOS():match("mac") ~= nil
--- Ctrl (Windows/Linux) ; Ctrl ou Cmd (macOS)
+-- Ctrl (Windows/Linux); Ctrl or Cmd (macOS)
 local function borrowModifierDown(cap)
   cap = cap or gfx.mouse_cap
   if IS_MAC then return cap & 32 == 32 or cap & 4 == 4 end
@@ -131,7 +131,7 @@ local function clicked(x, y, w, h)
 end
 
 local function afterModal()
-  -- un menu ou une boîte de dialogue a volé le relâchement du bouton
+  -- a menu or dialog swallowed the mouse button release
   M.prev, M.rprev = true, true
 end
 
@@ -141,7 +141,7 @@ end
 
 local function fillRect(x, y, w, h, hex, a) setColor(hex, a); gfx.rect(x, y, w, h, 1) end
 
--- formes carrées (le paramètre r est conservé pour garder les appels lisibles)
+-- square shapes (the r parameter is kept so calls stay readable)
 local function fillRound(x, y, w, h, r, hex, a)
   setColor(hex, a)
   gfx.rect(math.floor(x), math.floor(y), math.floor(w), math.floor(h), 1)
@@ -152,7 +152,7 @@ local function strokeRound(x, y, w, h, r, hex, a)
   gfx.rect(math.floor(x), math.floor(y), math.floor(w), math.floor(h), 0)
 end
 
--- majuscules avec accents (string.upper ne gère pas l'UTF-8)
+-- upper case with accents (string.upper does not handle UTF-8)
 local ACCENT_UPPER = { ["é"] = "É", ["è"] = "È", ["ê"] = "Ê", ["ë"] = "Ë", ["à"] = "À", ["â"] = "Â",
   ["ô"] = "Ô", ["î"] = "Î", ["ï"] = "Ï", ["û"] = "Û", ["ù"] = "Ù", ["ç"] = "Ç" }
 local function upperFR(str)
@@ -170,14 +170,14 @@ local function ellipsize(s, maxW, font)
   gfx.setfont(font or F_BODY)
   if gfx.measurestr(s) <= maxW then return s end
   while #s > 0 and gfx.measurestr(s .. "…") > maxW do
-    -- retire un caractère UTF-8 complet (octets de continuation + octet de tête)
+    -- removes a whole UTF-8 character (continuation bytes + lead byte)
     while #s > 0 and s:byte(-1) >= 0x80 and s:byte(-1) < 0xC0 do s = s:sub(1, -2) end
     s = s:sub(1, -2)
   end
   return s .. "…"
 end
 
--- align : 0 gauche, 1 centre, 2 droite ; centré verticalement dans h
+-- align: 0 left, 1 centre, 2 right; vertically centred in h
 local function drawText(s, x, y, w, h, hex, font, align)
   gfx.setfont(font or F_BODY)
   s = ellipsize(s, w, font)
@@ -233,7 +233,7 @@ local function toggleRow(x, y, w, label, value, hint)
   return value
 end
 
--- renvoie -1, +1 ou 0
+-- returns -1, +1 or 0
 local function stepper(x, y, w, label, valueText, labelW)
   local h = 28
   if label then drawText(label, x, y, labelW or (w - 100), h, THEME.soft, F_BODY, 0) end
@@ -291,53 +291,53 @@ local function showMenu(entries)
 end
 
 local POSITION_PRESETS = {
-  { "Serrée",                 "1 3 5 7" },
-  { "Ouverte",                "1 5 3 7" },
+  { "Close",                 "1 3 5 7" },
+  { "Open",                "1 5 3 7" },
   { "Drop 2",                 "5 1 3 7" },
   { "Drop 3",                 "3 1 5 7" },
   { "Shell",                  "1 3 7" },
-  { "Shell inversée",         "1 7 3" },
-  { "Sans fondamentale A",    "3 5 7 9" },
-  { "Sans fondamentale B",    "7 9 3 5" },
-  { "Neuvième / treizième",   "1 5 3 13 9" },
-  { "Triade ouverte",         "1 5 3" },
+  { "Shell inverted",         "1 7 3" },
+  { "Rootless A",    "3 5 7 9" },
+  { "Rootless B",    "7 9 3 5" },
+  { "Ninth / thirteenth",   "1 5 3 13 9" },
+  { "Open triad",         "1 5 3" },
 }
 
 local DOUBLING_MENU = {
-  { label = "Octave au-dessus",          value = "s12" },
-  { label = "Octave en dessous",         value = "s-12" },
-  { label = "Deux octaves au-dessus",    value = "s24" },
-  { header = "Intervalle chromatique" },
-  { label = "Quinte juste +",            value = "s7" },
-  { label = "Quarte juste +",            value = "s5" },
-  { label = "Tierce majeure +",          value = "s4" },
-  { label = "Tierce mineure +",          value = "s3" },
-  { label = "Sixte majeure +",           value = "s9" },
-  { label = "Sixte mineure +",           value = "s8" },
-  { label = "Quinte juste −",            value = "s-7" },
-  { label = "Quarte juste −",            value = "s-5", last = true },
-  { header = "Intervalle dans la gamme" },
-  { label = "Tierce +",                  value = "d2" },
-  { label = "Quarte +",                  value = "d3" },
-  { label = "Quinte +",                  value = "d4" },
-  { label = "Sixte +",                   value = "d5" },
-  { label = "Tierce −",                  value = "d-2" },
-  { label = "Sixte −",                   value = "d-5", last = true },
-  { label = "Personnalisé…",             value = "custom" },
-  { label = "Effacer les doublures de cette voix", value = "clear" },
+  { label = "Octave above",          value = "s12" },
+  { label = "Octave below",         value = "s-12" },
+  { label = "Two octaves above",    value = "s24" },
+  { header = "Chromatic interval" },
+  { label = "Perfect fifth +",            value = "s7" },
+  { label = "Perfect fourth +",            value = "s5" },
+  { label = "Major third +",          value = "s4" },
+  { label = "Minor third +",          value = "s3" },
+  { label = "Major sixth +",           value = "s9" },
+  { label = "Minor sixth +",           value = "s8" },
+  { label = "Perfect fifth −",            value = "s-7" },
+  { label = "Perfect fourth −",            value = "s-5", last = true },
+  { header = "Scale interval" },
+  { label = "Third +",                  value = "d2" },
+  { label = "Fourth +",                  value = "d3" },
+  { label = "Fifth +",                  value = "d4" },
+  { label = "Sixth +",                   value = "d5" },
+  { label = "Third −",                  value = "d-2" },
+  { label = "Sixth −",                   value = "d-5", last = true },
+  { label = "Custom…",             value = "custom" },
+  { label = "Clear this voice's doublings", value = "clear" },
 }
 
 local function editCustomPosition()
-  local ok, text = reaper.GetUserInputs("ChordMachineGun — position (grave → aigu)", 1,
-    "Fonctions (ex. 1 5 3 13 9),extrawidth=180", getCustomPosition())
+  local ok, text = reaper.GetUserInputs("ChordMachineGun — position (low → high)", 1,
+    "Functions (e.g. 1 5 3 13 9),extrawidth=180", getCustomPosition())
   afterModal()
   if not ok then return end
   local valid, err = validateCustomPosition(text)
   if not valid then
-    reaper.MB("Position invalide : " .. tostring(err) ..
-      "\n\nJetons acceptés : 1 (ou R/T/F), 2, 3, 4, 5, 6, 7, 9, 11, 13" ..
-      "\nAltérations : b9, #9, #11, b13, b5, #5, b7, 7M (ou maj7)" ..
-      "\nSuffixe + : une octave de plus (ex. 5+)", "ChordMachineGun", 0)
+    reaper.MB("Invalid position: " .. tostring(err) ..
+      "\n\nAccepted tokens: 1 (or R), 2, 3, 4, 5, 6, 7, 9, 11, 13" ..
+      "\nAlterations: b9, #9, #11, b13, b5, #5, b7, 7M (or maj7)" ..
+      "\nSuffix +: one octave higher (e.g. 5+)", "ChordMachineGun", 0)
     return
   end
   setCustomPosition(text)
@@ -345,8 +345,8 @@ local function editCustomPosition()
 end
 
 local function askCustomDoubling()
-  local ok, text = reaper.GetUserInputs("ChordMachineGun — doublure", 1,
-    "Demi-tons (ex. 7, -12) ou g+degrés (ex. g2),extrawidth=80", "12")
+  local ok, text = reaper.GetUserInputs("ChordMachineGun — doubling", 1,
+    "Semitones (e.g. 7, -12) or d+scale steps (e.g. d2),extrawidth=80", "12")
   afterModal()
   if not ok then return nil end
   text = text:gsub("%s", "")
@@ -354,25 +354,25 @@ local function askCustomDoubling()
   if n then return "s" .. tonumber(n) end
   n = text:match("^[gGdD]([%+%-]?%d+)$")
   if n then return "d" .. tonumber(n) end
-  reaper.MB("Format non reconnu : " .. text, "ChordMachineGun", 0)
+  reaper.MB("Unrecognised format: " .. text, "ChordMachineGun", 0)
   return nil
 end
 
 ------------------------------------------------------------------------------
--- État de l'interface
+-- UI state
 ------------------------------------------------------------------------------
 
 local ui = {
   panelScroll = 0,
   panelContentH = 0,
-  compactView = 1,  -- 1 = accords, 2 = voix (fenêtre étroite)
+  compactView = 1,  -- 1 = chords, 2 = voices (narrow window)
   frameNo = 0,
   refFrame = -100,
   refCache = nil,
-  ccDrag = nil,        -- curseur CC en cours de glissement
-  ccLearn = nil,       -- curseur CC en attente d'un contrôleur (Learn)
-  ccSeq = nil,         -- dernier message MIDI d'entrée traité
-  mod = nil,           -- { kind = "ctrl"|"alt", ctx = ... } quand Ctrl ou Alt est maintenu
+  ccDrag = nil,        -- CC slider being dragged
+  ccLearn = nil,       -- CC slider waiting for a controller (Learn)
+  ccSeq = nil,         -- last processed MIDI input message
+  mod = nil,           -- { kind = "ctrl"|"alt", ctx = ... } while Ctrl or Alt is held
   pinApplied = false,
   lastTonic = getScaleTonicNote(),
   lastType = getScaleType(),
@@ -383,7 +383,7 @@ local PANEL_W = 312
 local HEADER_H = 52
 
 ------------------------------------------------------------------------------
--- Épingler la fenêtre (toujours au premier plan) — nécessite js_ReaScriptAPI
+-- Pin the window (always on top) — needs js_ReaScriptAPI
 ------------------------------------------------------------------------------
 
 local function windowHandle()
@@ -401,8 +401,8 @@ end
 
 local function togglePin()
   if not reaper.JS_Window_SetZOrder then
-    reaper.MB("Pour épingler la fenêtre, installe l'extension js_ReaScriptAPI\n" ..
-      "(Extensions → ReaPack → Browse packages → « js_ReaScriptAPI »), puis redémarre REAPER.", "ChordMachineGun", 0)
+    reaper.MB("To pin the window, install the js_ReaScriptAPI extension\n" ..
+      "(Extensions → ReaPack → Browse packages → 'js_ReaScriptAPI'), then restart REAPER.", "ChordMachineGun", 0)
     afterModal()
     return
   end
@@ -411,7 +411,7 @@ local function togglePin()
 end
 
 local function drawPinIcon(x, y, size, hex)
-  -- punaise : tête, collerette, aiguille
+  -- pin: head, collar, needle
   local cx = math.floor(x + size / 2)
   setColor(hex)
   gfx.rect(cx - 4, y + 2, 8, 6, 1)
@@ -430,7 +430,7 @@ local function pinButton(x, y, w, h)
   drawPinIcon(x + (w - 20) / 2, y + (h - 20) / 2 + 1, 20, fg)
   if clicked(x, y, w, h) then
     if docked then
-      reaper.MB("La fenêtre est ancrée : détache-la (clic droit) pour l'épingler.", "ChordMachineGun", 0)
+      reaper.MB("The window is docked: undock it (right-click) to pin it.", "ChordMachineGun", 0)
       afterModal()
     else
       togglePin()
@@ -439,7 +439,7 @@ local function pinButton(x, y, w, h)
 end
 
 ------------------------------------------------------------------------------
--- Fenêtre Historique (script séparé : une fenêtre par script dans REAPER)
+-- History window (separate script: REAPER allows one window per script)
 ------------------------------------------------------------------------------
 
 local HISTORY_SCRIPT = scriptPath .. "Todoroki_ChordMachineGun history.lua"
@@ -459,13 +459,13 @@ local function toggleHistoryWindow()
   if cmd and cmd ~= 0 then
     reaper.Main_OnCommand(cmd, 0)
   else
-    reaper.MB("Impossible de lancer « ChordMachineGun history.lua ».\nVérifie qu'il est dans le même dossier.", "ChordMachineGun", 0)
+    reaper.MB("Could not launch 'Todoroki_ChordMachineGun history.lua'.\nMake sure it is in the same folder.", "ChordMachineGun", 0)
     afterModal()
   end
 end
 
 ------------------------------------------------------------------------------
--- En-tête
+-- Header
 ------------------------------------------------------------------------------
 
 local function drawHeader(W, compact)
@@ -485,7 +485,7 @@ local function drawHeader(W, compact)
   end
   x = x + 62
 
-  -- gamme
+  -- scale
   local st = getScaleType()
   if button(x, y, 150, h, scales[st].name, { align = 0, caret = true }) then
     local entries = {}
@@ -499,16 +499,16 @@ local function drawHeader(W, compact)
   if compact then rightW = rightW + 150 end
   drawText(getScaleNotesText(), x, y, math.max(0, W - x - rightW - PAD), h, THEME.muted, F_SMALL, 0)
 
-  -- vue compacte : bascule Accords / Voix
+  -- compact view: Chords / Voices switch
   if compact then
-    ui.compactView = segmented(W - PAD - 330 - 150, y, 140, h, { "Accords", "Voix" }, ui.compactView)
+    ui.compactView = segmented(W - PAD - 330 - 150, y, 140, h, { "Chords", "Voices" }, ui.compactView)
   end
 
-  -- épingle
+  -- pin
   pinButton(W - PAD - 30, y, 30, h)
 
-  -- historique
-  if button(W - PAD - 30 - 178 - 118, y, 110, h, "Historique", { font = F_SMALL, active = historyWindowOpen() }) then
+  -- history
+  if button(W - PAD - 30 - 178 - 118, y, 110, h, "History", { font = F_SMALL, active = historyWindowOpen() }) then
     toggleHistoryWindow()
   end
 
@@ -520,7 +520,7 @@ local function drawHeader(W, compact)
 end
 
 ------------------------------------------------------------------------------
--- Accord courant + renversement
+-- Current chord + inversion
 ------------------------------------------------------------------------------
 
 local function drawChordDisplay(x, y, w)
@@ -528,21 +528,27 @@ local function drawChordDisplay(x, y, w)
   local name = getChordText()
   if name == "" then name = "—" end
   drawText(name, x, y + 4, w - 230, 36, THEME.text, F_TITLE, 0)
-  drawText(getChordNotesText(), x, y + 40, w - 230, 18, THEME.muted, F_SMALL, 0)
+  local notesLine = getChordNotesText()
+  if getDroneEnabled() and #getDronePitches() > 0 then
+    local d = {}
+    for _, p in ipairs(getDronePitches()) do d[#d + 1] = getPitchName(p) end
+    notesLine = notesLine .. "      drone  " .. table.concat(d, " ")
+  end
+  drawText(notesLine, x, y + 40, w - 230, 18, THEME.muted, F_SMALL, 0)
 
   if ui.mod and ui.mod.ctx then
     local isCtrl = ui.mod.kind == "ctrl"
     local key = isCtrl and (IS_MAC and "Ctrl/Cmd" or "Ctrl") or (IS_MAC and "Option" or "Alt")
-    drawText(isCtrl and "DEGRÉS" or "NÉO-RIEMANNIEN", x + w - 220, y + 8, 220, 16, THEME.accent, F_LABEL, 2)
-    drawText(isCtrl and ("gamme de " .. ui.mod.ctx.label) or ("transformations de " .. ui.mod.ctx.label),
+    drawText(isCtrl and "DEGREES" or "NEO-RIEMANNIAN", x + w - 220, y + 8, 220, 16, THEME.accent, F_LABEL, 2)
+    drawText(isCtrl and ("scale of " .. ui.mod.ctx.label) or ("transformations of " .. ui.mod.ctx.label),
       x + w - 300, y + 24, 300, 22, THEME.text, F_BOLD, 2)
-    drawText(key .. "+1…7 écouter  ·  +Maj insérer", x + w - 300, y + 44, 300, 16, THEME.muted, F_SMALL, 2)
+    drawText(key .. "+1…7 play  ·  +Shift insert", x + w - 300, y + 44, 300, 16, THEME.muted, F_SMALL, 2)
     return y + h
   end
 
   local s = getSelectedScaleNote()
   local inv = getChordInversionState(s)
-  local d = stepper(x + w - 220, y + 10, 220, "Renversement", (inv > 0 and "+" or "") .. inv, 110)
+  local d = stepper(x + w - 220, y + 10, 220, "Inversion", (inv > 0 and "+" or "") .. inv, 110)
   if d ~= 0 then
     local shift = M.shift
     if d < 0 then
@@ -555,7 +561,7 @@ local function drawChordDisplay(x, y, w)
 end
 
 ------------------------------------------------------------------------------
--- Grille d'accords
+-- Chord grid
 ------------------------------------------------------------------------------
 
 local function drawChordGrid(x, y, w, h, ctx)
@@ -601,7 +607,7 @@ local function drawChordGrid(x, y, w, h, ctx)
       else
         fill, fg = hov and THEME.surface2 or nil, hov and THEME.soft or THEME.faint
       end
-      -- en mode emprunt : les accords absents de la gamme principale sont en couleur d'accent
+      -- borrowed mode: chords outside the main scale use the accent colour
       if ctx and inScale and chordIsOutsideMainScale(notesList[i], chord) and not (isSel and isSelCol) then
         fg = THEME.accent
       end
@@ -628,7 +634,7 @@ local function drawChordGrid(x, y, w, h, ctx)
 end
 
 ------------------------------------------------------------------------------
--- Ligne au-dessus de la grille : degrés (Ctrl) ou voisins (Alt)
+-- Row above the grid: degrees (Ctrl) or PLR (Alt)
 ------------------------------------------------------------------------------
 
 local MOD_ROW_H = 64
@@ -642,7 +648,7 @@ local function drawModifierRow(x, y, w)
   if not ui.mod or not ui.mod.ctx then
     local ctrlKey = IS_MAC and "Ctrl" or "Ctrl"
     local altKey = IS_MAC and "Option" or "Alt"
-    drawText(ctrlKey .. " : degrés    ·    " .. altKey .. " : PLR    ·    flèches : sélectionner    ·    Entrée : jouer    ·    + / − : octave",
+    drawText(ctrlKey .. ": degrees    ·    " .. altKey .. ": PLR    ·    arrows: select    ·    Enter: play    ·    + / −: octave",
       x, y, w, 16, THEME.faint, F_SMALL, 0)
     for k = 1, n do
       local cx = x + (k - 1) * (colW + GAP)
@@ -653,10 +659,10 @@ local function drawModifierRow(x, y, w)
 
   local ctx, isCtrl = ui.mod.ctx, ui.mod.kind == "ctrl"
   if isCtrl then
-    drawText("GAMME DE " .. upperFR(ctx.label), x, y, w, 16, THEME.accent, F_LABEL, 0)
+    drawText("SCALE OF " .. upperFR(ctx.label), x, y, w, 16, THEME.accent, F_LABEL, 0)
   else
     drawText("PLR", x, y, 30, 16, THEME.accent, F_LABEL, 0)
-    -- fil d'Ariane : chaque étape est cliquable pour y remonter (sans jouer)
+    -- breadcrumb: each step can be clicked to go back to it (without playing)
     local steps = {}
     for name in (ctx.trail .. " → "):gmatch("(.-) → ") do steps[#steps + 1] = name end
     local helpW = 380
@@ -681,7 +687,7 @@ local function drawModifierRow(x, y, w)
       tx = tx + tw
       if not current then drawText("→", tx + 4, y, 14, 16, THEME.faint, F_SMALL, 0); tx = tx + 22 end
     end
-    drawText("← → choisir  ·  Entrée / chiffre jouer  ·  ↓ descendre  ·  ↑ remonter", x + w - helpW, y, helpW, 16, THEME.muted, F_SMALL, 2)
+    drawText("← → choose  ·  Enter / digit play  ·  ↓ go down  ·  ↑ go up", x + w - helpW, y, helpW, 16, THEME.muted, F_SMALL, 2)
   end
 
   for k = 1, n do
@@ -735,10 +741,10 @@ end
 local function chooseCC(current)
   local entries = {}
   for _, cc in ipairs(CC_MENU) do entries[#entries + 1] = { label = ccLabel(cc), value = cc, checked = (cc == current) } end
-  entries[#entries + 1] = { label = "Autre…", value = "other" }
+  entries[#entries + 1] = { label = "Other…", value = "other" }
   local v = showMenu(entries)
   if v == "other" then
-    local ok, txt = reaper.GetUserInputs("ChordMachineGun — CC", 1, "Numéro de CC (0-127)", tostring(current))
+    local ok, txt = reaper.GetUserInputs("ChordMachineGun — CC", 1, "CC number (0-127)", tostring(current))
     afterModal()
     v = ok and tonumber(txt) or nil
     if v then v = math.max(0, math.min(127, math.floor(v))) end
@@ -746,7 +752,7 @@ local function chooseCC(current)
   return v
 end
 
--- accès communs aux curseurs : 1 et 2 = CC, "vel" = vélocité des notes
+-- common slider access: 1 and 2 = CC, "vel" = note velocity
 local function sliderGet(id)
   if id == "vel" then
     local v = getVelocitySlider()
@@ -770,10 +776,10 @@ local function sliderRow(id, x, y, w)
   local sl = sliderGet(id)
   local h = 28
 
-  -- étiquette : choix du CC (curseurs CC) / menu d'entrée (vélocité)
+  -- label: CC choice (CC sliders) / input menu (velocity)
   if id == "vel" then
-    if button(x, y, 118, h, "Vélocité", { font = F_SMALL, align = 0, caret = sl.inp >= 0 }) and sl.inp >= 0 then
-      local v = showMenu({ { label = "Oublier le contrôleur appris (CC " .. sl.inp .. ")", value = "forget" } })
+    if button(x, y, 118, h, "Velocity", { font = F_SMALL, align = 0, caret = sl.inp >= 0 }) and sl.inp >= 0 then
+      local v = showMenu({ { label = "Forget learned controller (CC " .. sl.inp .. ")", value = "forget" } })
       if v == "forget" then sl.inp = -1; sliderSet(id, sl) end
     end
   else
@@ -824,14 +830,14 @@ local function sliderRow(id, x, y, w)
     end
   end
 
-  -- Learn : le prochain contrôleur touché pilotera ce curseur ; recliquer annule
+  -- Learn: the next controller moved drives this slider; click again to cancel
   local learning = (ui.ccLearn == id)
   if button(x + w - 28, y, 28, h, "L", { font = F_BOLD, active = learning }) then
     if learning then stopLearn() else startLearn(id) end
   end
 end
 
--- contrôleurs MIDI → curseurs (appelé à chaque image)
+-- MIDI controllers → sliders (called every frame)
 local function processIncomingCC()
   if ui.ccLearn and reaper.time_precise() - (ui.ccLearnStart or 0) > LEARN_TIMEOUT then stopLearn() end
   if ui.ccSeq == nil then ui.ccSeq = currentInputSeq(); return end
@@ -858,43 +864,157 @@ local function processIncomingCC()
   end
 end
 
+
 ------------------------------------------------------------------------------
--- Panneau Voix
+-- Drone section
+------------------------------------------------------------------------------
+
+local function droneAddMenu()
+  local octave = getOctave()
+  local tonic = scaleNotes[1] and (scaleNotes[1] + octave * 12 - 1) or 48
+  local i = getSelectedScaleNote()
+  local root = scaleNotes[i] and (scaleNotes[i] + octave * 12 - 1) or tonic
+  local entries = {
+    { label = "Scale tonic  (" .. getPitchName(tonic) .. ")", value = "tonic" },
+    { label = "Scale fifth  (" .. getPitchName(tonic + 7) .. ")", value = "fifth" },
+    { label = "Tonic + fifth  (" .. getPitchName(tonic) .. " " .. getPitchName(tonic + 7) .. ")", value = "both" },
+    { label = "Selected chord root  (" .. getPitchName(root) .. ")", value = "root" },
+    { label = "Notes of the current chord", value = "chord" },
+    { label = "Selected notes in the MIDI editor", value = "selection" },
+    { label = "Type notes…  (e.g. C2 G2)", value = "type" },
+  }
+  local v = showMenu(entries)
+  if v == "tonic" then addDronePitch(tonic)
+  elseif v == "fifth" then addDronePitch(tonic + 7)
+  elseif v == "both" then addDronePitch(tonic); addDronePitch(tonic + 7)
+  elseif v == "root" then addDronePitch(root)
+  elseif v == "chord" then
+    local t = getDronePitches()
+    for _, p in ipairs(getLastVoices()) do t[#t + 1] = p end
+    setDronePitches(t)
+  elseif v == "selection" then
+    local take = activeTake()
+    local t = getDronePitches()
+    local found = false
+    if take then
+      for k = 0, getNumberOfNotes() - 1 do
+        local _, sel, _, _, _, _, pitch = reaper.MIDI_GetNote(take, k)
+        if sel then t[#t + 1] = pitch; found = true end
+      end
+    end
+    if found then setDronePitches(t)
+    else reaper.MB("Select notes in the MIDI editor first.", "ChordMachineGun", 0); afterModal() end
+  elseif v == "type" then
+    local current = {}
+    for _, p in ipairs(getDronePitches()) do current[#current + 1] = getPitchName(p) end
+    local ok, text = reaper.GetUserInputs("ChordMachineGun — drone notes", 1,
+      "Notes (e.g. C2 G2, or MIDI numbers),extrawidth=160", table.concat(current, " "))
+    afterModal()
+    if ok then
+      local list, bad = parsePitchList(text)
+      if list then setDronePitches(list)
+      else reaper.MB("Unknown note: " .. tostring(bad) .. "\n\nUse names like C2, F#1, Bb3 (C4 = middle C) or MIDI numbers.", "ChordMachineGun", 0); afterModal() end
+    end
+  end
+end
+
+local function drawDroneSection(x, y, w)
+  y = sectionTitle(x, y, w, "Drone")
+  local on = getDroneEnabled()
+  local non = toggleRow(x, y, w, "Drone", on)
+  if non ~= on then setDroneEnabled(non); on = non end
+  y = y + 34
+
+  -- notes: chips (click = remove) + add button
+  local rowH = 28
+  local cx = x
+  local pitches = getDronePitches()
+  if #pitches == 0 then
+    drawText("no drone notes yet", x, y, w - 40, rowH, THEME.faint, F_SMALL, 0)
+  end
+  for _, p in ipairs(pitches) do
+    local label = getPitchName(p)
+    local cw = measure(label, F_BOLD) + 18
+    if cx + cw > x + w - 36 then
+      drawText("…", cx, y, 14, rowH, THEME.muted, F_SMALL, 0)
+      break
+    end
+    local hov = hover(cx, y, cw, rowH)
+    fillRect(cx, y, cw, rowH, hov and THEME.danger or (on and THEME.accent or THEME.hover))
+    drawText(hov and "×" or label, cx, y, cw, rowH, (hov or on) and THEME.onAccent or THEME.soft, F_BOLD, 1)
+    if clicked(cx, y, cw, rowH) then removeDronePitch(p) end
+    cx = cx + cw + 4
+  end
+  if button(x + w - 30, y, 30, rowH, "+", { font = F_BOLD }) then droneAddMenu() end
+  y = y + rowH + 8
+
+  -- channel + clear
+  local ch = getDroneChannel()
+  drawText("Channel", x, y, 70, 26, THEME.soft, F_SMALL, 0)
+  if button(x + 70, y, 120, 26, (ch >= 0) and ("Channel " .. (ch + 1)) or "Default", { font = F_SMALL, align = 0, caret = true }) then
+    local entries = { { label = "Default channel (MIDI editor)", value = -1, checked = (ch < 0) } }
+    for c = 0, 15 do entries[#entries + 1] = { label = "Channel " .. (c + 1), value = c, checked = (ch == c) } end
+    local v = showMenu(entries)
+    if v then setDroneChannel(v) end
+  end
+  if #pitches > 0 and button(x + w - 64, y, 64, 26, "clear", { font = F_SMALL, ghost = true, fg = THEME.muted }) then
+    setDronePitches({})
+  end
+  y = y + 32
+
+  local hold = getDroneHold()
+  local nhold = toggleRow(x, y, w, "Hold between chords", hold)
+  if nhold ~= hold then setDroneHold(nhold) end
+  y = y + 30
+  drawText(nhold and "held in preview · written under inserted chords"
+    or "replayed with each chord · written under inserted chords", x, y, w, 16, THEME.faint, F_SMALL, 0)
+  y = y + 18
+  drawText("ignored by voice leading", x, y, w, 16, THEME.faint, F_SMALL, 0)
+  y = y + 26
+  fillRect(x, y, w, 1, THEME.line)
+  return y + 12
+end
+
+------------------------------------------------------------------------------
+-- Voices panel
 ------------------------------------------------------------------------------
 
 local function voiceName(v, total)
-  if v == 1 then return (getBassMode() == "root") and "Basse · fond." or "Basse" end
+  if v == 1 then return (getBassMode() == "root") and "Bass · root" or "Bass" end
   if v == total and total >= 3 then return "Soprano" end
-  return "Voix " .. v
+  return "Voice " .. v
 end
 
 local function drawPanel(x, y0, w, h)
   local y = y0 + ui.panelScroll
 
   -- CC -------------------------------------------------------------------------
-  y = sectionTitle(x, y, w, "Contrôleurs")
+  y = sectionTitle(x, y, w, "Controllers")
   sliderRow(1, x, y, w); y = y + 34
   sliderRow(2, x, y, w); y = y + 34
   sliderRow("vel", x, y, w); y = y + 30
-  local hint = "glisser · molette (Maj ×10) · L : apprendre"
+  local hint = "drag · wheel (Shift ×10) · L: learn"
   if ui.ccLearn then
     local left = math.max(0, math.ceil(LEARN_TIMEOUT - (reaper.time_precise() - (ui.ccLearnStart or 0))))
-    hint = "touche un contrôleur MIDI…  (L ou Échap pour annuler · " .. left .. " s)"
+    hint = "move a MIDI controller…  (L or Esc to cancel · " .. left .. " s)"
   end
   drawText(hint, x, y, w, 16, ui.ccLearn and THEME.accent or THEME.faint, F_SMALL, 0)
   y = y + 26
   fillRect(x, y, w, 1, THEME.line); y = y + 12
 
-  -- CONDUITE DE VOIX ---------------------------------------------------------
-  y = sectionTitle(x, y, w, "Conduite de voix")
+  -- DRONE ----------------------------------------------------------------------
+  y = drawDroneSection(x, y, w)
+
+  -- VOICE LEADING ------------------------------------------------------------
+  y = sectionTitle(x, y, w, "Voice leading")
   local vl = getVoiceLeadingEnabled()
-  local nv = toggleRow(x, y, w, "Conduite de voix", vl)
+  local nv = toggleRow(x, y, w, "Voice leading", vl)
   if nv ~= vl then setVoiceLeadingEnabled(nv); vl = nv end
   y = y + 32
 
   if vl then
     local src = getReferenceSource()
-    local nsrc = segmented(x, y, w, 28, { "Live", "Item MIDI" }, src == "item" and 2 or 1)
+    local nsrc = segmented(x, y, w, 28, { "Live", "MIDI item" }, src == "item" and 2 or 1)
     if (nsrc == 2) ~= (src == "item") then
       src = (nsrc == 2) and "item" or "live"
       setReferenceSource(src)
@@ -902,7 +1022,7 @@ local function drawPanel(x, y0, w, h)
     end
     y = y + 36
 
-    -- accord actuel, analysé en continu
+    -- current chord, analysed continuously
     if ui.frameNo - ui.refFrame >= 4 then
       ui.refCache = describeCurrentReference()
       ui.refFrame = ui.frameNo
@@ -921,12 +1041,12 @@ local function drawPanel(x, y0, w, h)
       drawText(r.source, x + w - 150, y + 5, 138, 24, r.live and THEME.accent or THEME.muted, F_SMALL, 2)
       drawText(r.notes, x + 12, y + 31, w - 120, 22, THEME.muted, F_SMALL, 0)
     else
-      drawText(src == "item" and "aucun accord avant le curseur" or "joue un accord…",
+      drawText(src == "item" and "no chord before the cursor" or "play a chord…",
         x + 12, y, w - 120, ch, THEME.muted, F_SMALL, 0)
     end
-    if button(x + w - 94, y + ch - 28, 52, 22, "Sél.", { font = F_SMALL }) then
+    if button(x + w - 94, y + ch - 28, 52, 22, "Sel.", { font = F_SMALL }) then
       if not setReferenceFromSelectedNotes() then
-        reaper.MB("Sélectionne d'abord des notes dans l'éditeur MIDI.", "ChordMachineGun", 0)
+        reaper.MB("Select notes in the MIDI editor first.", "ChordMachineGun", 0)
         afterModal()
       end
       ui.refFrame = -100
@@ -936,13 +1056,13 @@ local function drawPanel(x, y0, w, h)
       ui.refFrame = -100
     end
     y = y + ch + 4
-    drawText(src == "item" and "accord qui précède le curseur (ou chaque accord sélectionné)"
-      or "clavier MIDI  ·  lecture  ·  dernier accord ChordMachineGun", x, y, w, 16, THEME.faint, F_SMALL, 0)
+    drawText(src == "item" and "chord before the cursor (or each selected chord)"
+      or "MIDI keyboard  ·  playback  ·  last chord", x, y, w, 16, THEME.faint, F_SMALL, 0)
     y = y + 24
   end
 
   local vc = getVoiceCount()
-  local d = stepper(x, y, w, "Nombre de voix", vc == 0 and "auto" or tostring(vc))
+  local d = stepper(x, y, w, "Voices", vc == 0 and "auto" or tostring(vc))
   if d ~= 0 then
     local order = { 0, 2, 3, 4, 5, 6, 7, 8 }
     local idx = 1
@@ -954,12 +1074,12 @@ local function drawPanel(x, y0, w, h)
 
   -- EMPRUNT ------------------------------------------------------------------
   fillRect(x, y, w, 1, THEME.line); y = y + 12
-  y = sectionTitle(x, y, w, "Degrés  (Ctrl)")
+  y = sectionTitle(x, y, w, "Degrees  (Ctrl)")
   local bmode = (getBorrowMode() == "scale") and 2 or 1
-  local nb = segmented(x, y, w, 28, { "Selon l'accord", "Type de la gamme" }, bmode)
+  local nb = segmented(x, y, w, 28, { "From chord", "Scale type" }, bmode)
   if nb ~= bmode then setBorrowMode(nb == 2 and "scale" or "chord") end
   y = y + 32
-  drawText(bmode == 1 and "accord majeur → gamme majeure, mineur → mineure" or "même type que la gamme principale",
+  drawText(bmode == 1 and "major chord → major scale, minor → minor" or "same type as the main scale",
     x, y, w, 16, THEME.faint, F_SMALL, 0)
   y = y + 26
 
@@ -967,7 +1087,7 @@ local function drawPanel(x, y0, w, h)
   fillRect(x, y, w, 1, THEME.line); y = y + 12
   y = sectionTitle(x, y, w, "Position")
   local cp = getCustomPositionEnabled()
-  local ncp = toggleRow(x, y, w, "Position personnalisée", cp)
+  local ncp = toggleRow(x, y, w, "Custom position", cp)
   if ncp ~= cp then setCustomPositionEnabled(ncp); cp = ncp end
   y = y + 34
 
@@ -979,14 +1099,14 @@ local function drawPanel(x, y0, w, h)
   fillRound(x, y, w, fieldH, 7, THEME.surface)
   strokeRound(x, y, w, fieldH, 7, fhov and THEME.muted or THEME.line)
   drawText(pretty, x + 12, y, w - 60, fieldH, cp and THEME.text or THEME.muted, F_BOLD, 0)
-  drawText("grave → aigu", x + 12, y + fieldH, w, 16, THEME.faint, F_SMALL, 0)
+  drawText("low → high", x + 12, y + fieldH, w, 16, THEME.faint, F_SMALL, 0)
   if clicked(x, y, w - 40, fieldH) then editCustomPosition() end
   if button(x + w - 36, y + 4, 32, fieldH - 8, "", { ghost = true, caret = true }) then
     local entries = {}
     for i, p in ipairs(POSITION_PRESETS) do
       entries[i] = { label = p[1] .. "    " .. p[2], value = p[2], checked = (p[2] == pos) }
     end
-    entries[#entries + 1] = { label = "Personnalisée…", value = "__custom" }
+    entries[#entries + 1] = { label = "Custom…", value = "__custom" }
     local v = showMenu(entries)
     if v == "__custom" then editCustomPosition()
     elseif v then setCustomPosition(v); setCustomPositionEnabled(true) end
@@ -1001,20 +1121,20 @@ local function drawPanel(x, y0, w, h)
 
   if cp then
     local ai = getAutoInversion()
-    local nai = toggleRow(x, y, w, "Renversement auto", ai)
+    local nai = toggleRow(x, y, w, "Auto inversion", ai)
     if nai ~= ai then setAutoInversion(nai) end
-    drawText(vl and "choisit le renversement le plus proche" or "actif avec la conduite de voix",
+    drawText(vl and "picks the closest inversion" or "active with voice leading",
       x, y + 26, w, 16, THEME.faint, F_SMALL, 0)
     y = y + 50
   end
 
-  -- VOIX, SPLIT MIDI & DOUBLURES ---------------------------------------------
+  -- VOICES, MIDI SPLIT & DOUBLINGS -------------------------------------------
   fillRect(x, y, w, 1, THEME.line); y = y + 12
-  y = sectionTitle(x, y, w, "Voix & canaux MIDI")
+  y = sectionTitle(x, y, w, "Voices & MIDI channels")
 
-  drawText("Basse", x, y, 60, 28, THEME.soft, F_BODY, 0)
+  drawText("Bass", x, y, 60, 28, THEME.soft, F_BODY, 0)
   local bm = (getBassMode() == "root") and 2 or 1
-  local nbm = segmented(x + 64, y, w - 64, 28, { "Note la plus grave", "Fondamentale" }, bm)
+  local nbm = segmented(x + 64, y, w - 64, 28, { "Lowest note", "Root" }, bm)
   if nbm ~= bm then setBassMode(nbm == 2 and "root" or "lowest") end
   y = y + 36
 
@@ -1022,14 +1142,14 @@ local function drawPanel(x, y0, w, h)
   local mode = getChannelMode()
   drawText("Split", x, y, 60, 28, THEME.soft, F_BODY, 0)
   local presetIndex = ({ single = 1, all = 2, bass = 3 })[mode] or 0
-  local np = segmented(x + 64, y, w - 64, 28, { "Aucun", "Toutes", "Basse seule" }, presetIndex)
+  local np = segmented(x + 64, y, w - 64, 28, { "None", "All", "Bass only" }, presetIndex)
   if np ~= presetIndex and np >= 1 then setChannelMode(({ "single", "all", "bass" })[np]) end
   y = y + 30
   local modeHint = ({
-    single = "toutes les voix sur le canal de l'éditeur MIDI",
-    all = "voix 1 → canal 1, voix 2 → canal 2…",
-    bass = "basse → canal 1, voix supérieures → canal 2",
-    custom = "personnalisé : canal choisi voix par voix",
+    single = "all voices on the MIDI editor channel",
+    all = "voice 1 → channel 1, voice 2 → channel 2…",
+    bass = "bass → channel 1, upper voices → channel 2",
+    custom = "custom: channel chosen per voice",
   })[mode] or ""
   drawText(modeHint, x, y, w, 16, mode == "custom" and THEME.accent or THEME.faint, F_SMALL, 0)
   y = y + 24
@@ -1042,18 +1162,18 @@ local function drawPanel(x, y0, w, h)
   if K == 0 then
     K = (getVoiceCount() > 0 and getVoiceCount() or 4) + ((getBassMode() == "root") and 1 or 0)
   end
-  if button(x, y, half, 28, "Créer les pistes", { font = F_SMALL }) then
+  if button(x, y, half, 28, "Create tracks", { font = F_SMALL }) then
     if getChannelMode() == "single" then setChannelMode("all") end
     createRoutedVoiceTracks(K)
   end
-  if button(x + half + 8, y, half, 28, "Éclater l'item MIDI", { font = F_SMALL }) then
+  if button(x + half + 8, y, half, 28, "Explode MIDI item", { font = F_SMALL }) then
     explodeTakeToVoiceTracks()
   end
   y = y + 40
 
-  -- liste des voix : canal + doublures (les doublures marchent aussi sans split)
-  drawText("Voix (grave → aigu) · canal · doublures", x, y, w - 60, 18, THEME.muted, F_SMALL, 0)
-  if button(x + w - 56, y - 2, 56, 20, "effacer", { font = F_SMALL, ghost = true, fg = THEME.muted }) then
+  -- voice list: channel + doublings (doublings also work without split)
+  drawText("Voices (low → high) · channel · doublings", x, y, w - 60, 18, THEME.muted, F_SMALL, 0)
+  if button(x + w - 56, y - 2, 56, 20, "clear", { font = F_SMALL, ghost = true, fg = THEME.muted }) then
     clearDoublings()
   end
   y = y + 24
@@ -1064,15 +1184,15 @@ local function drawPanel(x, y0, w, h)
     local ry = y
     fillRect(x, ry, w, rowH - 4, THEME.surface)
 
-    -- canal de la voix (clic : choisir)
+    -- voice channel (click: choose)
     local ch = voiceChannel(v)
-    local badge = ch and ("ch " .. (ch + 1)) or "déf."
+    local badge = ch and ("ch " .. (ch + 1)) or "def."
     local bhov = hover(x, ry, 40, rowH - 4)
     if bhov then fillRect(x, ry, 40, rowH - 4, THEME.hover) end
     drawText(badge, x + 6, ry, 34, rowH - 4, ch and THEME.accent or THEME.muted, F_LABEL, 0)
     if clicked(x, ry, 40, rowH - 4) then
-      local entries = { { label = "Canal par défaut (éditeur MIDI)", value = -1, checked = (ch == nil) } }
-      for c = 0, 15 do entries[#entries + 1] = { label = "Canal " .. (c + 1), value = c, checked = (ch == c) } end
+      local entries = { { label = "Default channel (MIDI editor)", value = -1, checked = (ch == nil) } }
+      for c = 0, 15 do entries[#entries + 1] = { label = "Channel " .. (c + 1), value = c, checked = (ch == c) } end
       local val = showMenu(entries)
       if val then setVoiceChannel(v, (val >= 0) and val or nil, K) end
     end
@@ -1110,7 +1230,7 @@ local function drawPanel(x, y0, w, h)
 end
 
 ------------------------------------------------------------------------------
--- Clavier (raccourcis d'origine)
+-- Keyboard (original shortcuts)
 ------------------------------------------------------------------------------
 
 local function moveEditCursorByGrid(dir)
@@ -1118,8 +1238,8 @@ local function moveEditCursorByGrid(dir)
   if ed then reaper.MIDIEditor_OnCommand(ed, dir < 0 and 40047 or 40048) end
 end
 
--- Avec Ctrl/Alt, REAPER ne transmet pas toujours les chiffres et les flèches à gfx.getchar :
--- on lit donc l'état physique des touches (js_ReaScriptAPI) quand la fenêtre a le focus.
+-- With Ctrl/Alt held, REAPER does not always pass digits and arrows to gfx.getchar,
+-- so the physical key state is read (js_ReaScriptAPI) while the window has focus.
 local VK = { left = 0x25, up = 0x26, right = 0x27, down = 0x28, enter = 0x0D }
 local vkPrev, vkPrimed = {}, false
 
@@ -1136,7 +1256,7 @@ end
 
 local function physicalKeysAvailable() return type(reaper.JS_VKeys_GetState) == "function" end
 
--- renvoie la liste des touches nouvellement enfoncées : {digit=n} / {arrow="left"} / {enter=true}
+-- returns newly pressed keys: {digit=n} / {arrow="left"} / {enter=true}
 local function pollPhysicalKeys()
   if not physicalKeysAvailable() then return nil end
   local state = reaper.JS_VKeys_GetState(0)
@@ -1163,7 +1283,7 @@ local function pollPhysicalKeys()
   return events
 end
 
--- Ctrl : degrés de la gamme de l'accord ; Alt : transformations PLR
+-- Ctrl: degrees of the chord's scale; Alt: PLR transformations
 local function dispatchModifierEvent(kind, ev, shift)
   if ev.digit then
     if kind == "ctrl" then borrowedChordAction(ev.digit, shift) else plrAction(ev.digit, shift, false) end
@@ -1172,9 +1292,9 @@ local function dispatchModifierEvent(kind, ev, shift)
   if kind == "alt" then
     if ev.arrow == "left" then plrMoveFocus(-1)
     elseif ev.arrow == "right" then plrMoveFocus(1)
-    elseif ev.enter then plrPlayFocused(shift)          -- jouer (Maj : insérer)
-    elseif ev.arrow == "down" then plrDescendFocused()  -- descendre, sans jouer
-    elseif ev.arrow == "up" then plrBack(false) end     -- remonter, sans jouer
+    elseif ev.enter then plrPlayFocused(shift)          -- play (Shift: insert)
+    elseif ev.arrow == "down" then plrDescendFocused()  -- go down, without playing
+    elseif ev.arrow == "up" then plrBack(false) end     -- go up, without playing
     return true
   end
   return false
@@ -1200,7 +1320,7 @@ local function handleInput(char)
   local shiftDown = cap & 8 == 8
   local modKind = borrowModifierDown(cap) and "ctrl" or (altModifierDown(cap) and "alt" or nil)
 
-  -- avec Ctrl/Alt et l'extension js : chiffres, flèches et Entrée sont lus physiquement (voir frame)
+  -- with Ctrl/Alt and the js extension: digits, arrows and Enter are read physically (see frame)
   if modKind and physicalKeysAvailable() then
     local isDigitish = (char >= 49 and char <= 55) or (char >= 305 and char <= 311) or char == 13
       or char == 1818584692 or char == 1919379572 or char == 30064 or char == 1685026670
@@ -1208,7 +1328,7 @@ local function handleInput(char)
     if isDigitish then return end
   end
 
-  -- sans l'extension js : décodage de gfx.getchar
+  -- without the js extension: decode gfx.getchar
   if modKind then
     local d = nil
     local c = char
@@ -1232,12 +1352,12 @@ local function handleInput(char)
     if ev and dispatchModifierEvent(modKind, ev, shiftDown) then return end
   end
 
-  -- flèches : sélectionner sans jouer (Maj + ←/→ : déplacer le curseur d'une grille)
+  -- arrows: select without playing (Shift + ←/→: move the edit cursor by one grid step)
   if char == 1818584692 then if shiftDown then moveEditCursorByGrid(-1) else moveSelection(-1, 0) end; return end
   if char == 1919379572 then if shiftDown then moveEditCursorByGrid(1) else moveSelection(1, 0) end; return end
   if char == 30064 then moveSelection(0, -1); return end
   if char == 1685026670 then moveSelection(0, 1); return end
-  -- Entrée : jouer l'accord sélectionné (Maj : insérer)
+  -- Enter: play the selected chord (Shift: insert)
   if char == 13 then
     if shiftDown then playOrInsertScaleChord("scale chord " .. getSelectedScaleNote()) else previewScaleChord() end
     return
@@ -1298,7 +1418,7 @@ local function handleInput(char)
 end
 
 ------------------------------------------------------------------------------
--- Fenêtre
+-- Window
 ------------------------------------------------------------------------------
 
 local function saveWindowState()
@@ -1316,7 +1436,7 @@ end
 local function dockMenu()
   local docked = gfx.dock(-1) > 0
   gfx.x, gfx.y = gfx.mouse_x, gfx.mouse_y
-  local i = gfx.showmenu(docked and "Détacher la fenêtre" or "Ancrer la fenêtre")
+  local i = gfx.showmenu(docked and "Undock window" or "Dock window")
   afterModal()
   if i ~= 1 then return end
   if docked then
@@ -1359,7 +1479,7 @@ local function frame()
     return
   end
 
-  -- changement de gamme depuis un script d'action
+  -- scale changed from an action script
   if ui.lastTonic ~= getScaleTonicNote() or ui.lastType ~= getScaleType() then
     ui.lastTonic, ui.lastType = getScaleTonicNote(), getScaleType()
     updateScaleData()
@@ -1399,7 +1519,7 @@ local function frame()
   local showGrid = (not compact) or ui.compactView == 1
   local showPanel = (not compact) or ui.compactView == 2
 
-  -- panneau (dessiné d'abord : l'en-tête le recouvre en défilant)
+  -- panel (drawn first: the header covers it when scrolling)
   if showPanel then
     local pw = compact and math.min(W - 2 * PAD, 520) or PANEL_W
     local px = compact and PAD or (W - PAD - pw)
@@ -1425,7 +1545,7 @@ local function frame()
 
   -- pied
   fillRect(0, H - footerH, W, footerH, THEME.bg)
-  drawText("clic : écouter   ·   Maj + clic : insérer   ·   clic droit : ancrer", PAD, H - footerH, W - 2 * PAD, footerH - 4, THEME.faint, F_SMALL, 0)
+  drawText("click: play   ·   Shift + click: insert   ·   right-click: dock", PAD, H - footerH, W - 2 * PAD, footerH - 4, THEME.faint, F_SMALL, 0)
 
   drawHeader(W, compact)
 

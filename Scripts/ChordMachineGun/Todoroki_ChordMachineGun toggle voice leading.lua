@@ -5,5 +5,5 @@ dofile(path .. "Todoroki_ChordMachineGun_core.lua")
 
 updateScaleData()
 setVoiceLeadingEnabled(not getVoiceLeadingEnabled())
-reaper.Help_Set("ChordMachineGun : conduite de voix " .. (getVoiceLeadingEnabled() and "activée" or "désactivée"), false)
+reaper.Help_Set("ChordMachineGun: voice leading " .. (getVoiceLeadingEnabled() and "on" or "off"), false)
 reaper.defer(emptyFunctionToPreventAutomaticCreationOfUndoPoint)

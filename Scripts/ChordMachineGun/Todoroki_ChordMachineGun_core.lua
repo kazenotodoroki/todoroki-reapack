@@ -1,22 +1,22 @@
 -- @noindex
 --[[
-  ChordMachineGun — moteur partagé (v2)
-  Chargé par l'interface (ChordMachineGun.lua) et par tous les scripts d'action.
+  ChordMachineGun — shared engine
+  Loaded by the main window and by every action script.
 
-  Nouveautés v2 :
-    • Conduite de voix (on/off) : le premier accord sert de référence, les suivants
-      sont placés au plus proche, sans quintes/octaves parallèles, sans croisement,
-      avec un doublement raisonnable.
-    • Position personnalisée : ordre des fonctions de la plus grave à la plus aiguë,
-      ex. "1 5 3 13 9" (tonique, quinte, tierce, 13e, 9e). Compatible conduite de voix.
-    • Voix → canaux MIDI : la voix n (de la plus grave à la plus aiguë) va sur le canal n.
-      Basse = note la plus grave, ou fondamentale (voix de basse séparée).
-    • Doublures par voix : octave, quinte, tierce… (chromatiques ou diatoniques).
-    • Création de pistes par voix (routage MIDI par canal) ou éclatement d'un item.
+  Features:
+    • Voice leading (on/off): the first chord is the reference, the next ones
+      are placed as close as possible, without parallel fifths/octaves or crossing,
+      with sensible doubling.
+    • Custom position: order of functions from lowest to highest,
+      e.g. "1 5 3 13 9" (root, fifth, third, 13th, 9th). Works with voice leading.
+    • Voices → MIDI channels: voice n (low to high) goes to channel n.
+      Bass = lowest note, or root (separate bass voice).
+    • Doublings per voice: octave, fifth, third… (chromatic or diatonic).
+    • Voice tracks (MIDI routing per channel) or item explode.
 ]]
 
 ------------------------------------------------------------------------------
--- Accords (ordre identique à l'original : les index sauvegardés restent valides)
+-- Chords (same order as the original, so saved indexes stay valid)
 ------------------------------------------------------------------------------
 
 chords = {
@@ -75,7 +75,7 @@ local function copyTable(t)
 end
 
 ------------------------------------------------------------------------------
--- Préférences (ProjExtState, même section que l'original)
+-- Settings (ProjExtState)
 ------------------------------------------------------------------------------
 
 local activeProjectIndex = 0
@@ -165,7 +165,7 @@ end
 function resetSelectedChordTypes() setTableValue("selectedChordTypes", defaultSevenOnes) end
 function resetChordInversionStates() setTableValue("chordInversionStates", defaultSevenZeros) end
 
--- fenêtre
+-- window
 function getDockState() return tonumber(getValue("dockState", 0x0201)) or 0x0201 end
 function setDockState(a) setValue("dockState", a) end
 function windowShouldBeDocked() return getBool("shouldBeDocked", false) end
@@ -178,7 +178,7 @@ function setInterfaceXPosition(a) setValue("interfaceXPosition", a) end
 function getInterfaceYPosition() return tonumber(getValue("interfaceYPosition", -1)) or -1 end
 function setInterfaceYPosition(a) setValue("interfaceYPosition", a) end
 
--- v2 : voix
+-- voices
 function getVoiceLeadingEnabled() return getBool("vlEnabled", false) end
 function setVoiceLeadingEnabled(a) setBool("vlEnabled", a); if not a then clearVoiceLeadingReference() end end
 
@@ -187,15 +187,15 @@ function setCustomPositionEnabled(a) setBool("customPositionEnabled", a) end
 function getCustomPosition() return getValue("customPosition", "1 5 3 7") end
 function setCustomPosition(a) setValue("customPosition", a) end
 
--- 0 = auto, sinon 2..8
+-- 0 = auto, otherwise 2..8
 function getVoiceCount() return tonumber(getValue("voiceCount", 0)) or 0 end
 function setVoiceCount(a) setValue("voiceCount", a) end
 
---[[ Routage des voix vers les canaux MIDI
-  mode "single" : toutes les voix sur le canal par défaut (pas de split)
-       "all"    : voix n → canal (premier canal + n - 1)
-       "bass"   : voix 1 → premier canal, toutes les autres → canal suivant
-       "custom" : canal choisi voix par voix (-1 = canal par défaut)
+--[[ Voice routing to MIDI channels
+  mode "single" : all voices on the default channel (no split)
+       "all"    : voice n → channel (first channel + n - 1)
+       "bass"   : voice 1 → first channel, all others → next channel
+       "custom" : channel chosen per voice (-1 = default channel)
 ]]
 function getChannelMode()
   local m = getValue("channelMode", "")
@@ -214,7 +214,7 @@ function getCustomVoiceChannels()
 end
 function setCustomVoiceChannels(t) setValue("voiceChannels", table.concat(t, ",")) end
 
--- canal (0-15) de la voix v, ou nil = canal par défaut de l'éditeur
+-- channel (0-15) of voice v, or nil = editor default channel
 function voiceChannel(v)
   local mode = getChannelMode()
   local first = getFirstChannel()
@@ -227,7 +227,7 @@ function voiceChannel(v)
   return nil
 end
 
--- choisir le canal d'une voix : passe en mode personnalisé en partant du routage actuel
+-- set one voice's channel: switches to custom mode, starting from the current routing
 function setVoiceChannel(v, chan, totalVoices)
   local t = {}
   local n = math.max(totalVoices or 0, v, #getCustomVoiceChannels())
@@ -237,11 +237,11 @@ function setVoiceChannel(v, chan, totalVoices)
   setChannelMode("custom")
 end
 
--- compatibilité : « un canal par voix » = tout routage autre que le canal unique
+-- compatibility: "one channel per voice" = any routing other than single channel
 function getSplitChannels() return getChannelMode() ~= "single" end
 function setSplitChannels(a) setChannelMode(a and "all" or "single") end
 
--- vrai si chacune des n voix a son propre canal (permet d'identifier les voix par canal)
+-- true if each of the n voices has its own channel (voices can be identified by channel)
 function voicesHaveDistinctChannels(n)
   local seen = {}
   for v = 1, n do
@@ -252,11 +252,11 @@ function voicesHaveDistinctChannels(n)
   return true
 end
 
--- "lowest" (note la plus grave) ou "root" (fondamentale, voix de basse séparée)
+-- "lowest" (lowest note) or "root" (root, separate bass voice)
 function getBassMode() return getValue("bassMode", "lowest") end
 function setBassMode(a) setValue("bassMode", a) end
 
--- canal MIDI de la voix 1 (0-based)
+-- MIDI channel of voice 1 (0-based)
 function getFirstChannel() return tonumber(getValue("firstChannel", 0)) or 0 end
 function setFirstChannel(a) setValue("firstChannel", a) end
 
@@ -266,7 +266,7 @@ function getVoiceLeadingReference()
   for m in raw:gmatch("(%-?%d+)") do t[#t + 1] = tonumber(m) end
   return t
 end
--- tags : fonction de chaque voix dans l'accord de référence ("7" = septième, "L" = sensible, "" sinon)
+-- tags: function of each voice in the reference chord ("7" = seventh, "L" = leading tone, "" otherwise)
 function setVoiceLeadingReference(t, tags)
   setValue("vlReference", table.concat(t, ","))
   local tg = {}
@@ -280,11 +280,11 @@ function getVoiceLeadingReferenceTags()
 end
 function clearVoiceLeadingReference() setValue("vlReference", ""); setValue("vlRefTags", "") end
 
--- renversement automatique des positions personnalisées en conduite de voix
+-- automatic inversion of custom positions with voice leading
 function getAutoInversion() return getBool("autoInversion", false) end
 function setAutoInversion(a) setBool("autoInversion", a) end
 
--- dernière sortie (affichage des voix dans l'interface) : "pitch,pitch,..."
+-- last output (voices shown in the UI): "pitch,pitch,..."
 function getLastVoices()
   local raw = getValue("lastVoices", "")
   local t = {}
@@ -298,7 +298,7 @@ function getLastVoiceNames()
   return t
 end
 
---[[ Doublures : "voix1|voix2|..." ; chaque voix = jetons séparés par des virgules
+--[[ Doublings: "voice1|voice2|..."; each voice = comma-separated tokens
      sN = N demi-tons (signé), dN = N degrés de la gamme (signé) ]]
 function getDoublings()
   local raw = getValue("doublings", "")
@@ -341,8 +341,8 @@ function clearDoublings(voice)
 end
 
 local intervalNames = {
-  [0] = "8ve", [1] = "2m", [2] = "2M", [3] = "3m", [4] = "3M", [5] = "4te",
-  [6] = "4+", [7] = "5te", [8] = "6m", [9] = "6M", [10] = "7m", [11] = "7M",
+  [0] = "8ve", [1] = "m2", [2] = "M2", [3] = "m3", [4] = "M3", [5] = "P4",
+  [6] = "TT", [7] = "P5", [8] = "m6", [9] = "M6", [10] = "m7", [11] = "M7",
 }
 
 function doublingLabel(token)
@@ -350,9 +350,9 @@ function doublingLabel(token)
   if not n then return token end
   local sign = n < 0 and "-" or "+"
   local a = math.abs(n)
-  if kind == "d" then return sign .. (a + 1) .. " gam." end
+  if kind == "d" then return sign .. (a + 1) .. " steps" end
   if a == 12 then return sign .. "8ve" end
-  if a == 24 then return sign .. "15e" end
+  if a == 24 then return sign .. "15ma" end
   if a == 0 then return "=" end
   local base = intervalNames[a % 12] or tostring(a)
   if a > 12 then base = base .. "+8" end
@@ -360,7 +360,7 @@ function doublingLabel(token)
 end
 
 ------------------------------------------------------------------------------
--- Gamme
+-- Scale
 ------------------------------------------------------------------------------
 
 scaleNotes = {}
@@ -380,7 +380,7 @@ function getNoteName(note)
   return getFlatNoteName(note)
 end
 
--- nom avec octave pour une hauteur MIDI (C4 = 60)
+-- name with octave for a MIDI pitch (C4 = 60)
 function getPitchName(pitch)
   if noteNameInContext then return noteNameInContext(pitch + 1) .. tostring(math.floor(pitch / 12) - 1) end
   return getNoteName(pitch + 1) .. tostring(math.floor(pitch / 12) - 1)
@@ -502,7 +502,7 @@ function showScaleStatus()
   reaper.Help_Set(("%s %s: %s"):format(notes[getScaleTonicNote()], scales[getScaleType()].name, getScaleNotesText()), false)
 end
 
--- contexte d'emprunt actif (nil = gamme principale)
+-- active borrowed context (nil = main scale)
 borrowContext = nil
 function currentTonicNote() return borrowContext and borrowContext.tonic or getScaleTonicNote() end
 function noteNameInContext(note)
@@ -518,7 +518,7 @@ function scaleIsPentatonic()
 end
 
 ------------------------------------------------------------------------------
--- Éditeur MIDI (repris de l'original)
+-- MIDI editor (from the original)
 ------------------------------------------------------------------------------
 
 local tolerance = 0.000001
@@ -605,7 +605,7 @@ function getCurrentNoteChannel(channelArg)
   return reaper.MIDIEditor_GetSetting_int(activeMidiEditor(), "default_note_chan")
 end
 
--- vélocité des notes : curseur « Vélocité » de la fenêtre principale
+-- note velocity: "Velocity" slider of the main window
 function getVelocitySlider()
   local raw = getValue("velocitySlider", "-1,96")
   local inp, val = raw:match("(%-?%d+),(%d+)")
@@ -666,7 +666,7 @@ function deleteExistingNotesInNextInsertionTimePeriod(keepNotesSelected, selecte
 end
 
 ------------------------------------------------------------------------------
--- Lecture MIDI (prévisualisation)
+-- MIDI playback (preview)
 ------------------------------------------------------------------------------
 
 function playMidiNote(midiNote, channel)
@@ -679,7 +679,7 @@ function stopNoteFromPlaying(midiNote, channel)
   reaper.StuffMIDIMessage(0, 0x80 + channel, midiNote, 0)
 end
 
--- "pitch:canal,pitch:canal"
+-- "pitch:chan,pitch:chan"
 function getNotesThatArePlaying()
   local raw = getValue("notesThatArePlaying", "")
   local t = {}
@@ -710,13 +710,188 @@ function stopAllNotesFromPlaying()
     reaper.StuffMIDIMessage(0, 0x80 + getCurrentNoteChannel(), midiNote, 0)
   end
   setNotesThatArePlaying({})
+  setValue("droneSounding", "")
+end
+
+
+------------------------------------------------------------------------------
+-- Drone: one or more fixed notes added under every chord.
+--   They never move, and voice leading ignores them (they are filtered out of the
+--   analysed reference and are not part of the voicing).
+--   hold = true: in live preview the drone keeps sounding between chords
+--   (it is started once and only stopped when the drone is turned off).
+------------------------------------------------------------------------------
+
+function getDroneEnabled() return getBool("droneEnabled", false) end
+
+function getDronePitches()
+  local t = {}
+  for m in getValue("dronePitches", ""):gmatch("(%d+)") do
+    local p = tonumber(m)
+    if p and p >= 0 and p <= 127 then t[#t + 1] = p end
+  end
+  table.sort(t)
+  return t
+end
+
+-- -1 = default (MIDI editor) channel
+function getDroneChannel() return tonumber(getValue("droneChannel", -1)) or -1 end
+function getDroneHold() return getBool("droneHold", true) end
+
+local function droneChan()
+  local c = getDroneChannel()
+  if c >= 0 then return math.min(15, c) end
+  return nil
+end
+
+local function droneSet()
+  local set = {}
+  if getDroneEnabled() then
+    for _, p in ipairs(getDronePitches()) do set[p] = true end
+  end
+  return set
+end
+
+function isDronePitch(p) return droneSet()[p] == true end
+
+-- notes to add under a chord: { {pitch=, chan=, voice=0, drone=true}, ... }
+function getDroneNotes()
+  if not getDroneEnabled() then return {} end
+  local out = {}
+  local chan = droneChan()
+  for _, p in ipairs(getDronePitches()) do
+    out[#out + 1] = { pitch = p, chan = chan, voice = 0, drone = true }
+  end
+  return out
+end
+
+-- remove drone pitches from a list of pitches (numbers) or notes ({pitch=})
+function stripDrones(list)
+  local set = droneSet()
+  if next(set) == nil then return list end
+  local out = {}
+  for _, x in ipairs(list) do
+    local p = (type(x) == "table") and x.pitch or x
+    if not set[p] then out[#out + 1] = x end
+  end
+  return out
+end
+
+-- currently held drone ("pitch:chan,...")
+local function getDroneSounding()
+  local t = {}
+  for p, c in getValue("droneSounding", ""):gmatch("(%d+):(%d+)") do
+    t[#t + 1] = { pitch = tonumber(p), chan = tonumber(c) }
+  end
+  return t
+end
+
+local function setDroneSounding(list)
+  local parts = {}
+  for _, n in ipairs(list) do parts[#parts + 1] = n.pitch .. ":" .. n.chan end
+  setValue("droneSounding", table.concat(parts, ","))
+end
+
+function stopDrone()
+  for _, n in ipairs(getDroneSounding()) do
+    reaper.StuffMIDIMessage(0, 0x80 + n.chan, n.pitch, 0)
+  end
+  setDroneSounding({})
+end
+
+-- start the held drone if it is not already sounding with the same notes
+function startDrone()
+  local wanted = {}
+  for _, n in ipairs(getDroneNotes()) do
+    wanted[#wanted + 1] = { pitch = n.pitch, chan = n.chan or getCurrentNoteChannel() }
+  end
+  local key = function(list)
+    local t = {}
+    for _, n in ipairs(list) do t[#t + 1] = n.pitch .. ":" .. n.chan end
+    table.sort(t)
+    return table.concat(t, ",")
+  end
+  local current = getDroneSounding()
+  if key(current) == key(wanted) then return end
+  stopDrone()
+  for _, n in ipairs(wanted) do
+    reaper.StuffMIDIMessage(0, 0x90 + n.chan, n.pitch, getCurrentVelocity())
+  end
+  setDroneSounding(wanted)
+end
+
+-- call after any drone setting change: restart, stop or leave it as it is
+function refreshDrone()
+  if getDroneEnabled() and getDroneHold() and #getDronePitches() > 0 then
+    if #getDroneSounding() > 0 then startDrone() end
+  else
+    stopDrone()
+  end
+end
+
+function setDroneEnabled(a) setBool("droneEnabled", a); refreshDrone() end
+function setDronePitches(t)
+  local seen, out = {}, {}
+  for _, p in ipairs(t) do
+    p = math.floor(p)
+    if p >= 0 and p <= 127 and not seen[p] then seen[p] = true; out[#out + 1] = p end
+  end
+  table.sort(out)
+  setValue("dronePitches", table.concat(out, ","))
+  refreshDrone()
+end
+function setDroneChannel(c) setValue("droneChannel", c or -1); refreshDrone() end
+function setDroneHold(a) setBool("droneHold", a); refreshDrone() end
+
+function addDronePitch(p)
+  local t = getDronePitches()
+  t[#t + 1] = p
+  setDronePitches(t)
+end
+
+function removeDronePitch(p)
+  local t = {}
+  for _, q in ipairs(getDronePitches()) do if q ~= p then t[#t + 1] = q end end
+  setDronePitches(t)
+end
+
+-- "C2", "F#1", "Bb3", "eb2" or a MIDI number (C4 = 60); returns nil if invalid
+function parsePitchName(token)
+  token = token:gsub("%s", "")
+  local n = tonumber(token)
+  if n then
+    if n >= 0 and n <= 127 then return math.floor(n) end
+    return nil
+  end
+  local letter, acc, oct = token:match("^([A-Ga-g])([#b♯♭]*)(%-?%d+)$")
+  if not letter then return nil end
+  local base = ({ C = 0, D = 2, E = 4, F = 5, G = 7, A = 9, B = 11 })[letter:upper()]
+  for ch in acc:gmatch(".") do
+    if ch == "#" then base = base + 1 elseif ch == "b" then base = base - 1 end
+  end
+  if acc:find("♯", 1, true) then base = base + 1 end
+  if acc:find("♭", 1, true) then base = base - 1 end
+  local p = (tonumber(oct) + 1) * 12 + base
+  if p < 0 or p > 127 then return nil end
+  return p
+end
+
+-- parse "C2 G2, D3" into a list of pitches; returns list, first invalid token
+function parsePitchList(text)
+  local out = {}
+  for tok in text:gmatch("[^%s,;]+") do
+    local p = parsePitchName(tok)
+    if not p then return nil, tok end
+    out[#out + 1] = p
+  end
+  return out
 end
 
 ------------------------------------------------------------------------------
 -- Moteur de voicing
 ------------------------------------------------------------------------------
 
--- intervalles d'un accord (demi-tons depuis la fondamentale)
+-- chord intervals (semitones from the root)
 local function chordIntervals(chord)
   local t = {}
   local p = chord.pattern
@@ -729,13 +904,13 @@ end
 local function intervalFunction(iv)
   iv = iv % 12
   if iv == 0 then return "1" end
-  if iv == 2 or iv == 3 or iv == 4 or iv == 5 then return "3" end -- sus2/sus4 remplacent la tierce
+  if iv == 2 or iv == 3 or iv == 4 or iv == 5 then return "3" end -- sus2/sus4 replace the third
   if iv >= 6 and iv <= 8 then return "5" end
   if iv == 9 then return "6" end
   return "7"
 end
 
--- intervalle diatonique (dans la gamme) depuis le degré scaleNoteIndex, en pas
+-- diatonic interval (in the scale) from degree scaleNoteIndex, in steps
 local majorRef = { 0, 2, 4, 5, 7, 9, 11 }
 
 local function diatonicInterval(scaleNoteIndex, steps)
@@ -745,7 +920,7 @@ local function diatonicInterval(scaleNoteIndex, steps)
   return (target - scaleNotes[scaleNoteIndex]) % 12
 end
 
--- Parse un jeton de position : "1", "R", "b9", "#11", "13", "7M", "5+" (+ = octave supplémentaire)
+-- Parses a position token: "1", "R", "b9", "#11", "13", "7M", "5+" (+ = one more octave)
 local function resolvePositionToken(token, ctx)
   local t = token:gsub("♭", "b"):gsub("♯", "#")
   local jumps = 0
@@ -785,7 +960,7 @@ local function resolvePositionToken(token, ctx)
   return nil
 end
 
--- Renvoie { {pc=, jumps=}, ... } ou nil, message d'erreur
+-- Returns { {pc=, jumps=}, ... } or nil, error message
 function parseCustomPosition(text, rootPC, chord, scaleNoteIndex)
   local funcs = {}
   for _, iv in ipairs(chordIntervals(chord)) do
@@ -796,14 +971,14 @@ function parseCustomPosition(text, rootPC, chord, scaleNoteIndex)
   local shape = {}
   for token in text:gmatch("[^%s,;%-/·]+") do
     local iv, jumps = resolvePositionToken(token, ctx)
-    if iv == nil then return nil, "jeton inconnu : " .. token end
+    if iv == nil then return nil, "unknown token: " .. token end
     shape[#shape + 1] = { pc = (rootPC + iv) % 12, jumps = jumps, token = token }
   end
-  if #shape == 0 then return nil, "position vide" end
+  if #shape == 0 then return nil, "empty position" end
   return shape
 end
 
--- vérifie une position sans accord (pour l'interface)
+-- validates a position without a chord (for the UI)
 function validateCustomPosition(text)
   local _, err = parseCustomPosition(text, 0, chords[10], nil)
   return err == nil, err
@@ -811,7 +986,7 @@ end
 
 local function lowestAtOrAbove(pc, floor) return floor + ((pc - floor) % 12) end
 
--- inversion façon ChordMachineGun : rotation + décalage d'octave
+-- ChordGun-style inversion: rotation + octave shift
 local function rotateForInversion(list, inversion)
   local n = #list
   if n == 0 or inversion == 0 then return list, 0 end
@@ -822,7 +997,7 @@ local function rotateForInversion(list, inversion)
   return out, oct
 end
 
--- empilement d'une position personnalisée sans conduite de voix
+-- stacking of a custom position without voice leading
 local function stackShape(rootPitch, shape, inversion)
   local rotated, oct = rotateForInversion(shape, inversion)
   local out = {}
@@ -840,7 +1015,7 @@ local function stackShape(rootPitch, shape, inversion)
   return out
 end
 
--- voicing standard ChordMachineGun (accord serré + inversion)
+-- standard ChordGun voicing (close chord + inversion)
 function getChordNotesArray(root, chord, octave, inversion)
   local arr = {}
   local p = chord.pattern
@@ -862,7 +1037,7 @@ function getChordNotesArray(root, chord, octave, inversion)
   return arr
 end
 
--- ajuste un voicing à N voix (retire la quinte d'abord, double fondamentale/quinte/tierce)
+-- fits a voicing to N voices (drops the fifth first, doubles root/fifth/third)
 local function fitVoiceCount(V, N, info)
   table.sort(V)
   while #V > N do
@@ -882,7 +1057,7 @@ local function fitVoiceCount(V, N, info)
   return V
 end
 
--- aligne une référence de M voix sur N voix (interpolation) ; aligned=true si M==N
+-- aligns an M-voice reference to N voices (interpolation); aligned=true if M==N
 local function alignReference(ref, N)
   local M = #ref
   if M == N then return copyTable(ref), true end
@@ -897,13 +1072,13 @@ local function alignReference(ref, N)
   return out, false
 end
 
--- Pénalités (réglables)
+-- Penalties (tweakable)
 VL = {
-  parallel = 1000,     -- quintes / octaves parallèles
-  hidden = 6,          -- quintes/octaves directes aux voix extrêmes (saut au soprano)
-  crossing = 4,        -- chevauchement avec la position précédente
-  spacing = 6,         -- plus d'une octave entre voix supérieures voisines
-  bassGap = 3,         -- plus de 2 octaves entre basse et ténor
+  parallel = 1000,     -- parallel fifths / octaves
+  hidden = 6,          -- direct fifths/octaves in outer voices (leap in the soprano)
+  crossing = 4,        -- overlap with the previous position
+  spacing = 6,         -- more than an octave between adjacent upper voices
+  bassGap = 3,         -- more than 2 octaves between bass and tenor
   doubledThird = 5,
   doubledSeventh = 10,
   doubledLeading = 10,
@@ -915,10 +1090,10 @@ VL = {
   minPitch = 24, maxPitch = 100,
 }
 
---[[ Recherche du meilleur voicing.
-  prev     : référence alignée (N hauteurs)
-  aligned  : la référence a exactement N voix (permet la détection des parallèles)
-  allowed  : allowed[i] = table { [pc]=true } des classes autorisées pour la voix i
+--[[ Search for the best voicing.
+  prev     : aligned reference (N pitches)
+  aligned  : the reference has exactly N voices (enables parallel detection)
+  allowed  : allowed[i] = table { [pc]=true } of pitch classes allowed for voice i
   opts     : { required = {pc,...}, funcOf = {[pc]=func}, leadingPC = pc|nil, coverage = bool }
 ]]
 local function searchVoicing(prev, aligned, allowed, opts, window)
@@ -931,7 +1106,7 @@ local function searchVoicing(prev, aligned, allowed, opts, window)
         cands[i][#cands[i] + 1] = p
       end
     end
-    -- essayer d'abord les notes les plus proches (meilleur élagage)
+    -- try the closest notes first (better pruning)
     table.sort(cands[i], function(a, b) return math.abs(a - prev[i]) < math.abs(b - prev[i]) end)
     if #cands[i] == 0 then return nil end
   end
@@ -951,7 +1126,7 @@ local function searchVoicing(prev, aligned, allowed, opts, window)
 
   local function stepPenalty(i)
     local c = math.abs(cur[i] - prev[i])
-    -- ancrage du registre : la basse reste près de l'octave choisie (évite la dérive)
+    -- register anchoring: the bass stays near the chosen octave (avoids drifting)
     if i == 1 and opts.anchor then
       local d = math.abs(cur[1] - opts.anchor)
       if d > 7 then c = c + (d - 7) * 2 end
@@ -967,9 +1142,9 @@ local function searchVoicing(prev, aligned, allowed, opts, window)
       local tag = opts.tags and opts.tags[i]
       local move = cur[i] - prev[i]
       if tag == "7" and move ~= 0 and (move > 0 or move < -2) then
-        c = c + VL.seventhResolution                       -- la 7e descend par degré conjoint
+        c = c + VL.seventhResolution                       -- the 7th resolves down by step
       elseif tag == "L" and opts.tonicPC and opts.hasTonic and move ~= 1 then
-        c = c + ((i == N) and VL.leadingSoprano or VL.leadingInner) -- la sensible monte à la tonique
+        c = c + ((i == N) and VL.leadingSoprano or VL.leadingInner) -- the leading tone rises to the tonic
       end
       if i < N and cur[i] > prev[i + 1] then c = c + VL.crossing end
       if i > 1 and cur[i] < prev[i - 1] then c = c + VL.crossing end
@@ -1039,7 +1214,7 @@ local function searchWithFallback(prev, aligned, allowed, opts)
   return nil
 end
 
--- informations sur l'accord : classes de hauteurs et fonctions
+-- chord info: pitch classes and functions
 local function chordInfo(root, chord)
   local rootPC = (root - 1) % 12
   local info = { rootPC = rootPC, pcs = {}, funcOf = {}, funcs = {} }
@@ -1064,7 +1239,7 @@ local function leadingTonePC()
   return nil
 end
 
--- conduite de voix automatique (fonctions libres, basse imposée par l'inversion)
+-- automatic voice leading (free functions, bass set by the inversion)
 local function voiceLeadAuto(ref, info, N, inversion, anchor, tags)
   local M = #info.pcs
   local idx = inversion % M
@@ -1095,8 +1270,8 @@ local function voiceLeadAuto(ref, info, N, inversion, anchor, tags)
   })
 end
 
--- conduite de voix d'une position personnalisée : la position (ordre + écarts) est conservée,
--- on choisit le registre le plus proche (et, en option, le renversement le plus proche)
+-- voice leading of a custom position: the position (order + spacing) is kept,
+-- the closest register is chosen (and, optionally, the closest inversion)
 local function voiceLeadShape(ref, shape, inversion, anchor, autoInversion)
   local rotations = {}
   if autoInversion then
@@ -1137,7 +1312,7 @@ local function voiceLeadShape(ref, shape, inversion, anchor, autoInversion)
   return best
 end
 
--- hauteur décalée de n degrés de la gamme
+-- pitch shifted by n scale steps
 local function diatonicShift(p, n)
   if n == 0 then return p end
   local dir = n > 0 and 1 or -1
@@ -1159,10 +1334,10 @@ function applyDoublingToken(pitch, token)
 end
 
 ------------------------------------------------------------------------------
--- Analyse de l'accord courant (référence de la conduite de voix)
---   "live" : accord tenu au clavier MIDI > accord qui sonne sous la tête de lecture
---            > le plus récent entre dernier accord joué au clavier et dernier accord ChordMachineGun
---   "item" : accord qui précède la position d'insertion dans l'item MIDI
+-- Current chord analysis (voice leading reference)
+--   "live" : chord held on the MIDI keyboard > chord sounding under the play cursor
+--            > the most recent of last keyboard chord and last ChordMachineGun chord
+--   "item" : chord preceding the insertion position in the MIDI item
 ------------------------------------------------------------------------------
 
 function getReferenceSource() return getValue("vlSource", "live") end
@@ -1170,7 +1345,7 @@ function setReferenceSource(a) setValue("vlSource", a) end
 local function getRefSeq() return tonumber(getValue("vlRefSeq", 0)) or 0 end
 local function setRefSeq(a) setValue("vlRefSeq", a) end
 
--- reconnaissance d'accord (ordre = priorité)
+-- chord recognition (order = priority)
 local CHORD_TEMPLATES = {
   { "",        { 0, 4, 7 } },        { "m",       { 0, 3, 7 } },
   { "7",       { 0, 4, 7, 10 } },    { "maj7",    { 0, 4, 7, 11 } },
@@ -1230,7 +1405,7 @@ function identifyChord(pitches)
   return result
 end
 
--- fonctions utiles à la résolution : "7" (septième), "L" (sensible tierce de l'accord)
+-- functions used for resolution: "7" (seventh), "L" (leading tone as chord third)
 function tagsFromPitches(pitches)
   local id = identifyChord(pitches)
   local tags = {}
@@ -1250,12 +1425,12 @@ function tagsFromPitches(pitches)
   return tags
 end
 
--- historique MIDI d'entrée de REAPER : dernier accord joué / tenu au clavier
+-- REAPER MIDI input history: last chord played / held on the keyboard
 local function isIgnoredDevice(dev)
   if not dev then return false end
   dev = math.floor(dev)
-  if dev & 0x10000 ~= 0 then return true end       -- périphérique en mode contrôle uniquement
-  return (dev & 0xFFFF) == 62                       -- clavier virtuel (prévisualisations ChordMachineGun)
+  if dev & 0x10000 ~= 0 then return true end       -- device in control-only mode
+  return (dev & 0xFFFF) == 62                       -- virtual keyboard (ChordMachineGun previews)
 end
 
 function scanKeyboardChord()
@@ -1274,7 +1449,7 @@ function scanKeyboardChord()
     if #e.buf >= 3 and not isIgnoredDevice(e.dev) then
       local status, note, vel = e.buf:byte(1) & 0xF0, e.buf:byte(2), e.buf:byte(3)
       if status == 0x90 and vel > 0 then
-        if heldCount == 0 then bestCount = 0 end     -- nouvel épisode
+        if heldCount == 0 then bestCount = 0 end     -- new episode
         if not held[note] then held[note] = true; heldCount = heldCount + 1 end
         if heldCount >= 2 and heldCount >= bestCount then
           local t = {}
@@ -1302,7 +1477,7 @@ local function latestInputSeq()
   return tonumber(seq) or 0
 end
 
--- notes d'un accord dans une prise : "sounding" = qui sonnent à ppq ; "before" = accord qui précède ppq
+-- notes of a chord in a take: "sounding" = sounding at ppq; "before" = chord before ppq
 local CHORD_WINDOW_PPQ = 40
 function chordNotesInTake(take, ppq, mode)
   local _, n = reaper.MIDI_CountEvts(take)
@@ -1329,8 +1504,9 @@ function chordNotesInTake(take, ppq, mode)
   return out
 end
 
--- retire basse séparée et doublures produites par ChordMachineGun pour retrouver les voix de l'accord
+-- removes the separate bass and ChordMachineGun doublings to recover the chord voices
 function voicesFromNotes(list)
+  list = stripDrones(list)
   local pitches = {}
   local nv = math.max(#getLastVoices(), 2)
   if voicesHaveDistinctChannels(nv) then
@@ -1365,7 +1541,7 @@ function voicesFromNotes(list)
       end
     end
   else
-    -- canaux partagés : on retire la basse séparée (si elle a son canal) et les octaves doublées
+    -- shared channels: drop the separate bass (if on its own channel) and doubled octaves
     local bassChan = (getBassMode() == "root") and voiceChannel(1) or nil
     local shared = false
     for v = 2, nv do if voiceChannel(v) == bassChan then shared = true end end
@@ -1377,7 +1553,7 @@ function voicesFromNotes(list)
         pitches[#pitches + 1] = x.pitch
       end
     end
-    -- trop de notes pour le nombre de voix : retirer les doublures connues (les plus aiguës d'abord)
+    -- too many notes for the voice count: drop known doublings (highest first)
     local expected = #getLastVoices()
     if bassChan and not shared then expected = expected - 1 end
     if expected >= 2 and #pitches > expected then
@@ -1402,13 +1578,14 @@ function voicesFromNotes(list)
 end
 
 local function makeExternalRef(pitches, source)
-  local p = copyTable(pitches)
+  local p = stripDrones(copyTable(pitches))
+  if #p == 0 then return nil end
   table.sort(p)
   while #p > 8 do table.remove(p, 1) end
   return { pitches = p, tags = tagsFromPitches(p), source = source, external = true }
 end
 
--- positionPPQ : position d'insertion (mode item) ; nil = curseur d'édition
+-- positionPPQ: insertion position (item mode); nil = edit cursor
 function resolveReference(positionPPQ)
   if not getVoiceLeadingEnabled() then return nil end
   local source = getReferenceSource()
@@ -1418,22 +1595,22 @@ function resolveReference(positionPPQ)
     local list = chordNotesInTake(take, positionPPQ or getCursorPositionPPQ(), "before")
     if #list >= 1 then
       local p = voicesFromNotes(list)
-      if #p >= 2 then return makeExternalRef(p, "item") end
+      if #p >= 2 then local r = makeExternalRef(p, "item"); if r then return r end end
     end
   end
 
   if source == "live" then
     local kb = scanKeyboardChord()
-    if kb and kb.heldNow then return makeExternalRef(kb.held, "clavier") end
+    if kb and kb.heldNow then local r = makeExternalRef(kb.held, "keyboard"); if r then return r end end
     if take and reaper.GetPlayState() & 1 == 1 then
       local ppq = reaper.MIDI_GetPPQPosFromProjTime(take, reaper.GetPlayPosition())
       local list = chordNotesInTake(take, ppq, "sounding")
       if #list >= 2 then
         local p = voicesFromNotes(list)
-        if #p >= 2 then return makeExternalRef(p, "lecture") end
+        if #p >= 2 then local r = makeExternalRef(p, "playback"); if r then return r end end
       end
     end
-    if kb and kb.pitches and kb.seq > getRefSeq() then return makeExternalRef(kb.pitches, "clavier") end
+    if kb and kb.pitches and kb.seq > getRefSeq() then local r = makeExternalRef(kb.pitches, "keyboard"); if r then return r end end
   end
 
   local mem = getVoiceLeadingReference()
@@ -1441,9 +1618,9 @@ function resolveReference(positionPPQ)
   return nil
 end
 
-local SOURCE_LABELS = { clavier = "clavier MIDI", lecture = "lecture", chordgun = "dernier accord ChordMachineGun", item = "item MIDI" }
+local SOURCE_LABELS = { keyboard = "MIDI keyboard", playback = "playback", chordgun = "last chord", item = "MIDI item" }
 
--- pour l'affichage : { name, notes, source, live }
+-- for display: { name, notes, source, live }
 function describeCurrentReference()
   local ref = resolveReference(nil)
   if not ref then return nil end
@@ -1454,20 +1631,20 @@ function describeCurrentReference()
     name = id and id.name or "",
     notes = table.concat(t, " "),
     source = SOURCE_LABELS[ref.source] or ref.source,
-    live = (ref.source == "clavier" or ref.source == "lecture"),
+    live = (ref.source == "keyboard" or ref.source == "playback"),
   }
 end
 
---[[ Construit le voicing complet de l'accord sélectionné.
+--[[ Builds the full voicing of the selected chord.
   Retour :
     {
-      upper  = {hauteurs}      structure d'accord (référence de conduite de voix)
-      voices = {hauteurs}      voix de base (basse séparée incluse si mode fondamentale)
-      notes  = { {pitch=, chan=, voice=}, ... }   notes réellement jouées/insérées
+      upper  = {pitches}       chord structure (voice leading reference)
+      voices = {pitches}       base voices (separate bass included in root mode)
+      notes  = { {pitch=, chan=, voice=}, ... }   notes actually played/inserted
       name, error
     }
 ]]
--- refInfo : référence explicite, false = aucune, nil = résolue automatiquement
+-- refInfo: explicit reference, false = none, nil = resolved automatically
 function buildChordVoicing(scaleNoteIndex, chordTypeIndex, refInfo)
   local root = scaleNotes[scaleNoteIndex]
   local chord = scaleChords[scaleNoteIndex][chordTypeIndex]
@@ -1480,7 +1657,7 @@ function buildChordVoicing(scaleNoteIndex, chordTypeIndex, refInfo)
   local ref = (refInfo and refInfo.pitches) or {}
   local refTags = (refInfo and refInfo.tags) or {}
   local useRef = getVoiceLeadingEnabled() and #ref >= 1
-  -- registre : celui de l'accord analysé s'il vient de l'extérieur, sinon l'octave choisie
+  -- register: the analysed chord's if external, otherwise the chosen octave
   local anchor = (refInfo and refInfo.external) and ref[1] or rootPitch
   local N = getVoiceCount()
   local result = { root = root, chord = chord }
@@ -1519,10 +1696,10 @@ function buildChordVoicing(scaleNoteIndex, chordTypeIndex, refInfo)
     else result.tags[i] = "" end
   end
 
-  -- voix de basse
+  -- bass voice
   local voices = {}
   if getBassMode() == "root" then
-    local bass = V[1] - ((V[1] - info.rootPC) % 12)   -- fondamentale la plus haute <= voix grave
+    local bass = V[1] - ((V[1] - info.rootPC) % 12)   -- highest root <= lowest voice
     if bass >= V[1] then bass = bass - 12 end
     voices[1] = bass
     for i, p in ipairs(V) do voices[i + 1] = p end
@@ -1531,7 +1708,7 @@ function buildChordVoicing(scaleNoteIndex, chordTypeIndex, refInfo)
   end
   result.voices = voices
 
-  -- notes finales : voix + doublures, canaux
+  -- final notes: voices + doublings, channels
   local doublings = getDoublings()
   local seen = {}
   local out = {}
@@ -1543,6 +1720,12 @@ function buildChordVoicing(scaleNoteIndex, chordTypeIndex, refInfo)
     seen[key] = true
     out[#out + 1] = { pitch = p, chan = chan, voice = v }
   end
+  -- drone first: a chord note on the same pitch and channel merges into the drone
+  -- (so a held drone is never cut by the next chord's note-off)
+  for _, n in ipairs(getDroneNotes()) do
+    local key = n.pitch .. ":" .. tostring(n.chan)
+    if not seen[key] then seen[key] = true; out[#out + 1] = n end
+  end
   for v, p in ipairs(voices) do
     add(p, v)
     for _, tok in ipairs(doublings[v] or {}) do
@@ -1553,7 +1736,7 @@ function buildChordVoicing(scaleNoteIndex, chordTypeIndex, refInfo)
   table.sort(out, function(a, b) return a.pitch < b.pitch end)
   result.notes = out
 
-  -- nom de l'accord
+  -- chord name
   result.refSource = refInfo and refInfo.source or nil
   local rootName = (borrowContext and borrowContext.names and borrowContext.names[scaleNoteIndex]) or noteNameInContext(root)
   local name = rootName .. chord.display
@@ -1561,9 +1744,9 @@ function buildChordVoicing(scaleNoteIndex, chordTypeIndex, refInfo)
   if lowestPC ~= info.rootPC then name = name .. "/" .. noteNameInContext(voices[1] + 1) end
   if borrowContext then
     if borrowContext.isNeighbors then
-      result.borrowLabel = borrowContext.describe or ("depuis " .. borrowContext.label)
+      result.borrowLabel = borrowContext.describe or ("from " .. borrowContext.label)
     else
-      result.borrowLabel = (borrowContext.headers[scaleNoteIndex] or "?") .. " de " .. borrowContext.label
+      result.borrowLabel = (borrowContext.headers[scaleNoteIndex] or "?") .. " of " .. borrowContext.label
     end
   end
   result.name = name
@@ -1584,14 +1767,14 @@ function updateChordDisplay(result)
   for i, p in ipairs(result.voices) do vn[i] = getPitchName(p) end
   setValue("lastVoiceNames", table.concat(vn, ","))
   local status = result.name .. "    " .. voicingNotesText(result)
-  if result.error then status = status .. "    (position : " .. result.error .. ")" end
+  if result.error then status = status .. "    (position: " .. result.error .. ")" end
   reaper.Help_Set(status, false)
 end
 
 function showChordText() reaper.Help_Set(getChordText() .. "    " .. getChordNotesText(), false) end
 
--- chaque accord joué par ChordMachineGun devient la référence « mémoire » ; les accords
--- joués au clavier avant ce moment sont alors considérés comme plus anciens
+-- every chord played by ChordMachineGun becomes the "memory" reference; chords
+-- played on the keyboard before that moment are then considered older
 local function commitReference(result)
   if not getVoiceLeadingEnabled() then return end
   setVoiceLeadingReference(result.upper, result.tags)
@@ -1675,7 +1858,7 @@ local function setEditCursorTo(ppq)
   setEditCursorPosition(reaper.MIDI_GetProjTimeFromPPQPos(activeTake(), ppq))
 end
 
--- note = { pitch=, chan= } ; chan nil => canal par défaut / canal de la note remplacée
+-- note = { pitch=, chan= }; chan nil => default channel / channel of the replaced note
 function insertMidiNote(note, keepNotesSelected, selectedChord, noteIndex)
   local startPosition = getCursorPositionPPQ()
   local endPosition, velocity, channel, muteState
@@ -1702,7 +1885,7 @@ function insertScaleChord(noteList, keepNotesSelected, selectedChord)
   moveCursor(keepNotesSelected, selectedChord)
 end
 
--- remplace chaque accord sélectionné ; chacun est conduit depuis l'accord qui le précède
+-- replaces each selected chord; each one is voice-led from the previous one
 function changeSelectedNotesToScaleChords(scaleNoteIndex, chordTypeIndex)
   local selectedChords = getSelectedChords()
   deleteSelectedNotes()
@@ -1726,8 +1909,22 @@ end
 
 local function playScaleChord(noteList)
   stopNotesFromPlaying()
-  for _, n in ipairs(noteList) do playMidiNote(n.pitch, n.chan) end
-  setNotesThatArePlaying(noteList)
+  local hold = getDroneEnabled() and getDroneHold()
+  local held = {}
+  if hold then
+    for _, d in ipairs(getDroneNotes()) do held[d.pitch .. ":" .. (d.chan or getCurrentNoteChannel())] = true end
+  end
+  local played = {}
+  for _, n in ipairs(noteList) do
+    local isDrone = n.drone or n.voice == 0
+    local onHeld = held[n.pitch .. ":" .. (n.chan or getCurrentNoteChannel())]
+    if not (hold and (isDrone or onHeld)) then
+      playMidiNote(n.pitch, n.chan)
+      played[#played + 1] = n
+    end
+  end
+  if hold and #getDroneNotes() > 0 then startDrone() end
+  setNotesThatArePlaying(played)
 end
 
 function previewScaleChord()
@@ -1770,7 +1967,7 @@ function playOrInsertChord(i, t, actionDescription)
   return result
 end
 
--- notes seules (inchangé)
+-- single notes (unchanged)
 local function playScaleNote(noteValue)
   stopNotesFromPlaying()
   playMidiNote(noteValue)
@@ -1831,7 +2028,7 @@ local function shiftReference(semitones)
 end
 
 ------------------------------------------------------------------------------
--- Actions (mêmes noms que l'original)
+-- Actions (same names as the original)
 ------------------------------------------------------------------------------
 
 local function previewOrApply(actionDescription)
@@ -1985,12 +2182,12 @@ end
 
 
 ------------------------------------------------------------------------------
--- Accords d'emprunt : gamme dont la tonique est la fondamentale de l'accord sélectionné
---   Ctrl + 1..7 (ou actions "borrowed scale chord N") : degré N de cette gamme
+-- Borrowed chords: the scale whose tonic is the root of the selected chord
+--   Ctrl + 1..7 (or "borrowed scale chord N" actions): degree N of that scale
 ------------------------------------------------------------------------------
 
--- "chord" : majeure si l'accord est majeur/dominant, mineure naturelle s'il est mineur/diminué
--- "scale" : même type de gamme que la gamme principale
+-- "chord" : major if the chord is major/dominant, natural minor if minor/diminished
+-- "scale" : same scale type as the main scale
 function getBorrowMode() return getValue("borrowMode", "chord") end
 function setBorrowMode(a) setValue("borrowMode", a) end
 
@@ -2035,7 +2232,7 @@ local function headersFor(chordLists)
   return headers
 end
 
--- exécute fn dans le contexte de la gamme d'emprunt
+-- runs fn inside the borrowed scale context
 function withBorrowContext(ctx, fn)
   local savedPattern, savedNotes, savedChords, savedCtx = scalePattern, scaleNotes, scaleChords, borrowContext
   scalePattern, scaleNotes, scaleChords, borrowContext = ctx.pattern, ctx.notes, ctx.chords, ctx
@@ -2057,7 +2254,7 @@ function getBorrowedContext()
   local tonic = getNotesIndex(root)
   local ctx = { tonic = tonic, scaleType = st }
   ctx.pattern = getScalePattern(tonic, scales[st])
-  -- même registre que la gamme principale : chaque note dans [tonique principale, +11]
+  -- same register as the main scale: each note within [main tonic, +11]
   local mainTonic = getScaleTonicNote()
   ctx.notes = {}
   for note = tonic, tonic + 11 do
@@ -2082,11 +2279,11 @@ function getBorrowedContext()
 
   ctx.headers = headersFor(ctx.chords)
   local isMinor = (st == 2)
-  ctx.label = ctx.names[1] .. ((st == 1 or st == 6) and " majeur" or (isMinor or st == 7) and " mineur" or (" " .. scales[st].name))
+  ctx.label = ctx.names[1] .. ((st == 1 or st == 6) and " major" or (isMinor or st == 7) and " minor" or (" " .. scales[st].name))
   return ctx
 end
 
--- l'accord d'emprunt est-il hors de la gamme principale ? (vrai emprunt)
+-- is the borrowed chord outside the main scale? (true borrowing)
 function chordIsOutsideMainScale(rootNote, chord)
   local pattern = chord.pattern
   for n = 0, #pattern - 1 do
@@ -2111,29 +2308,29 @@ end
 
 
 ------------------------------------------------------------------------------
--- Transformations néo-riemanniennes (Alt)
---   P  parallèle          C ↔ Cm
---   L  échange de sensible C ↔ Em
+-- Neo-Riemannian transformations (Alt)
+--   P  parallel            C ↔ Cm
+--   L  leading-tone exchange C ↔ Em
 --   R  relatif             C ↔ Am
 --   N  Nebenverwandt (RLP) C → Fm
 --   S  glissement   (LPR)  C → C#m
---   H  pôle hexatonique (LPL) C → Abm
---   PR médiante chromatique C → Eb
--- On part d'un « point d'ancrage » (accord sélectionné au départ) ; choisir une
--- transformation en fait le nouvel ancrage → suggestions de suggestions, sans fin.
+--   H  hexatonic pole (LPL)  C → Abm
+--   PR chromatic mediant    C → Eb
+-- We start from an "anchor" (the selected chord); choosing a
+-- transformation makes it the new anchor → suggestions of suggestions, endlessly.
 ------------------------------------------------------------------------------
 
 PLR_OPS = {
-  { op = "P",  name = "parallèle" },
-  { op = "L",  name = "sensible" },
-  { op = "R",  name = "relatif" },
+  { op = "P",  name = "parallel" },
+  { op = "L",  name = "leading tone" },
+  { op = "R",  name = "relative" },
   { op = "N",  seq = "RLP", name = "nebenverw." },
-  { op = "S",  seq = "LPR", name = "glissement" },
-  { op = "H",  seq = "LPL", name = "pôle hexa." },
-  { op = "PR", seq = "PR",  name = "médiante" },
+  { op = "S",  seq = "LPR", name = "slide" },
+  { op = "H",  seq = "LPL", name = "hex. pole" },
+  { op = "PR", seq = "PR",  name = "mediant" },
 }
 
--- qualité de la triade sous-jacente
+-- quality of the underlying triad
 local TRIAD_OF = { major = "M", ['7'] = "M", maj7 = "M", maj6 = "M", aug = "M", sus2 = "M", sus4 = "M",
                    power = "M", minor = "m", min7 = "m", min6 = "m", dim = "m", flat5 = "m" }
 
@@ -2163,7 +2360,7 @@ local function triadName(pc, q)
     if (note - 1) % 12 == pc then name = getScaleNoteName(d) end
   end
   if not name then
-    -- touches noires hors gamme : orthographe usuelle (C#m, F#m, G#m / Db, Eb, Ab, Bb)
+    -- black keys outside the scale: usual spelling (C#m, F#m, G#m / Db, Eb, Ab, Bb)
     local minorNames = { [1] = "C#", [3] = "Eb", [6] = "F#", [8] = "G#", [10] = "Bb" }
     local majorNames = { [1] = "Db", [3] = "Eb", [6] = "F#", [8] = "Ab", [10] = "Bb" }
     name = ((q == "m") and minorNames[pc] or majorNames[pc]) or getNoteName(pc + 1)
@@ -2185,7 +2382,7 @@ local function gridSelectionKey()
   return i .. ":" .. getSelectedChordType(i) .. ":" .. getScaleTonicNote() .. ":" .. getScaleType()
 end
 
--- état : ancrage + historique ; réinitialisé quand l'accord sélectionné dans la grille change
+-- state: anchor + history; reset when the selected grid chord changes
 function getPLRState()
   local origin = getValue("plrOrigin", "")
   local key = gridSelectionKey()
@@ -2205,7 +2402,7 @@ end
 
 local function savePath(path)
   local parts = {}
-  local start = math.max(1, #path - 31)  -- historique limité à 32 pas
+  local start = math.max(1, #path - 31)  -- history limited to 32 steps
   for k = start, #path do parts[#parts + 1] = encodeTriad(path[k]) end
   setValue("plrPath", table.concat(parts, " "))
 end
@@ -2244,14 +2441,14 @@ function getPLRContext()
   return ctx
 end
 
--- joue (ou insère) la transformation k depuis l'ancrage courant.
--- descend = true : elle devient aussi le nouvel ancrage (actions globales) ;
--- sinon on reste sur la même strate et le focus se pose sur k (fenêtre).
+-- plays (or inserts) transformation k from the current anchor.
+-- descend = true: it also becomes the new anchor (global actions);
+-- otherwise we stay on the same level and the focus moves to k (window).
 function plrAction(k, insert, descend)
   local ctx = getPLRContext()
   if not ctx or not ctx.notes[k] then return nil end
   local info = ctx.info[k]
-  ctx.describe = info.op .. " de " .. ctx.label
+  ctx.describe = info.op .. " of " .. ctx.label
   local r = withBorrowContext(ctx, function()
     if insert then
       return playOrInsertChord(k, 1, "PLR " .. info.op .. " (" .. ctx.headers[k] .. ")")
@@ -2274,14 +2471,14 @@ function plrMoveFocus(d)
   setValue("plrFocus", f)
 end
 
--- joue la case focalisée sans changer de strate
+-- plays the focused cell without changing level
 function plrPlayFocused(insert)
   local st = getPLRState()
   if not st then return end
   return plrAction(st.focus, insert, false)
 end
 
--- descend dans la case focalisée, sans jouer
+-- go down into the focused cell, without playing
 function plrDescendFocused()
   local ctx = getPLRContext()
   if not ctx then return end
@@ -2291,7 +2488,7 @@ function plrDescendFocused()
   savePath(path)
 end
 
--- remonte d'une strate ; play = true pour l'entendre (action globale)
+-- go up one level; play = true to hear it (global action)
 function plrBack(play)
   local st = getPLRState()
   if not st or #st.path <= 1 then return end
@@ -2304,11 +2501,11 @@ function plrBack(play)
   ctx.notes = { mainTonic + ((a.pc + 1 - mainTonic) % 12) }
   ctx.chords = { { chordByCode((a.q == "m") and "minor" or "major") } }
   ctx.names = { triadName(a.pc, a.q):gsub("m$", "") }
-  ctx.describe = "retour à " .. triadName(a.pc, a.q)
+  ctx.describe = "back to " .. triadName(a.pc, a.q)
   return withBorrowContext(ctx, function() return previewChord(1, 1) end)
 end
 
--- revient directement à la strate n du chemin (clic sur le fil d'Ariane), sans jouer
+-- jumps straight back to level n of the path (breadcrumb click), without playing
 function plrJumpTo(n)
   local st = getPLRState()
   if not st or n < 1 or n >= #st.path then return end
@@ -2316,7 +2513,7 @@ function plrJumpTo(n)
   savePath(st.path)
 end
 
--- sélection au clavier sans jouer : affiche l'accord et son voicing
+-- keyboard selection without playing: shows the chord and its voicing
 function showSelectedChordWithoutPlaying()
   local i = getSelectedScaleNote()
   if not scaleNotes[i] then return end
@@ -2341,9 +2538,9 @@ end
 
 
 ------------------------------------------------------------------------------
--- Historique des accords joués (fenêtre « ChordMachineGun history »)
---   chaque entrée garde les notes exactes (voix, canaux, doublures) pour les rejouer
---   rejouer depuis l'historique n'ajoute rien à l'historique
+-- History of played chords ("ChordMachineGun history" window)
+--   each entry keeps the exact notes (voices, channels, doublings) to replay them
+--   replaying from the history adds nothing to the history
 ------------------------------------------------------------------------------
 
 HISTORY_MAX = 300
@@ -2372,7 +2569,7 @@ local function decodeInts(raw)
   return t
 end
 
--- entrée : nom \t libellé \t notes \t structure \t voix \t inséré(0/1)
+-- entry: name \t label \t notes \t structure \t voices \t inserted(0/1)
 function getHistory()
   local raw = getValue("history", "")
   local list = {}
@@ -2435,7 +2632,7 @@ local function pitchesText(list)
 end
 function historyVoicesText(entry) return pitchesText(entry.voices) end
 
--- rejoue (ou insère) une entrée telle qu'elle a été jouée
+-- replays (or inserts) an entry exactly as it was played
 function playHistoryEntry(index, insert)
   local list = getHistory()
   local e = list[index]
@@ -2454,7 +2651,7 @@ function playHistoryEntry(index, insert)
       else
         insertScaleChord(e.notes, false)
       end
-      endUndoBlock("ChordMachineGun : historique (" .. e.name .. ")")
+      endUndoBlock("ChordMachineGun: history (" .. e.name .. ")")
     end
     playScaleChord(e.notes)
     setChordText(e.label ~= "" and (e.name .. "   ·  " .. e.label) or e.name)
@@ -2467,7 +2664,7 @@ function playHistoryEntry(index, insert)
       setVoiceLeadingReference(e.upper, tagsFromPitches(e.upper))
       setValue("vlRefSeq", latestInputSeq())
     end
-    reaper.Help_Set("Historique : " .. e.name .. "    " .. pitchesText(e.voices), false)
+    reaper.Help_Set("History: " .. e.name .. "    " .. pitchesText(e.voices), false)
   end)
   historySuspended = false
   if not ok then error(err, 0) end
@@ -2475,13 +2672,13 @@ function playHistoryEntry(index, insert)
 end
 
 ------------------------------------------------------------------------------
--- Curseurs CC (2) : souris ou contrôleur MIDI
---   out   = CC envoyé ; in = CC du contrôleur qui pilote le curseur (Learn)
+-- CC sliders (2): mouse or MIDI controller
+--   out   = CC sent; in = controller CC driving the slider (Learn)
 ------------------------------------------------------------------------------
 
-CC_NAMES = { [1] = "Modulation", [2] = "Souffle", [4] = "Pédale", [5] = "Portamento", [7] = "Volume",
-  [10] = "Pan", [11] = "Expression", [64] = "Sustain", [71] = "Résonance", [72] = "Release",
-  [73] = "Attaque", [74] = "Brillance", [91] = "Réverb", [93] = "Chorus" }
+CC_NAMES = { [1] = "Modulation", [2] = "Breath", [4] = "Foot", [5] = "Portamento", [7] = "Volume",
+  [10] = "Pan", [11] = "Expression", [64] = "Sustain", [71] = "Resonance", [72] = "Release",
+  [73] = "Attack", [74] = "Brightness", [91] = "Reverb", [93] = "Chorus" }
 
 function getCCSlider(i)
   local defaults = { "1,1,0", "11,11,127" }
@@ -2494,7 +2691,7 @@ function setCCSlider(i, sl)
   setValue("ccSlider" .. i, sl.out .. "," .. sl.inp .. "," .. sl.value)
 end
 
--- envoie le CC sur le canal par défaut, ou sur chaque canal de voix si « un canal par voix »
+-- sends the CC on the default channel, or on every voice channel when split
 function sendCC(cc, value)
   value = math.max(0, math.min(127, math.floor(value + 0.5)))
   local chans, seen = {}, {}
@@ -2507,7 +2704,7 @@ function sendCC(cc, value)
   for _, ch in ipairs(chans) do reaper.StuffMIDIMessage(0, 0xB0 + ch, cc, value) end
 end
 
--- nouveaux messages CC venus des contrôleurs depuis seq ; renvoie events, dernier seq
+-- new CC messages from controllers since seq; returns events, last seq
 function pollIncomingCC(sinceSeq)
   if not reaper.MIDI_GetRecentInputEvent then return {}, sinceSeq end
   local events = {}
@@ -2529,29 +2726,29 @@ end
 function currentInputSeq() return latestInputSeq() end
 
 ------------------------------------------------------------------------------
--- Pistes par voix
+-- Voice tracks
 ------------------------------------------------------------------------------
 
 local function voiceTrackName(v)
-  if v == 1 then return getBassMode() == "root" and "Basse (fond.)" or "Basse" end
-  return "Voix " .. v
+  if v == 1 then return getBassMode() == "root" and "Bass (root)" or "Bass" end
+  return "Voice " .. v
 end
 
--- nom d'une piste pour un canal : les voix qui y sont routées
+-- track name for a channel: the voices routed to it
 local function channelTrackName(ch, totalVoices)
   local names = {}
   for v = 1, totalVoices do
     if voiceChannel(v) == ch then names[#names + 1] = (v == 1) and voiceTrackName(1) or tostring(v) end
   end
-  if #names == 0 then return "Canal " .. (ch + 1) end
+  if #names == 0 then return "Channel " .. (ch + 1) end
   if #names == 1 then
     local v = tonumber(names[1])
     return v and voiceTrackName(v) or names[1]
   end
-  if names[1]:match("^Basse") then
-    return names[1] .. " + voix " .. table.concat(names, ", ", 2)
+  if names[1]:match("^Bass") then
+    return names[1] .. " + voices " .. table.concat(names, ", ", 2)
   end
-  return "Voix " .. table.concat(names, ", ")
+  return "Voice " .. table.concat(names, ", ")
 end
 
 local function sourceTrack()
@@ -2559,23 +2756,23 @@ local function sourceTrack()
   return reaper.GetSelectedTrack(0, 0)
 end
 
--- Crée une piste par voix, alimentée par un envoi MIDI filtré sur le canal de la voix
+-- Creates one track per voice, fed by a MIDI send filtered on the voice channel
 function createRoutedVoiceTracks(count)
   local src = sourceTrack()
   if not src then
-    reaper.MB("Sélectionne une piste (ou ouvre un item MIDI) d'abord.", "ChordMachineGun", 0)
+    reaper.MB("Select a track (or open a MIDI item) first.", "ChordMachineGun", 0)
     return false
   end
   count = math.max(1, math.min(16, count))
   local srcIdx = math.floor(reaper.GetMediaTrackInfo_Value(src, "IP_TRACKNUMBER")) -- 1-based
-  -- une piste par canal utilisé par les voix (en mode « basse seule » : 2 pistes)
+  -- one track per channel used by the voices ("bass only" mode: 2 tracks)
   local chans, seen = {}, {}
   for v = 1, count do
     local c = voiceChannel(v)
     if c and not seen[c] then seen[c] = true; chans[#chans + 1] = c end
   end
   if #chans == 0 then
-    reaper.MB("Toutes les voix sont sur le canal par défaut : choisis un split d'abord.", "ChordMachineGun", 0)
+    reaper.MB("All voices are on the default channel: choose a split first.", "ChordMachineGun", 0)
     return false
   end
   reaper.Undo_BeginBlock()
@@ -2583,18 +2780,18 @@ function createRoutedVoiceTracks(count)
   for k, ch in ipairs(chans) do
     reaper.InsertTrackAtIndex(srcIdx + k - 1, true)
     local tr = reaper.GetTrack(0, srcIdx + k - 1)
-    reaper.GetSetMediaTrackInfo_String(tr, "P_NAME", channelTrackName(ch, count) .. "  ·  canal " .. (ch + 1), true)
+    reaper.GetSetMediaTrackInfo_String(tr, "P_NAME", channelTrackName(ch, count) .. "  ·  channel " .. (ch + 1), true)
     local send = reaper.CreateTrackSend(src, tr)
-    reaper.SetTrackSendInfo_Value(src, 0, send, "I_SRCCHAN", -1)            -- pas d'audio
-    reaper.SetTrackSendInfo_Value(src, 0, send, "I_MIDIFLAGS", (ch + 1))     -- canal source n, destination = original
+    reaper.SetTrackSendInfo_Value(src, 0, send, "I_SRCCHAN", -1)            -- no audio
+    reaper.SetTrackSendInfo_Value(src, 0, send, "I_MIDIFLAGS", (ch + 1))     -- source channel n, destination = original
   end
   reaper.PreventUIRefresh(-1)
   reaper.TrackList_AdjustWindows(false)
-  reaper.Undo_EndBlock("ChordMachineGun : créer des pistes par voix", -1)
+  reaper.Undo_EndBlock("ChordMachineGun: create voice tracks", -1)
   return true
 end
 
--- Éclate l'item MIDI actif (ou sélectionné) : une piste et un item par canal utilisé
+-- Explodes the active (or selected) MIDI item: one track and one item per channel used
 function explodeTakeToVoiceTracks()
   local take = activeTake()
   if take == nil then
@@ -2602,7 +2799,7 @@ function explodeTakeToVoiceTracks()
     if item then take = reaper.GetActiveTake(item) end
   end
   if take == nil or not reaper.TakeIsMIDI(take) then
-    reaper.MB("Ouvre ou sélectionne un item MIDI d'abord.", "ChordMachineGun", 0)
+    reaper.MB("Open or select a MIDI item first.", "ChordMachineGun", 0)
     return false
   end
   local item = reaper.GetMediaItemTake_Item(take)
@@ -2633,7 +2830,7 @@ function explodeTakeToVoiceTracks()
     reaper.InsertTrackAtIndex(srcIdx + k - 1, true)
     local tr = reaper.GetTrack(0, srcIdx + k - 1)
     local name = channelTrackName(ch, totalVoices)
-    reaper.GetSetMediaTrackInfo_String(tr, "P_NAME", name .. "  ·  canal " .. (ch + 1), true)
+    reaper.GetSetMediaTrackInfo_String(tr, "P_NAME", name .. "  ·  channel " .. (ch + 1), true)
     local newItem = reaper.CreateNewMIDIItemInProj(tr, pos, pos + len, false)
     local newTake = reaper.GetActiveTake(newItem)
     for _, e in ipairs(byChan[ch]) do
@@ -2646,6 +2843,6 @@ function explodeTakeToVoiceTracks()
   end
   reaper.PreventUIRefresh(-1)
   reaper.UpdateArrange()
-  reaper.Undo_EndBlock("ChordMachineGun : éclater l'item en pistes par voix", -1)
+  reaper.Undo_EndBlock("ChordMachineGun: explode item to voice tracks", -1)
   return true
 end

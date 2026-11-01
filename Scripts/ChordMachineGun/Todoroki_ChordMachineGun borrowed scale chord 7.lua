@@ -1,5 +1,5 @@
 -- @noindex
--- ChordMachineGun — borrowed scale chord 7 (degré 7 de la gamme de l'accord sélectionné)
+-- ChordMachineGun — borrowed scale chord 7 (degree 7 of the selected chord's scale)
 local path = ({ reaper.get_action_context() })[2]:match("^(.*[/\\])")
 dofile(path .. "Todoroki_ChordMachineGun_core.lua")
 

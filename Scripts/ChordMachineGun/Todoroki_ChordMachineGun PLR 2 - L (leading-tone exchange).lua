@@ -1,5 +1,5 @@
 -- @noindex
--- ChordMachineGun — transformation néo-riemannienne L (leading-tone exchange) depuis l'ancrage courant
+-- ChordMachineGun — neo-Riemannian transformation L (leading-tone exchange) from the current anchor
 local path = ({ reaper.get_action_context() })[2]:match("^(.*[/\\])")
 dofile(path .. "Todoroki_ChordMachineGun_core.lua")
 
