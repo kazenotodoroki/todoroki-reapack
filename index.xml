@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Todoroki" commit="1e941535f91b338a7a61add2f139527e09c67ed1">
+<index version="1" name="Todoroki" commit="7d3d31cfe6d756949f8180254460214defea4767">
   <category name="FX">
     <reapack name="RefLab.jsfx" type="effect" desc="RefLab - Multi-track referencing (spectrum, LUFS, loudness match, loops, band solo)">
       <metadata>
@@ -405,6 +405,31 @@
         <source file="Todoroki_ChordMachineGun_core.lua">https://github.com/kazenotodoroki/todoroki-reapack/raw/1e941535f91b338a7a61add2f139527e09c67ed1/Scripts/ChordMachineGun/Todoroki_ChordMachineGun_core.lua</source>
         <source file="Todoroki_ChordMachineGun README.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/1e941535f91b338a7a61add2f139527e09c67ed1/Scripts/ChordMachineGun/Todoroki_ChordMachineGun%20README.md</source>
         <source file="LICENSE.md">https://github.com/kazenotodoroki/todoroki-reapack/raw/1e941535f91b338a7a61add2f139527e09c67ed1/Scripts/ChordMachineGun/LICENSE.md</source>
+      </version>
+    </reapack>
+  </category>
+  <category name="Scripts/Param Sweep">
+    <reapack name="Todoroki_Param Sweep.lua" type="script" desc="Todoroki Param Sweep - automate FX parameter steps into regions to render and analyse">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 Param Sweep\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Automates the variation of one or more FX parameters and creates one region per step, ready to be rendered with the {\f1 $region} pattern.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 1.\tx360\tab Set a {\b time selection} (the passage replayed for each step: test signal, loop, MIDI item\u8230 ?).\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 2.\tx360\tab Run the script, then {\b move the parameters} to analyse in the plugin windows (or click {\i Scan} to detect every parameter changed since launch).\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 3.\tx360\tab {\b Continue}: for each parameter enter {\f1 steps min% max%} (e.g. {\f1 10 0 100}), whether the parameters {\b interact}, and the {\b tail} (silence after each step).\sa180\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab No interaction: 10 + 10 steps = 20 regions (the other parameters stay at their initial value).\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Interaction: 10 \u215 ? 10 = 100 regions (every combination).\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 The script inserts space after the time selection, duplicates its content for each step, writes the automation (square points, slightly before each step), creates the regions, writes a CSV (region \u8594 ? values) next to the project and can prepare the render ({\f1 $region}). Everything is in a single undo.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Hardware: automate a ReaControlMIDI (CC) or ReaInsert parameter the same way. Track FX and master FX only (not take FX, input FX or containers).\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-11-04T16:28:57Z">
+        <changelog><![CDATA[First version.]]></changelog>
+        <source main="main">https://github.com/kazenotodoroki/todoroki-reapack/raw/7d3d31cfe6d756949f8180254460214defea4767/Scripts/Param%20Sweep/Todoroki_Param%20Sweep.lua</source>
       </version>
     </reapack>
   </category>
