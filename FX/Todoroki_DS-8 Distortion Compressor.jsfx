@@ -1,0 +1,434 @@
+// @description DS-8 Distortion Compressor - Distressor-style character compressor (ear training)
+// @author Todoroki
+// @version 1.0
+// @changelog
+//   - First release: compressor modelled on the Distressor behaviour, flat dark vector interface
+// @about
+//   # DS-8 Distortion Compressor
+//
+//   Character compressor modelled on the behaviour of the Empirical Labs Distressor (EL8 / EL8-X),
+//   built as an ear-training tool to learn to hear compression.
+//
+//   - Attack 50 us .. 30 ms, Release 50 ms .. 3.5 s (up to ~20 s, program dependent, in 10:1 Opto)
+//   - Ratios 1:1, 2:1 (+15 dB soft knee), 3:1, 4:1, 6:1, 10:1 Opto, 20:1, Nuke
+//   - Detector: HP (100 Hz, 6 dB/oct), Band emphasis (+12 dB @ 6 kHz), Stereo link, external sidechain (3/4)
+//   - Audio: Dist 2 (tube, 2nd harm.), Dist 3 (tape, 3rd harm.), HP (80 Hz, 18 dB/oct), British mode
+//   - Fixed internal threshold: drive with INPUT, compensate with OUTPUT (like the hardware)
+//   - LED gain-reduction meter and exact value readouts under every knob
+//
+//   Mouse: drag knobs (Shift = fine), wheel, double-click = reset. Click ratio / mode buttons.
+desc:DS-8 Distortion Compressor (Distressor style)
+//tags: compressor dynamics distortion saturation
+
+slider1:3<0,10,0.01>Input
+slider2:5<0,10,0.01>Attack
+slider3:5<0,10,0.01>Release
+slider4:5<0,10,0.01>Output
+slider5:4<0,7,1{1:1,2:1,3:1,4:1,6:1,10:1 Opto,20:1,Nuke}>Ratio
+slider6:0<0,1,1{Off,On}>Detector HP
+slider7:0<0,1,1{Off,On}>Detector Band
+slider8:1<0,1,1{Off,On}>Stereo Link
+slider9:0<0,1,1{Off,On}>External Sidechain (3/4)
+slider10:0<0,1,1{Off,On}>Dist 2
+slider11:0<0,1,1{Off,On}>Dist 3
+slider12:0<0,1,1{Off,On}>Audio HP
+slider13:0<0,1,1{Off,On}>British Mode
+slider14:100<0,100,0.1>Mix (%)
+slider15:0<0,1,1{In,Bypass}>Bypass
+
+in_pin:Left
+in_pin:Right
+in_pin:Sidechain Left
+in_pin:Sidechain Right
+out_pin:Left
+out_pin:Right
+
+@init
+ext_nodenorm = 0;
+LN10_20 = log(10)/20;
+
+// ---------- tables ----------
+Rtab = 0;  Ktab = 16;  grLeds = 32;
+Rtab[0]=1; Rtab[1]=2;  Rtab[2]=3;  Rtab[3]=4; Rtab[4]=6; Rtab[5]=10; Rtab[6]=20; Rtab[7]=1000;
+// knee widths (dB above threshold where full ratio is reached)
+Ktab[0]=0; Ktab[1]=15; Ktab[2]=10; Ktab[3]=7; Ktab[4]=5; Ktab[5]=9;  Ktab[6]=3;  Ktab[7]=0;
+grLeds[0]=1; grLeds[1]=2; grLeds[2]=3; grLeds[3]=4; grLeds[4]=6;
+grLeds[5]=8; grLeds[6]=10; grLeds[7]=15; grLeds[8]=20; grLeds[9]=30;
+
+// ---------- DSP helpers ----------
+function th(x) local(e) ( x = max(min(x, 15), -15); e = exp(2*x); (e-1)/(e+1); );
+
+function hp1_init(f) instance(a) ( a = exp(-2*$pi*f/srate); );
+function hp1(x) instance(a, xp, yp) ( yp = a*(yp + x - xp); xp = x; yp; );
+
+function bq_hp(f, q) instance(b0,b1,b2,a1,a2) local(w,cs,al,n) (
+  w = 2*$pi*f/srate; cs = cos(w); al = sin(w)/(2*q); n = 1/(1+al);
+  b0 = (1+cs)*0.5*n; b1 = -(1+cs)*n; b2 = b0; a1 = -2*cs*n; a2 = (1-al)*n;
+);
+function bq_bp(f, q) instance(b0,b1,b2,a1,a2) local(w,cs,al,n) (
+  w = 2*$pi*f/srate; cs = cos(w); al = sin(w)/(2*q); n = 1/(1+al);
+  b0 = al*n; b1 = 0; b2 = -al*n; a1 = -2*cs*n; a2 = (1-al)*n;
+);
+function bq(x) instance(b0,b1,b2,a1,a2,z1,z2) local(y) (
+  y = b0*x + z1; z1 = b1*x - a1*y + z2; z2 = b2*x - a2*y; y;
+);
+
+// static curve: returns gain reduction in dB for detector level e (linear)
+function gr_curve(e) local(x, g) (
+  x = 20*log10(max(e, 0.0000001)) - thr;
+  g = 0;
+  x > 0 ? (
+    (kneeW > 0 && x < kneeW) ? (g = slopeC*x*x/(2*kneeW)) : (g = slopeC*(x - kneeW*0.5));
+    // British mode: "all buttons" style over-compression past the knee
+    (britOn && x > 8) ? (g += 0.35*(x - 8));
+  );
+  g;
+);
+
+// 10:1 opto: two-stage, program-dependent release (up to ~20 s)
+function opto(t) instance(f, s, m) (
+  t > f ? (f = t) : (f += (t - f)*optoFastCo);
+  t > s ? (s += (t - s)*optoAttCo) : (s += (t - s)*optoSlowCo/(1 + 3*m));
+  m += (min(t*0.1, 1) - m)*memCo;
+  max(0.65*f + 0.35*s, s);
+);
+
+// harmonic stage (after the VCA), more distortion in the low end like the hardware
+function dist(y) instance(lp, hf, dx, dy) local(s, lo, hi, z, k) (
+  s = y*nomScale;
+  lp += (s - lp)*xoCo;
+  lo = lp; hi = s - lp;
+  (d2On || britOn) ? (
+    k = d2On ? 1 : 0.4;
+    lo += k*a2lo*lo*lo/(1 + 0.08*lo*lo);
+    hi += k*a2hi*hi*hi/(1 + 0.08*hi*hi);
+  );
+  d3On ? (
+    lo = th(c3lo*lo)/c3lo;
+    hi = th(c3hi*hi)/c3hi;
+  );
+  z = lo + hi;
+  d3On ? ( hf += (z - hf)*hfCo; z = hf; );
+  dy = z - dx + dcR*dy; dx = z;
+  dy/nomScale;
+);
+
+function update_params() (
+  inGain  = exp((slider1*4 - 8)*LN10_20);    // -8 .. +32 dB (unity at 2)
+  outGain = exp((slider4*4 - 20)*LN10_20);   // -20 .. +20 dB (unity at 5)
+  ratioIdx = max(0, min(7, floor(slider5 + 0.5)));
+  kneeW  = Ktab[ratioIdx];
+  slopeC = ratioIdx == 0 ? 0 : 1 - 1/Rtab[ratioIdx];
+  britOn = slider13 > 0.5;
+  thr = -14 - (britOn ? 2 : 0);
+  at = 0.00005*pow(600, slider2/10);         // 50 us .. 30 ms
+  britOn ? (at *= 0.6);
+  rt = 0.05*pow(70, slider3/10);             // 50 ms .. 3.5 s
+  ca = 1 - exp(-1/(at*srate));
+  cr = 1 - exp(-1/(rt*srate));
+  optoOn = ratioIdx == 5;
+  optoRel = 0.08*pow(60, slider3/10);
+  crUse = optoOn ? 1 - exp(-1/(0.005*srate)) : cr;
+  optoFastCo = 1 - exp(-1/(0.06*srate));
+  optoSlowCo = 1 - exp(-1/(optoRel*srate));
+  optoAttCo  = 1 - exp(-1/(0.3*srate));
+  memCo      = 1 - exp(-1/(2.5*srate));
+  dhpOn  = slider6 > 0.5;  bandOn = slider7 > 0.5;
+  linkOn = slider8 > 0.5;  extOn  = slider9 > 0.5;
+  d2On   = slider10 > 0.5; d3On   = slider11 > 0.5;
+  ahpOn  = slider12 > 0.5;
+  distOn = d2On || d3On || britOn;
+  mix = slider14/100;
+  bypassOn = slider15 > 0.5;
+);
+
+// ---------- filter setup ----------
+dhpL.hp1_init(100); dhpR.hp1_init(100);
+dbpL.bq_bp(min(6000, srate*0.45), 0.9); dbpR.bq_bp(min(6000, srate*0.45), 0.9);
+ahL1.hp1_init(80); ahR1.hp1_init(80);
+ahL2.bq_hp(80, 1); ahR2.bq_hp(80, 1);
+nomScale = exp(14*LN10_20);
+xoCo = 1 - exp(-2*$pi*250/srate);
+hfCo = 1 - exp(-2*$pi*min(16000, srate*0.45)/srate);
+dcR  = exp(-2*$pi*8/srate);
+a2lo = 0.10; a2hi = 0.035; c3lo = 0.75; c3hi = 0.45;
+
+// ---------- GUI (flat dark, vector) ----------
+CYr = 0.25; CYg = 0.82; CYb = 0.92;
+grLedsG = 96;
+grLedsG[0]=1; grLedsG[1]=2; grLedsG[2]=3; grLedsG[3]=4; grLedsG[4]=6;
+grLedsG[5]=8; grLedsG[6]=10; grLedsG[7]=15; grLedsG[8]=20; grLedsG[9]=30;
+KX = 112; KX[0]=612; KX[1]=700; KX[2]=788; KX[3]=876;
+KCY = 122; KR = 26;
+MXX = 957; MXY = 136; MXR = 16;
+
+function fx(v) ( ox + v*sc );
+function fy(v) ( oy + v*sc );
+function C(x, y, r) ( gfx_circle(fx(x), fy(y), r*sc, 1, 1); );
+function CO(x, y, r) ( gfx_circle(fx(x), fy(y), r*sc, 0, 1); );
+function R(x, y, w, h) ( gfx_rect(fx(x), fy(y), w*sc, h*sc); );
+function RRf(x, y, w, h, r) (
+  R(x + r, y, w - 2*r, h); R(x, y + r, r, h - 2*r); R(x + w - r, y + r, r, h - 2*r);
+  C(x + r, y + r, r); C(x + w - r, y + r, r); C(x + r, y + h - r, r); C(x + w - r, y + h - r, r);
+);
+function RRo(x, y, w, h, r) ( gfx_roundrect(fx(x), fy(y), w*sc, h*sc, r*sc, 1); );
+function LT(x1, y1, x2, y2, t) local(dx, dy, l, nx, ny) (
+  dx = x2 - x1; dy = y2 - y1; l = sqrt(dx*dx + dy*dy);
+  l > 0 ? (
+    t = max(t, 1/sc);
+    nx = -dy/l*t*0.5; ny = dx/l*t*0.5;
+    gfx_triangle(fx(x1+nx), fy(y1+ny), fx(x1-nx), fy(y1-ny), fx(x2-nx), fy(y2-ny), fx(x2+nx), fy(y2+ny));
+  );
+);
+function txtL(x, y, s) local(w, h) ( gfx_measurestr(s, w, h); gfx_x = fx(x);         gfx_y = fy(y) - h*0.5; gfx_drawstr(s); );
+function txtC(x, y, s) local(w, h) ( gfx_measurestr(s, w, h); gfx_x = fx(x) - w*0.5; gfx_y = fy(y) - h*0.5; gfx_drawstr(s); );
+function txtR(x, y, s) local(w, h) ( gfx_measurestr(s, w, h); gfx_x = fx(x) - w;     gfx_y = fy(y) - h*0.5; gfx_drawstr(s); );
+function setcy(a) ( gfx_set(CYr, CYg, CYb, a); );
+function pmix(r, g, b, a) ( gfx_set(0.067*(1-a) + r*a, 0.078*(1-a) + g*a, 0.10*(1-a) + b*a, 1); );
+function dim()  ( gfx_set(0.40, 0.45, 0.52, 1); );
+function lite() ( gfx_set(0.80, 0.85, 0.90, 1); );
+function border() ( gfx_set(0.16, 0.19, 0.24, 1); );
+
+function set_fonts() (
+  gfx_setfont(1, "Arial", max(8, 10*sc), 'b');
+  gfx_setfont(2, "Arial", max(11, 17*sc), 'b');
+  gfx_setfont(3, "Arial", max(7, 9*sc));
+  gfx_setfont(4, "Arial", max(8, 11*sc), 'b');
+);
+
+// flat HUD knob: lit tick ring, outlined body, needle
+function hknob(cx, cy, r, v, nt) local(i, t, a, sa, cs, l) (
+  i = 0;
+  loop(nt,
+    t = i/(nt - 1); a = (-135 + 270*t)*$pi/180; sa = sin(a); cs = -cos(a);
+    l = (i % 5 == 0) ? 8 : 4.5;
+    t <= v + 0.0001 ? setcy(1) : gfx_set(0.20, 0.24, 0.29, 1);
+    LT(cx + sa*(r + 5), cy + cs*(r + 5), cx + sa*(r + 5 + l), cy + cs*(r + 5 + l), 1.4);
+    i += 1;
+  );
+  gfx_set(0.085, 0.10, 0.13, 1); C(cx, cy, r);
+  gfx_set(0.22, 0.27, 0.33, 1);  CO(cx, cy, r); CO(cx, cy, r - 0.5);
+  gfx_set(0.14, 0.17, 0.21, 1);  CO(cx, cy, r*0.6);
+  a = (-135 + 270*v)*$pi/180; sa = sin(a); cs = -cos(a);
+  setcy(1);
+  LT(cx + sa*r*0.28, cy + cs*r*0.28, cx + sa*r*0.84, cy + cs*r*0.84, max(2, r*0.09));
+  C(cx + sa*r*0.84, cy + cs*r*0.84, max(1, r*0.045));
+  C(cx + sa*r*0.28, cy + cs*r*0.28, max(1, r*0.045));
+);
+
+function led_dot(x, y, on, lr, lg, lb) (
+  on ? ( gfx_set(lr, lg, lb, 0.22); C(x, y, 6.5); gfx_set(lr, lg, lb, 1); C(x, y, 3.5); )
+     : ( gfx_set(lr*0.22, lg*0.22, lb*0.22, 1); C(x, y, 3.5); );
+);
+
+function mbutton(x, y, w, h, s, on) (
+  gfx_set(0.09, 0.105, 0.135, 1); RRf(x, y, w, h, 4);
+  on ? setcy(0.9) : border(); RRo(x, y, w, h, 4);
+  led_dot(x + 12, y + h*0.5, on, CYr, CYg, CYb);
+  gfx_setfont(1); on ? lite() : dim(); txtL(x + 22, y + h*0.5, s);
+);
+
+function rlabel(i) (
+  i == 0 ? "1:1" : i == 1 ? "2:1" : i == 2 ? "3:1" : i == 3 ? "4:1" :
+  i == 4 ? "6:1" : i == 5 ? "10:1" : i == 6 ? "20:1" : "NUKE";
+);
+function tlabel(i) (
+  i == 0 ? "HP" : i == 1 ? "BAND" : i == 2 ? "LINK" : i == 3 ? "EXT SC" :
+  i == 4 ? "DIST 2" : i == 5 ? "DIST 3" : i == 6 ? "HP" : "BRIT";
+);
+function tget(i) (
+  i == 0 ? slider6 : i == 1 ? slider7 : i == 2 ? slider8 : i == 3 ? slider9 :
+  i == 4 ? slider10 : i == 5 ? slider11 : i == 6 ? slider12 : slider13;
+);
+function tflip(i) (
+  i == 0 ? ( slider6  = !slider6;  slider_automate(slider6);  ) :
+  i == 1 ? ( slider7  = !slider7;  slider_automate(slider7);  ) :
+  i == 2 ? ( slider8  = !slider8;  slider_automate(slider8);  ) :
+  i == 3 ? ( slider9  = !slider9;  slider_automate(slider9);  ) :
+  i == 4 ? ( slider10 = !slider10; slider_automate(slider10); ) :
+  i == 5 ? ( slider11 = !slider11; slider_automate(slider11); ) :
+  i == 6 ? ( slider12 = !slider12; slider_automate(slider12); ) :
+           ( slider13 = !slider13; slider_automate(slider13); );
+  update_params();
+);
+// button positions: index 0-3 detector, 4-7 audio
+function bx(i) ( 398 + (i % 2)*80 );
+function by(i) ( i < 4 ? 66 + floor(i/2)*30 : 146 + floor((i - 4)/2)*30 );
+
+function khit(cx, cy, r) ( sqr(mx - cx) + sqr(my - cy) < sqr(r + 8) );
+function kget(id) ( id == 1 ? slider1 : id == 2 ? slider2 : id == 3 ? slider3 : id == 4 ? slider4 : slider14 );
+function kmax(id) ( id == 5 ? 100 : 10 );
+function kdef(id) ( id == 1 ? 3 : id == 5 ? 100 : 5 );
+function kset(id, v) (
+  v = max(0, min(kmax(id), v));
+  id == 1 ? ( slider1 = v; slider_automate(slider1); ) :
+  id == 2 ? ( slider2 = v; slider_automate(slider2); ) :
+  id == 3 ? ( slider3 = v; slider_automate(slider3); ) :
+  id == 4 ? ( slider4 = v; slider_automate(slider4); ) :
+            ( slider14 = v; slider_automate(slider14); );
+  update_params();
+);
+function set_ratio(i) ( slider5 = max(0, min(7, i)); slider_automate(slider5); update_params(); );
+
+// value readouts
+function readout(id) local(t) (
+  id == 1 ? sprintf(#ro, "%+.1f dB", slider1*4 - 8) :
+  id == 2 ? (
+    t = 0.00005*pow(600, slider2/10);
+    t < 0.001 ? sprintf(#ro, "%.0f us", t*1000000) : sprintf(#ro, "%.1f ms", t*1000);
+  ) :
+  id == 3 ? (
+    optoOn ? sprintf(#ro, "%.2f s opto", optoRel)
+           : (rt < 1 ? sprintf(#ro, "%.0f ms", rt*1000) : sprintf(#ro, "%.2f s", rt));
+  ) :
+  id == 4 ? sprintf(#ro, "%+.1f dB", slider4*4 - 20) :
+            sprintf(#ro, "%.0f %%", slider14);
+);
+
+update_params();
+
+@slider
+update_params();
+
+@sample
+!bypassOn ? (
+  inL = spl0; inR = spl1;
+  xL = inL*inGain; xR = inR*inGain;
+
+  // ---- detector ----
+  extOn ? ( sL = spl2*inGain; sR = spl3*inGain; ) : ( sL = xL; sR = xR; );
+  dhpOn  ? ( sL = dhpL.hp1(sL); sR = dhpR.hp1(sR); );
+  bandOn ? ( sL += 3*dbpL.bq(sL); sR += 3*dbpR.bq(sR); );
+  rL = abs(sL); rR = abs(sR);
+  envL += (rL - envL)*(rL > envL ? ca : crUse);
+  envR += (rR - envR)*(rR > envR ? ca : crUse);
+  linkOn ? ( eL = max(envL, envR); eR = eL; ) : ( eL = envL; eR = envR; );
+  grL = gr_curve(eL);
+  grR = linkOn ? grL : gr_curve(eR);
+  optoOn ? ( grL = opL.opto(grL); grR = opR.opto(grR); );
+
+  // ---- VCA ----
+  yL = xL*exp(-grL*LN10_20);
+  yR = xR*exp(-grR*LN10_20);
+
+  // ---- audio modes ----
+  distOn ? ( yL = dsL.dist(yL); yR = dsR.dist(yR); );
+  ahpOn  ? ( yL = ahL2.bq(ahL1.hp1(yL)); yR = ahR2.bq(ahR1.hp1(yR)); );
+
+  yL *= outGain; yR *= outGain;
+  spl0 = inL + (yL - inL)*mix;
+  spl1 = inR + (yR - inR)*mix;
+  grMax = max(grMax, max(grL, grR));
+);
+(abs(spl0) >= 1 || abs(spl1) >= 1) ? clipT = 1;
+
+@gfx 1000 240
+sc = min(gfx_w/1000, gfx_h/240);
+ox = (gfx_w - 1000*sc)*0.5; oy = (gfx_h - 240*sc)*0.5;
+mx = (mouse_x - ox)/sc; my = (mouse_y - oy)/sc;
+set_fonts();
+
+// ---------- panel ----------
+gfx_set(0.043, 0.051, 0.067, 1); gfx_rect(0, 0, gfx_w, gfx_h);
+gfx_set(0.067, 0.078, 0.10, 1);  RRf(8, 8, 984, 224, 10);
+border(); RRo(8, 8, 984, 224, 10);
+gfx_setfont(2); setcy(1); txtL(24, 23, "DS-8");
+gfx_setfont(1); dim(); txtL(78, 24, "DISTORTION  COMPRESSOR");
+border(); R(16, 38, 968, 1);
+R(382, 48, 1, 172); R(566, 48, 1, 172); R(918, 48, 1, 172);
+
+// ---------- GR meter ----------
+mTarget = grMax; grMax = 0;
+meterVal += (mTarget - meterVal)*(mTarget > meterVal ? 0.5 : 0.12);
+gfx_setfont(1); dim(); txtL(28, 56, "GAIN REDUCTION");
+sprintf(#gr, "%.1f dB", meterVal); setcy(1); gfx_setfont(4); txtR(363, 56, #gr);
+i = 0;
+loop(10,
+  x = 28 + i*34;
+  i < 5 ? ( lr = 0.30; lg = 0.88; lb = 0.45; ) : i < 8 ? ( lr = 1; lg = 0.78; lb = 0.22; ) : ( lr = 1; lg = 0.30; lb = 0.25; );
+  meterVal >= grLedsG[i] ? (
+    pmix(lr, lg, lb, 0.18); RRf(x - 3, 65, 35, 24, 5);
+    gfx_set(lr, lg, lb, 1);    RRf(x, 68, 29, 18, 3);
+  ) : (
+    gfx_set(lr*0.16, lg*0.16, lb*0.16, 1); RRf(x, 68, 29, 18, 3);
+  );
+  gfx_setfont(3); dim(); sprintf(#kn, "%d", grLedsG[i]); txtC(x + 14.5, 97, #kn);
+  i += 1;
+);
+
+// ---------- ratio ----------
+gfx_setfont(1); dim(); txtL(28, 122, "RATIO");
+i = 0;
+loop(8,
+  x = 28 + i*42;
+  ratioIdx == i ? ( setcy(1); RRf(x, 132, 37, 26, 4); gfx_set(0.04, 0.06, 0.08, 1); )
+                : ( gfx_set(0.09, 0.105, 0.135, 1); RRf(x, 132, 37, 26, 4); border(); RRo(x, 132, 37, 26, 4); dim(); );
+  gfx_setfont(1); txtC(x + 18.5, 145, rlabel(i));
+  i += 1;
+);
+
+// ---------- status ----------
+clipT *= 0.95;
+led_dot(34, 192, optoOn, CYr, CYg, CYb);   gfx_setfont(3); dim(); txtL(43, 192, "OPTO");
+led_dot(100, 192, britOn, 1, 0.78, 0.22);  dim(); txtL(109, 192, "BRIT");
+led_dot(166, 192, clipT > 0.05, 1, 0.3, 0.25); dim(); txtL(175, 192, "CLIP");
+
+// ---------- modes ----------
+gfx_setfont(1); dim(); txtL(398, 56, "DETECTOR"); txtL(398, 136, "AUDIO");
+i = 0;
+loop(8, mbutton(bx(i), by(i), 74, 24, tlabel(i), tget(i) > 0.5); i += 1; );
+
+// ---------- knobs ----------
+gfx_setfont(1); lite();
+txtC(KX[0], 62, "INPUT"); txtC(KX[1], 62, "ATTACK"); txtC(KX[2], 62, "RELEASE"); txtC(KX[3], 62, "OUTPUT");
+hknob(KX[0], KCY, KR, slider1/10, 31);
+hknob(KX[1], KCY, KR, slider2/10, 31);
+hknob(KX[2], KCY, KR, slider3/10, 31);
+hknob(KX[3], KCY, KR, slider4/10, 31);
+gfx_setfont(4); setcy(1);
+k = 1; loop(4, readout(k); txtC(KX[k - 1], 174, #ro); k += 1; );
+
+// ---------- IN + mix ----------
+!bypassOn ? ( pmix(CYr, CYg, CYb, 0.18); RRf(930, 52, 54, 26, 4); setcy(1); RRo(930, 52, 54, 26, 4); gfx_setfont(4); setcy(1); )
+          : ( gfx_set(0.09, 0.105, 0.135, 1); RRf(930, 52, 54, 26, 4); border(); RRo(930, 52, 54, 26, 4); gfx_setfont(4); dim(); );
+txtC(957, 65, "IN");
+gfx_setfont(1); lite(); txtC(MXX, 98, "MIX");
+hknob(MXX, MXY, MXR, slider14/100, 21);
+readout(5); gfx_setfont(4); setcy(1); txtC(MXX, 174, #ro);
+
+// ---------- mouse ----------
+lmb = mouse_cap & 1;
+click = lmb && !last_lmb;
+fine = (mouse_cap & 8) ? 0.12 : 1;
+
+hover = khit(KX[0], KCY, KR) ? 1 : khit(KX[1], KCY, KR) ? 2 : khit(KX[2], KCY, KR) ? 3 :
+        khit(KX[3], KCY, KR) ? 4 : khit(MXX, MXY, MXR) ? 5 : 0;
+
+click ? (
+  hover ? (
+    now = time_precise();
+    (now - lastClickT < 0.3 && lastClickId == hover) ? ( kset(hover, kdef(hover)); drag_id = 0; ) : ( drag_id = hover; );
+    lastClickT = now; lastClickId = hover;
+    last_my = mouse_y;
+  ) : (
+    i = 0;
+    loop(8,
+      x = 28 + i*42;
+      (mx >= x && mx <= x + 37 && my >= 132 && my <= 158) ? set_ratio(i);
+      (mx >= bx(i) && mx <= bx(i) + 74 && my >= by(i) && my <= by(i) + 24) ? tflip(i);
+      i += 1;
+    );
+    (mx >= 930 && mx <= 984 && my >= 52 && my <= 78) ? ( slider15 = !slider15; slider_automate(slider15); update_params(); );
+  );
+);
+
+(lmb && drag_id) ? (
+  dy = last_my - mouse_y;
+  dy != 0 ? ( kset(drag_id, kget(drag_id) + dy*kmax(drag_id)/(200*sc)*fine); last_my = mouse_y; );
+) : (
+  !lmb ? (drag_id = 0);
+);
+
+(mouse_wheel != 0 && hover) ? kset(hover, kget(hover) + mouse_wheel/120*kmax(hover)*0.02*fine);
+mouse_wheel = 0;
+last_lmb = lmb;
