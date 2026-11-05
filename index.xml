@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Todoroki" commit="5e736d83612407000b8cbeb35febf6ef302be663">
+<index version="1" name="Todoroki" commit="6810bfa136c0a23e3109f9ac75f8aac946d4a344">
   <category name="FX">
     <reapack name="RefLab.jsfx" type="effect" desc="RefLab - Multi-track referencing (spectrum, LUFS, loudness match, loops, band solo)">
       <metadata>
@@ -97,7 +97,8 @@
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Detector: HP (100 Hz, 6 dB/oct), Band emphasis (+12 dB @ 6 kHz), Stereo link, external sidechain (3/4)\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Audio: Dist 2 (tube, 2nd harm.), Dist 3 (tape, 3rd harm.), HP (80 Hz, 18 dB/oct), British mode\par}
 {\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Fixed internal threshold: drive with INPUT, compensate with OUTPUT (like the hardware)\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab LED gain-reduction meter and exact value readouts under every knob\sa180\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab LED gain-reduction meter and exact value readouts under every knob\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab MATCH: automatic loudness compensation for level-matched bypass comparison\sa180\par}
 {\pard \ql \f0 \sa180 \li0 \fi0 Mouse: drag knobs (Shift = fine), wheel, double-click = reset. Click ratio / mode buttons.\par}
 }
 ]]></description>
@@ -111,6 +112,13 @@
 - Interface drawn at 2x resolution (+ HiDPI support): clean knob lines at every angle
 - Parameter sliders hidden from the top of the FX window (still automatable)]]></changelog>
         <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/5e736d83612407000b8cbeb35febf6ef302be663/FX/Todoroki_DS-8%20Distortion%20Compressor.jsfx</source>
+      </version>
+      <version name="1.2" author="Todoroki" time="2026-11-05T11:15:45Z">
+        <changelog><![CDATA[- MATCH: automatic gain compensation (K-weighted loudness match) so the output level equals the bypassed level, for fair A/B comparison
+- Square flat interface (square LEDs, buttons and panel)
+- Interface drawn at 2x resolution (+ HiDPI support): clean knob lines at every angle
+- Parameter sliders hidden from the top of the FX window (still automatable)]]></changelog>
+        <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/6810bfa136c0a23e3109f9ac75f8aac946d4a344/FX/Todoroki_DS-8%20Distortion%20Compressor.jsfx</source>
       </version>
     </reapack>
   </category>
