@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Todoroki" commit="2358ae0a68b9c1ceb97ff3cf3a8133993eca88c0">
+<index version="1" name="Todoroki" commit="e25df2d3892c424a46686e1c485a3e633f2e1d90">
   <category name="FX">
     <reapack name="RefLab.jsfx" type="effect" desc="RefLab - Multi-track referencing (spectrum, LUFS, loudness match, loops, band solo)">
       <metadata>
@@ -82,6 +82,29 @@
 - English UI
 - Time-based drum envelope (attack / hold / decay / curve), anti-click fades, voice limit]]></changelog>
         <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/287125830a49dd130fcaf735d80b3637f1f88959/FX/RS%20Trig%20Sampler.jsfx</source>
+      </version>
+    </reapack>
+    <reapack name="Todoroki_DS-8 Distortion Compressor.jsfx" type="effect" desc="DS-8 Distortion Compressor (Distressor style)">
+      <metadata>
+        <description><![CDATA[{\rtf1\ansi\deff0{\fonttbl{\f0 \fswiss Helvetica;}{\f1 \fmodern Courier;}}
+{\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
+\widowctrl\hyphauto
+
+{\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 DS-8 Distortion Compressor\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Character compressor modelled on the behaviour of the Empirical Labs Distressor (EL8 / EL8-X), built as an ear-training tool to learn to hear compression.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Attack 50 us .. 30 ms, Release 50 ms .. 3.5 s (up to ~20 s, program dependent, in 10:1 Opto)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Ratios 1:1, 2:1 (+15 dB soft knee), 3:1, 4:1, 6:1, 10:1 Opto, 20:1, Nuke\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Detector: HP (100 Hz, 6 dB/oct), Band emphasis (+12 dB @ 6 kHz), Stereo link, external sidechain (3/4)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Audio: Dist 2 (tube, 2nd harm.), Dist 3 (tape, 3rd harm.), HP (80 Hz, 18 dB/oct), British mode\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Fixed internal threshold: drive with INPUT, compensate with OUTPUT (like the hardware)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab LED gain-reduction meter and exact value readouts under every knob\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Mouse: drag knobs (Shift = fine), wheel, double-click = reset. Click ratio / mode buttons.\par}
+}
+]]></description>
+      </metadata>
+      <version name="1.0" author="Todoroki" time="2026-11-05T09:04:27Z">
+        <changelog><![CDATA[- First release: compressor modelled on the Distressor behaviour, flat dark vector interface]]></changelog>
+        <source>https://github.com/kazenotodoroki/todoroki-reapack/raw/e25df2d3892c424a46686e1c485a3e633f2e1d90/FX/Todoroki_DS-8%20Distortion%20Compressor.jsfx</source>
       </version>
     </reapack>
   </category>
