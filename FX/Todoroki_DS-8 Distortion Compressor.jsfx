@@ -1,7 +1,8 @@
 // @description DS-8 Distortion Compressor - Distressor-style character compressor (ear training)
 // @author Todoroki
-// @version 1.1
+// @version 1.2
 // @changelog
+//   - MATCH: automatic gain compensation (K-weighted loudness match) so the output level equals the bypassed level, for fair A/B comparison
 //   - Square flat interface (square LEDs, buttons and panel)
 //   - Interface drawn at 2x resolution (+ HiDPI support): clean knob lines at every angle
 //   - Parameter sliders hidden from the top of the FX window (still automatable)
@@ -17,6 +18,7 @@
 //   - Audio: Dist 2 (tube, 2nd harm.), Dist 3 (tape, 3rd harm.), HP (80 Hz, 18 dB/oct), British mode
 //   - Fixed internal threshold: drive with INPUT, compensate with OUTPUT (like the hardware)
 //   - LED gain-reduction meter and exact value readouts under every knob
+//   - MATCH: automatic loudness compensation for level-matched bypass comparison
 //
 //   Mouse: drag knobs (Shift = fine), wheel, double-click = reset. Click ratio / mode buttons.
 desc:DS-8 Distortion Compressor (Distressor style)
@@ -37,6 +39,7 @@ slider12:0<0,1,1{Off,On}>-Audio HP
 slider13:0<0,1,1{Off,On}>-British Mode
 slider14:100<0,100,0.1>-Mix (%)
 slider15:0<0,1,1{In,Bypass}>-Bypass
+slider16:0<0,1,1{Off,On}>-Gain Match
 
 in_pin:Left
 in_pin:Right
@@ -71,6 +74,12 @@ function bq_hp(f, q) instance(b0,b1,b2,a1,a2) local(w,cs,al,n) (
 function bq_bp(f, q) instance(b0,b1,b2,a1,a2) local(w,cs,al,n) (
   w = 2*$pi*f/srate; cs = cos(w); al = sin(w)/(2*q); n = 1/(1+al);
   b0 = al*n; b1 = 0; b2 = -al*n; a1 = -2*cs*n; a2 = (1-al)*n;
+);
+function bq_hs(f, gdb, q) instance(b0,b1,b2,a1,a2) local(A,w,cs,al,sA,n) (
+  A = pow(10, gdb/40); w = 2*$pi*f/srate; cs = cos(w); al = sin(w)/(2*q); sA = 2*sqrt(A)*al;
+  n = 1/((A+1) - (A-1)*cs + sA);
+  b0 = A*((A+1) + (A-1)*cs + sA)*n; b1 = -2*A*((A-1) + (A+1)*cs)*n; b2 = A*((A+1) + (A-1)*cs - sA)*n;
+  a1 = 2*((A-1) - (A+1)*cs)*n; a2 = ((A+1) - (A-1)*cs - sA)*n;
 );
 function bq(x) instance(b0,b1,b2,a1,a2,z1,z2) local(y) (
   y = b0*x + z1; z1 = b1*x - a1*y + z2; z2 = b2*x - a2*y; y;
@@ -143,6 +152,9 @@ function update_params() (
   distOn = d2On || d3On || britOn;
   mix = slider14/100;
   bypassOn = slider15 > 0.5;
+  matchOn = slider16 > 0.5;
+  agcCo = 1 - exp(-1/(1.5*srate));   // loudness integration (~1.5 s)
+  agcSm = 1 - exp(-1/(0.4*srate));   // compensation gain smoothing
 );
 
 // ---------- filter setup ----------
@@ -150,6 +162,10 @@ dhpL.hp1_init(100); dhpR.hp1_init(100);
 dbpL.bq_bp(min(6000, srate*0.45), 0.9); dbpR.bq_bp(min(6000, srate*0.45), 0.9);
 ahL1.hp1_init(80); ahR1.hp1_init(80);
 ahL2.bq_hp(80, 1); ahR2.bq_hp(80, 1);
+// K-weighting (BS.1770 style) for the loudness match: high shelf +4 dB @ 1.68 kHz, high-pass 38 Hz
+kiL1.bq_hs(1681, 4, 0.707); kiR1.bq_hs(1681, 4, 0.707); koL1.bq_hs(1681, 4, 0.707); koR1.bq_hs(1681, 4, 0.707);
+kiL2.bq_hp(38, 0.5);        kiR2.bq_hp(38, 0.5);        koL2.bq_hp(38, 0.5);        koR2.bq_hp(38, 0.5);
+agcG = 1;
 nomScale = exp(14*LN10_20);
 xoCo = 1 - exp(-2*$pi*250/srate);
 hfCo = 1 - exp(-2*$pi*min(16000, srate*0.45)/srate);
@@ -321,7 +337,18 @@ update_params();
   distOn ? ( yL = dsL.dist(yL); yR = dsR.dist(yR); );
   ahpOn  ? ( yL = ahL2.bq(ahL1.hp1(yL)); yR = ahR2.bq(ahR1.hp1(yR)); );
 
-  yL *= outGain; yR *= outGain;
+  // ---- output gain / MATCH (loudness of the wet signal locked to the dry input) ----
+  matchOn ? (
+    kL = kiL2.bq(kiL1.bq(inL)); kR = kiR2.bq(kiR1.bq(inR));
+    eIn += (kL*kL + kR*kR - eIn)*agcCo;
+    kL = koL2.bq(koL1.bq(yL));  kR = koR2.bq(koR1.bq(yR));
+    eOut += (kL*kL + kR*kR - eOut)*agcCo;
+    eIn > 0.00001 ? ( agcT = min(max(sqrt(eIn/max(eOut, 0.0000000001)), 0.0631), 15.85); ) : agcT = agcG;  // hold in silence
+    agcG += (agcT - agcG)*agcSm;
+    yL *= agcG; yR *= agcG;
+  ) : (
+    yL *= outGain; yR *= outGain;
+  );
   spl0 = inL + (yL - inL)*mix;
   spl1 = inR + (yR - inR)*mix;
   grMax = max(grMax, max(grL, grR));
@@ -383,6 +410,8 @@ clipT *= 0.95;
 led_dot(34, 192, optoOn, CYr, CYg, CYb);   gfx_setfont(3); dim(); txtL(43, 192, "OPTO");
 led_dot(100, 192, britOn, 1, 0.78, 0.22);  dim(); txtL(109, 192, "BRIT");
 led_dot(166, 192, clipT > 0.05, 1, 0.3, 0.25); dim(); txtL(175, 192, "CLIP");
+led_dot(232, 192, matchOn && !bypassOn, CYr, CYg, CYb); dim(); txtL(241, 192, "MATCH");
+matchOn && !bypassOn ? ( sprintf(#mg, "%+.1f dB", 20*log10(max(agcG, 0.000001))); setcy(1); gfx_setfont(4); txtR(363, 192, #mg); );
 
 // ---------- modes ----------
 gfx_setfont(1); dim(); txtL(398, 56, "DETECTOR"); txtL(398, 136, "AUDIO");
@@ -397,12 +426,15 @@ hknob(KX[1], KCY, KR, slider2/10, 31);
 hknob(KX[2], KCY, KR, slider3/10, 31);
 hknob(KX[3], KCY, KR, slider4/10, 31);
 gfx_setfont(4); setcy(1);
-k = 1; loop(4, readout(k); txtC(KX[k - 1], 174, #ro); k += 1; );
+k = 1; loop(4, readout(k); (k == 4 && matchOn) ? ( dim(); txtC(KX[3], 174, "AUTO"); ) : ( setcy(1); txtC(KX[k - 1], 174, #ro); ); k += 1; );
 
 // ---------- IN + mix ----------
 !bypassOn ? ( pmix(CYr, CYg, CYb, 0.18); RRf(930, 52, 54, 26, 4); setcy(1); RRo(930, 52, 54, 26, 4); gfx_setfont(4); setcy(1); )
           : ( gfx_set(0.09, 0.105, 0.135, 1); RRf(930, 52, 54, 26, 4); border(); RRo(930, 52, 54, 26, 4); gfx_setfont(4); dim(); );
 txtC(957, 65, "IN");
+matchOn ? ( pmix(CYr, CYg, CYb, 0.18); RRf(930, 194, 54, 24, 0); setcy(1); RRo(930, 194, 54, 24, 0); gfx_setfont(1); setcy(1); )
+        : ( gfx_set(0.09, 0.105, 0.135, 1); RRf(930, 194, 54, 24, 0); border(); RRo(930, 194, 54, 24, 0); gfx_setfont(1); dim(); );
+txtC(957, 206, "MATCH");
 gfx_setfont(1); lite(); txtC(MXX, 98, "MIX");
 hknob(MXX, MXY, MXR, slider14/100, 21);
 readout(5); gfx_setfont(4); setcy(1); txtC(MXX, 174, #ro);
@@ -435,6 +467,7 @@ click ? (
       i += 1;
     );
     (mx >= 930 && mx <= 984 && my >= 52 && my <= 78) ? ( slider15 = !slider15; slider_automate(slider15); update_params(); );
+    (mx >= 930 && mx <= 984 && my >= 194 && my <= 218) ? ( slider16 = !slider16; slider_automate(slider16); update_params(); );
   );
 );
 
