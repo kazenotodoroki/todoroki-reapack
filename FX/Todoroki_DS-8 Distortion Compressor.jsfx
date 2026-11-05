@@ -1,8 +1,10 @@
 // @description DS-8 Distortion Compressor - Distressor-style character compressor (ear training)
 // @author Todoroki
-// @version 1.0
+// @version 1.1
 // @changelog
-//   - First release: compressor modelled on the Distressor behaviour, flat dark vector interface
+//   - Square flat interface (square LEDs, buttons and panel)
+//   - Interface drawn at 2x resolution (+ HiDPI support): clean knob lines at every angle
+//   - Parameter sliders hidden from the top of the FX window (still automatable)
 // @about
 //   # DS-8 Distortion Compressor
 //
@@ -20,21 +22,21 @@
 desc:DS-8 Distortion Compressor (Distressor style)
 //tags: compressor dynamics distortion saturation
 
-slider1:3<0,10,0.01>Input
-slider2:5<0,10,0.01>Attack
-slider3:5<0,10,0.01>Release
-slider4:5<0,10,0.01>Output
-slider5:4<0,7,1{1:1,2:1,3:1,4:1,6:1,10:1 Opto,20:1,Nuke}>Ratio
-slider6:0<0,1,1{Off,On}>Detector HP
-slider7:0<0,1,1{Off,On}>Detector Band
-slider8:1<0,1,1{Off,On}>Stereo Link
-slider9:0<0,1,1{Off,On}>External Sidechain (3/4)
-slider10:0<0,1,1{Off,On}>Dist 2
-slider11:0<0,1,1{Off,On}>Dist 3
-slider12:0<0,1,1{Off,On}>Audio HP
-slider13:0<0,1,1{Off,On}>British Mode
-slider14:100<0,100,0.1>Mix (%)
-slider15:0<0,1,1{In,Bypass}>Bypass
+slider1:3<0,10,0.01>-Input
+slider2:5<0,10,0.01>-Attack
+slider3:5<0,10,0.01>-Release
+slider4:5<0,10,0.01>-Output
+slider5:4<0,7,1{1:1,2:1,3:1,4:1,6:1,10:1 Opto,20:1,Nuke}>-Ratio
+slider6:0<0,1,1{Off,On}>-Detector HP
+slider7:0<0,1,1{Off,On}>-Detector Band
+slider8:1<0,1,1{Off,On}>-Stereo Link
+slider9:0<0,1,1{Off,On}>-External Sidechain (3/4)
+slider10:0<0,1,1{Off,On}>-Dist 2
+slider11:0<0,1,1{Off,On}>-Dist 3
+slider12:0<0,1,1{Off,On}>-Audio HP
+slider13:0<0,1,1{Off,On}>-British Mode
+slider14:100<0,100,0.1>-Mix (%)
+slider15:0<0,1,1{In,Bypass}>-Bypass
 
 in_pin:Left
 in_pin:Right
@@ -44,6 +46,7 @@ out_pin:Left
 out_pin:Right
 
 @init
+gfx_ext_retina = 1;
 ext_nodenorm = 0;
 LN10_20 = log(10)/20;
 
@@ -165,19 +168,22 @@ MXX = 957; MXY = 136; MXR = 16;
 function fx(v) ( ox + v*sc );
 function fy(v) ( oy + v*sc );
 function C(x, y, r) ( gfx_circle(fx(x), fy(y), r*sc, 1, 1); );
-function CO(x, y, r) ( gfx_circle(fx(x), fy(y), r*sc, 0, 1); );
+function CO(x, y, r) ( gfx_circle(fx(x), fy(y), r*sc, 0, 1); gfx_circle(fx(x), fy(y), r*sc - 1, 0, 1); );
 function R(x, y, w, h) ( gfx_rect(fx(x), fy(y), w*sc, h*sc); );
-function RRf(x, y, w, h, r) (
-  R(x + r, y, w - 2*r, h); R(x, y + r, r, h - 2*r); R(x + w - r, y + r, r, h - 2*r);
-  C(x + r, y + r, r); C(x + w - r, y + r, r); C(x + r, y + h - r, r); C(x + w - r, y + h - r, r);
-);
-function RRo(x, y, w, h, r) ( gfx_roundrect(fx(x), fy(y), w*sc, h*sc, r*sc, 1); );
-function LT(x1, y1, x2, y2, t) local(dx, dy, l, nx, ny) (
+function RRf(x, y, w, h, r) ( R(x, y, w, h); );
+function RRo(x, y, w, h, r) local(t) ( t = 1; R(x, y, w, t); R(x, y + h - t, w, t); R(x, y, t, h); R(x + w - t, y, t, h); );
+// thick line = stack of anti-aliased 1px lines (clean at every angle)
+function LT(x1, y1, x2, y2, t) local(dx, dy, l, nx, ny, n, k, o) (
   dx = x2 - x1; dy = y2 - y1; l = sqrt(dx*dx + dy*dy);
   l > 0 ? (
-    t = max(t, 1/sc);
-    nx = -dy/l*t*0.5; ny = dx/l*t*0.5;
-    gfx_triangle(fx(x1+nx), fy(y1+ny), fx(x1-nx), fy(y1-ny), fx(x2-nx), fy(y2-ny), fx(x2+nx), fy(y2+ny));
+    nx = -dy/l; ny = dx/l;
+    n = max(1, floor(t*sc + 0.5));
+    k = 0;
+    loop(n,
+      o = (k - (n - 1)*0.5)/sc;
+      gfx_line(fx(x1 + nx*o), fy(y1 + ny*o), fx(x2 + nx*o), fy(y2 + ny*o), 1);
+      k += 1;
+    );
   );
 );
 function txtL(x, y, s) local(w, h) ( gfx_measurestr(s, w, h); gfx_x = fx(x);         gfx_y = fy(y) - h*0.5; gfx_drawstr(s); );
@@ -323,13 +329,19 @@ update_params();
 (abs(spl0) >= 1 || abs(spl1) >= 1) ? clipT = 1;
 
 @gfx 1000 240
-sc = min(gfx_w/1000, gfx_h/240);
-ox = (gfx_w - 1000*sc)*0.5; oy = (gfx_h - 240*sc)*0.5;
-mx = (mouse_x - ox)/sc; my = (mouse_y - oy)/sc;
+// draw at 2x into an offscreen image, then downscale to the window (supersampled anti-aliasing)
+SS = 2;
+scr = min(gfx_w/1000, gfx_h/240);
+oxs = floor((gfx_w - 1000*scr)*0.5); oys = floor((gfx_h - 240*scr)*0.5);
+mx = (mouse_x - oxs)/scr; my = (mouse_y - oys)/scr;
+bw = ceil(1000*scr*SS); bh = ceil(240*scr*SS);
+(bw != lastBW || bh != lastBH) ? ( gfx_setimgdim(1, 0, 0); gfx_setimgdim(1, bw, bh); lastBW = bw; lastBH = bh; );
+gfx_dest = 1;
+sc = scr*SS; ox = 0; oy = 0;
 set_fonts();
 
 // ---------- panel ----------
-gfx_set(0.043, 0.051, 0.067, 1); gfx_rect(0, 0, gfx_w, gfx_h);
+gfx_set(0.043, 0.051, 0.067, 1); gfx_rect(0, 0, bw, bh);
 gfx_set(0.067, 0.078, 0.10, 1);  RRf(8, 8, 984, 224, 10);
 border(); RRo(8, 8, 984, 224, 10);
 gfx_setfont(2); setcy(1); txtL(24, 23, "DS-8");
@@ -347,7 +359,6 @@ loop(10,
   x = 28 + i*34;
   i < 5 ? ( lr = 0.30; lg = 0.88; lb = 0.45; ) : i < 8 ? ( lr = 1; lg = 0.78; lb = 0.22; ) : ( lr = 1; lg = 0.30; lb = 0.25; );
   meterVal >= grLedsG[i] ? (
-    pmix(lr, lg, lb, 0.18); RRf(x - 3, 65, 35, 24, 5);
     gfx_set(lr, lg, lb, 1);    RRf(x, 68, 29, 18, 3);
   ) : (
     gfx_set(lr*0.16, lg*0.16, lb*0.16, 1); RRf(x, 68, 29, 18, 3);
@@ -396,6 +407,11 @@ gfx_setfont(1); lite(); txtC(MXX, 98, "MIX");
 hknob(MXX, MXY, MXR, slider14/100, 21);
 readout(5); gfx_setfont(4); setcy(1); txtC(MXX, 174, #ro);
 
+// ---------- to screen ----------
+gfx_dest = -1;
+gfx_set(0.043, 0.051, 0.067, 1); gfx_rect(0, 0, gfx_w, gfx_h);
+gfx_a = 1; gfx_mode = 0; gfx_x = oxs; gfx_y = oys; gfx_blit(1, 1/SS, 0);
+
 // ---------- mouse ----------
 lmb = mouse_cap & 1;
 click = lmb && !last_lmb;
@@ -424,7 +440,7 @@ click ? (
 
 (lmb && drag_id) ? (
   dy = last_my - mouse_y;
-  dy != 0 ? ( kset(drag_id, kget(drag_id) + dy*kmax(drag_id)/(200*sc)*fine); last_my = mouse_y; );
+  dy != 0 ? ( kset(drag_id, kget(drag_id) + dy*kmax(drag_id)/(200*scr)*fine); last_my = mouse_y; );
 ) : (
   !lmb ? (drag_id = 0);
 );
