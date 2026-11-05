@@ -1,7 +1,9 @@
 // @description DS-8 Distortion Compressor - Distressor-style character compressor (ear training)
 // @author Todoroki
-// @version 1.2
+// @version 1.3
 // @changelog
+//   - Fix: knobs were drawn wrong after enabling MATCH (variable name clash)
+//   - 10:1 Opto release now reaches 20 s (base 80 ms..10 s, up to x2 program dependent); readout shows the range
 //   - MATCH: automatic gain compensation (K-weighted loudness match) so the output level equals the bypassed level, for fair A/B comparison
 //   - Square flat interface (square LEDs, buttons and panel)
 //   - Interface drawn at 2x resolution (+ HiDPI support): clean knob lines at every angle
@@ -100,7 +102,7 @@ function gr_curve(e) local(x, g) (
 // 10:1 opto: two-stage, program-dependent release (up to ~20 s)
 function opto(t) instance(f, s, m) (
   t > f ? (f = t) : (f += (t - f)*optoFastCo);
-  t > s ? (s += (t - s)*optoAttCo) : (s += (t - s)*optoSlowCo/(1 + 3*m));
+  t > s ? (s += (t - s)*optoAttCo) : (s += (t - s)*optoSlowCo/(1 + m));
   m += (min(t*0.1, 1) - m)*memCo;
   max(0.65*f + 0.35*s, s);
 );
@@ -139,7 +141,7 @@ function update_params() (
   ca = 1 - exp(-1/(at*srate));
   cr = 1 - exp(-1/(rt*srate));
   optoOn = ratioIdx == 5;
-  optoRel = 0.08*pow(60, slider3/10);
+  optoRel = 0.08*pow(125, slider3/10);   // 80 ms .. 10 s, x2 when heavily driven (up to 20 s)
   crUse = optoOn ? 1 - exp(-1/(0.005*srate)) : cr;
   optoFastCo = 1 - exp(-1/(0.06*srate));
   optoSlowCo = 1 - exp(-1/(optoRel*srate));
@@ -300,7 +302,7 @@ function readout(id) local(t) (
     t < 0.001 ? sprintf(#ro, "%.0f us", t*1000000) : sprintf(#ro, "%.1f ms", t*1000);
   ) :
   id == 3 ? (
-    optoOn ? sprintf(#ro, "%.2f s opto", optoRel)
+    optoOn ? sprintf(#ro, "%.1f-%.1f s", optoRel, optoRel*2)
            : (rt < 1 ? sprintf(#ro, "%.0f ms", rt*1000) : sprintf(#ro, "%.2f s", rt));
   ) :
   id == 4 ? sprintf(#ro, "%+.1f dB", slider4*4 - 20) :
@@ -339,10 +341,10 @@ update_params();
 
   // ---- output gain / MATCH (loudness of the wet signal locked to the dry input) ----
   matchOn ? (
-    kL = kiL2.bq(kiL1.bq(inL)); kR = kiR2.bq(kiR1.bq(inR));
-    eIn += (kL*kL + kR*kR - eIn)*agcCo;
-    kL = koL2.bq(koL1.bq(yL));  kR = koR2.bq(koR1.bq(yR));
-    eOut += (kL*kL + kR*kR - eOut)*agcCo;
+    kwInL = kiL2.bq(kiL1.bq(inL)); kwInR = kiR2.bq(kiR1.bq(inR));
+    eIn += (kwInL*kwInL + kwInR*kwInR - eIn)*agcCo;
+    kwOutL = koL2.bq(koL1.bq(yL));  kwOutR = koR2.bq(koR1.bq(yR));
+    eOut += (kwOutL*kwOutL + kwOutR*kwOutR - eOut)*agcCo;
     eIn > 0.00001 ? ( agcT = min(max(sqrt(eIn/max(eOut, 0.0000000001)), 0.0631), 15.85); ) : agcT = agcG;  // hold in silence
     agcG += (agcT - agcG)*agcSm;
     yL *= agcG; yR *= agcG;
