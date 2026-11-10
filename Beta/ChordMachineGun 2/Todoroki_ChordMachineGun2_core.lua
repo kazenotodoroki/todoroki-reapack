@@ -745,12 +745,23 @@ function setNotesThatArePlaying(list)
   setValue("notesThatArePlaying", table.concat(parts, ","))
 end
 
-function stopNotesFromPlaying()
+-- stops what the last chord left sounding (the held drone keeps going)
+local function rawStopNotes()
   for _, n in ipairs(getNotesThatArePlaying()) do stopNoteFromPlaying(n.pitch, n.chan) end
   setNotesThatArePlaying({})
 end
 
+-- live engine (see "Live engine" further down): running pattern, queued chord,
+-- requests between scripts
+LiveArp = { host = false }
+
+function stopNotesFromPlaying()
+  if LiveArp.cancel then LiveArp.cancel() end
+  rawStopNotes()
+end
+
 function stopAllNotesFromPlaying()
+  if LiveArp.cancel then LiveArp.cancel() end
   for ch = 0, 15 do
     reaper.StuffMIDIMessage(0, 0xB0 + ch, 123, 0) -- All Notes Off
   end
@@ -2106,7 +2117,7 @@ end
 --   block: plain chord · up / down / updown: arpeggios · alberti: low-high-mid-high
 --   basschord: bass then chord · pulse: repeated chord
 -- The drone (and the bass, with "hold bass") is written as one long note.
--- Preview always plays the plain chord.
+-- In the main window the preview plays the same pattern live (see "Live engine").
 ------------------------------------------------------------------------------
 
 PATTERNS = {
@@ -2179,15 +2190,8 @@ local function patternCycle(pattern, n)
   return seq
 end
 
--- writes noteList as a pattern between the edit cursor and cursor + chord length
-function insertPatternNotes(noteList)
-  local take = activeTake()
-  local startPPQ = getCursorPositionPPQ()
-  local endPPQ = getMidiEndPositionPPQ()
-  local velocity = getCurrentVelocity()
-  local defaultChan = getCurrentNoteChannel()
-  local pattern = getPattern()
-
+-- long notes (drone, and the bass with "hold bass") and the notes the pattern moves through
+local function splitPatternNotes(noteList)
   local long, moving = {}, {}
   for _, n in ipairs(noteList) do
     if n.drone or n.voice == 0 then long[#long + 1] = n else moving[#moving + 1] = n end
@@ -2202,6 +2206,19 @@ function insertPatternNotes(noteList)
     end
     if #rest > 0 then moving = rest end
   end
+  return long, moving
+end
+
+-- writes noteList as a pattern between the edit cursor and cursor + chord length
+function insertPatternNotes(noteList)
+  local take = activeTake()
+  local startPPQ = getCursorPositionPPQ()
+  local endPPQ = getMidiEndPositionPPQ()
+  local velocity = getCurrentVelocity()
+  local defaultChan = getCurrentNoteChannel()
+  local pattern = getPattern()
+
+  local long, moving = splitPatternNotes(noteList)
 
   for _, n in ipairs(long) do
     reaper.MIDI_InsertNote(take, false, false, startPPQ, endPPQ, n.chan or defaultChan, n.pitch, velocity, true)
@@ -2259,8 +2276,410 @@ function changeSelectedNotesToScaleChords(scaleNoteIndex, chordTypeIndex)
   return prev
 end
 
+------------------------------------------------------------------------------
+-- Reharmonize (v2.1): the selected notes keep their rhythm, length, velocity and
+-- channel; each pitch moves to the closest note of the new chord. Notes that were
+-- distinct stay distinct and in the same order whenever the chord allows it, and
+-- the lowest one prefers the bass note of the new chord. Drone notes do not move.
+------------------------------------------------------------------------------
+
+-- "replace": selected chords are replaced by the new chord (ChordGun behaviour)
+-- "reharm":  selected notes are moved onto the new chord
+function getSelectionMode() return (getValue("selectionMode", "replace") == "reharm") and "reharm" or "replace" end
+function setSelectionMode(a) setValue("selectionMode", a) end
+
+-- sources: sorted distinct pitches; pcs: set of pitch classes; returns { [source] = target }
+function reharmonizeMap(sources, pcs, bassPC)
+  local cands = {}
+  for k, p in ipairs(sources) do
+    local list = {}
+    for q = math.max(0, p - 7), math.min(127, p + 7) do
+      if pcs[q % 12] then
+        local cost = math.abs(q - p)
+        -- a real bass note (below C3) follows the bass of the new chord
+        if k == 1 and bassPC and q % 12 == bassPC then cost = cost - ((p < 48) and 5.5 or 1) end
+        list[#list + 1] = { q = q, cost = cost }
+      end
+    end
+    if #list == 0 then list[1] = { q = p, cost = 0 } end
+    cands[k] = list
+  end
+  -- dynamic programming over the sources, low to high
+  local best, from = {}, {}
+  for k, list in ipairs(cands) do
+    best[k], from[k] = {}, {}
+    for j, c in ipairs(list) do
+      if k == 1 then
+        best[k][j] = c.cost
+      else
+        local bv, bj = math.huge, 1
+        for i, prev in ipairs(cands[k - 1]) do
+          local trans = 0
+          if c.q == prev.q then trans = 4            -- two notes merge
+          elseif c.q < prev.q then trans = 100 end   -- voices would cross
+          local v = best[k - 1][i] + trans
+          if v < bv then bv, bj = v, i end
+        end
+        best[k][j] = bv + c.cost
+        from[k][j] = bj
+      end
+    end
+  end
+  local map = {}
+  local n = #cands
+  if n == 0 then return map end
+  local j, bv = 1, math.huge
+  for i, v in ipairs(best[n]) do if v < bv then bv, j = v, i end end
+  for k = n, 1, -1 do
+    map[sources[k]] = cands[k][j].q
+    j = from[k][j] or 1
+  end
+  return map
+end
+
+function reharmonizeSelection(scaleNoteIndex, chordTypeIndex)
+  local take = activeTake()
+  local result = buildChordVoicing(scaleNoteIndex, chordTypeIndex)
+  local pcs = {}
+  for _, p in ipairs(result.voices) do pcs[p % 12] = true end
+  local bassPC = result.voices[1] and (result.voices[1] % 12) or nil
+
+  local selected, sources, seen = {}, {}, {}
+  for k = 0, getNumberOfNotes() - 1 do
+    local _, sel, _, _, _, _, pitch = reaper.MIDI_GetNote(take, k)
+    if sel and not isDronePitch(pitch) then
+      selected[#selected + 1] = { index = k, pitch = pitch }
+      if not seen[pitch] then seen[pitch] = true; sources[#sources + 1] = pitch end
+    end
+  end
+  table.sort(sources)
+  local map = reharmonizeMap(sources, pcs, bassPC)
+  local moved = 0
+  for _, n in ipairs(selected) do
+    local q = map[n.pitch]
+    if q and q ~= n.pitch then
+      reaper.MIDI_SetNote(take, n.index, nil, nil, nil, nil, nil, q, nil, true)
+      moved = moved + 1
+    end
+  end
+  reaper.MIDI_Sort(take)
+  result.reharmonized = moved
+  return result
+end
+
+------------------------------------------------------------------------------
+-- Live engine (v2.1): patterns played in real time + quantized chord changes
+--   Runs inside the main window (LiveArp.host = true, ticked on every frame).
+--   Clock: the project position while the transport plays (so the pattern is
+--   in sync with the song), otherwise a free clock at the project tempo.
+--   Other scripts (actions, history window) forward their chords to the window
+--   while it is open; when it is closed they play a plain chord.
+------------------------------------------------------------------------------
+
+local EXT_SECTION = "ChordMachineGun2"
+
+function getLivePattern() return getBool("livePattern", true) end
+function setLivePattern(a) setBool("livePattern", a) end
+
+-- when does a newly triggered chord replace the one that is sounding?
+CHANGE_MODES = {
+  { id = "now",   name = "Now",    hint = "a new chord replaces the current one at once" },
+  { id = "beat",  name = "Beat",   hint = "a new chord waits for the next beat" },
+  { id = "bar",   name = "Bar",    hint = "a new chord waits for the end of the bar" },
+  { id = "2bars", name = "2 bars", hint = "a new chord waits for the end of a 2-bar group" },
+}
+function getChangeMode()
+  local v = getValue("changeMode", "now")
+  for _, m in ipairs(CHANGE_MODES) do if m.id == v then return v end end
+  return "now"
+end
+function setChangeMode(a) setValue("changeMode", a) end
+function cycleChangeMode(d)
+  local cur, idx = getChangeMode(), 1
+  for k, m in ipairs(CHANGE_MODES) do if m.id == cur then idx = k end end
+  idx = ((idx - 1 + (d or 1)) % #CHANGE_MODES) + 1
+  setChangeMode(CHANGE_MODES[idx].id)
+  return CHANGE_MODES[idx]
+end
+
+local arpState = nil    -- the chord that is sounding (pattern or plain chord)
+local arpPending = nil  -- the chord waiting for the next beat / bar
+
+local function transportPlaying() return reaper.GetPlayState() & 1 == 1 end
+
+-- position in quarter notes, and which clock it comes from
+function LiveArp.clock()
+  if transportPlaying() then
+    return reaper.TimeMap2_timeToQN(0, reaper.GetPlayPosition()), "transport"
+  end
+  local bpm = reaper.Master_GetTempo()
+  if not bpm or bpm <= 0 then bpm = 120 end
+  return reaper.time_precise() * bpm / 60, "free"
+end
+
+-- length of a beat and of a bar, in quarter notes
+function LiveArp.barLength()
+  local t = transportPlaying() and reaper.GetPlayPosition() or reaper.GetCursorPosition()
+  local num, den = reaper.TimeMap_GetTimeSigAtTime(0, t)
+  if not num or num <= 0 or not den or den <= 0 then num, den = 4, 4 end
+  local beat = 4 / den
+  return beat, num * beat
+end
+
+-- quarter-note position of the next beat / bar / 2-bar line after `now`
+local function nextBoundary(mode, now, clockMode, origin)
+  local beat, bar = LiveArp.barLength()
+  local eps = 1e-6
+  if clockMode == "transport" then
+    local m, s, e = reaper.TimeMap_QNToMeasures(0, now)
+    if not s or not e or e <= s then s = math.floor(now / bar) * bar; e = s + bar; m = math.floor(now / bar) end
+    if mode == "beat" then return math.min(e, s + (math.floor((now - s) / beat + eps) + 1) * beat) end
+    if mode == "bar" then return e end
+    -- 2 bars: groups are counted from the bar in which the first chord started
+    local startBar = (origin and origin.originBar) or m
+    if (m - startBar) % 2 == 1 then return e end
+    local _, s2, e2 = reaper.TimeMap_QNToMeasures(0, e + 0.01)
+    if not e2 or not s2 or e2 <= e then e2 = e + bar end
+    return e2
+  end
+  local len = (mode == "beat") and beat or ((mode == "bar") and bar or 2 * bar)
+  local o = (origin and origin.originQN) or now
+  return o + (math.floor((now - o) / len + eps) + 1) * len
+end
+
+local function soundKey(n) return n.pitch .. ":" .. (n.chan or getCurrentNoteChannel()) end
+
+-- remembers what sounds, so that any script can stop it
+local function publishSounding(st)
+  local all = {}
+  for _, n in ipairs(st.longSounding) do all[#all + 1] = n end
+  for _, n in ipairs(st.sounding) do all[#all + 1] = n end
+  setNotesThatArePlaying(all)
+end
+
+local function settingsSignature()
+  return getPattern() .. "|" .. getPatternRate() .. "|" .. tostring(getLivePattern()) .. "|" .. tostring(getPatternHoldBass())
+end
+
+local function fireStep(st, step)
+  for _, n in ipairs(st.sounding) do stopNoteFromPlaying(n.pitch, n.chan) end
+  st.sounding = {}
+  local pos = step * st.stepQN
+  local onBeat = math.abs(pos - math.floor(pos + 0.5)) < 0.001
+  local vel = getCurrentVelocity()
+  if not onBeat then vel = math.max(1, math.floor(vel * 0.8 + 0.5)) end
+  local k = step - st.firstStep
+  for _, idx in ipairs(st.cycle[(k % #st.cycle) + 1]) do
+    local n = st.moving[idx]
+    if n then
+      reaper.StuffMIDIMessage(0, 0x90 + getCurrentNoteChannel(n.chan), n.pitch, vel)
+      st.sounding[#st.sounding + 1] = n
+    end
+  end
+  st.lastStep = step
+  publishSounding(st)
+end
+
+-- starts noteList now. inherit: previous state (keeps the bar count going);
+-- at: exact position of the beat / bar line the change was queued for;
+-- deferFirst: stay on the step grid instead of striking a note at once
+local function startChord(noteList, now, clockMode, inherit, at, deferFirst)
+  rawStopNotes()
+  local hold = getDroneEnabled() and getDroneHold()
+  local held = {}
+  if hold then
+    for _, d in ipairs(getDroneNotes()) do held[soundKey(d)] = true end
+  end
+
+  local live = getLivePattern() and getPattern() ~= "block"
+  local long, moving = noteList, {}
+  if live then
+    long, moving = splitPatternNotes(noteList)
+    -- a moving note must never re-strike (and then cut) the held drone
+    local kept = {}
+    for _, n in ipairs(moving) do
+      if not held[soundKey(n)] then kept[#kept + 1] = n end
+    end
+    moving = kept
+    if #moving == 0 then live, long = false, noteList end
+  end
+
+  local st = {
+    notes = noteList, live = live, clockMode = clockMode, moving = moving,
+    sounding = {}, longSounding = {}, pattern = getPattern(), stepQN = rateQN(),
+    sig = settingsSignature(), lastQN = now,
+  }
+  for _, n in ipairs(long) do
+    local isDrone = n.drone or n.voice == 0
+    if not (hold and (isDrone or held[soundKey(n)])) then
+      playMidiNote(n.pitch, n.chan)
+      st.longSounding[#st.longSounding + 1] = n
+    end
+  end
+  if hold and #getDroneNotes() > 0 then startDrone() end
+
+  if inherit then
+    st.originQN, st.originBar = inherit.originQN, inherit.originBar
+  else
+    st.originQN = at or now
+    st.originBar = (clockMode == "transport") and reaper.TimeMap_QNToMeasures(0, now) or 0
+  end
+  if clockMode == "transport" then
+    local _, s = reaper.TimeMap_QNToMeasures(0, now)
+    st.gridQN = (s and s <= now) and s or 0
+  else
+    st.gridQN = at or now
+  end
+
+  arpState = st
+  if live then
+    st.cycle = patternCycle(st.pattern, #moving)
+    local cur = math.floor((now - st.gridQN) / st.stepQN + 1e-6)
+    if deferFirst then
+      st.firstStep, st.lastStep = cur + 1, cur
+    else
+      st.firstStep, st.lastStep = cur, cur - 1
+      fireStep(st, cur)
+    end
+  end
+  publishSounding(st)
+  return st
+end
+
+-- a chord was triggered in the window (or forwarded by another script)
+function LiveArp.trigger(noteList)
+  if not LiveArp.internal then LiveArp.sequence = nil end
+  local now, clockMode = LiveArp.clock()
+  local mode = getChangeMode()
+  local st = arpState
+  -- something to wait for: a running pattern, or any chord while the song plays
+  local busy = st ~= nil and (st.live or clockMode == "transport")
+  if LiveArp.forceNow or mode == "now" or not busy then
+    arpPending = nil
+    local onGrid = st ~= nil and st.live and clockMode == "transport" and st.clockMode == "transport"
+    startChord(noteList, now, clockMode, nil, nil, onGrid)
+  else
+    arpPending = { notes = noteList, at = nextBoundary(mode, now, clockMode, st), from = now, mode = mode }
+  end
+end
+
+function LiveArp.hostAlive()
+  if LiveArp.host then return true end
+  local t = tonumber(reaper.GetExtState(EXT_SECTION, "hostAlive")) or 0
+  return t > 0 and math.abs(reaper.time_precise() - t) < 0.6
+end
+
+local function encodeLiveNotes(list)
+  local t = {}
+  for _, n in ipairs(list) do
+    t[#t + 1] = n.pitch .. ":" .. (n.chan or -1) .. ":" .. (n.voice or 0) .. ":" .. (n.drone and 1 or 0)
+  end
+  return table.concat(t, ",")
+end
+
+local function decodeLiveNotes(raw)
+  local t = {}
+  for p, c, v, d in (raw or ""):gmatch("(%-?%d+):(%-?%d+):(%-?%d+):(%d)") do
+    local chan = tonumber(c)
+    t[#t + 1] = { pitch = tonumber(p), chan = (chan >= 0) and chan or nil, voice = tonumber(v), drone = (d == "1") or nil }
+  end
+  return t
+end
+
+-- other scripts → window
+local function postLiveRequest(kind, payload)
+  local cur = reaper.GetExtState(EXT_SECTION, "liveRequests")
+  if type(cur) ~= "string" then cur = "" end
+  reaper.SetExtState(EXT_SECTION, "liveRequests", cur .. kind .. "=" .. (payload or "") .. ";", false)
+end
+
+-- forgets the running chord; the caller stops the notes
+function LiveArp.cancel()
+  if LiveArp.host then
+    arpState, arpPending = nil, nil
+    if not LiveArp.internal then LiveArp.sequence = nil end
+  elseif LiveArp.hostAlive() then
+    postLiveRequest("stop")
+  end
+end
+
+-- nil when nothing runs; otherwise what the window shows
+function LiveArp.status()
+  local st = arpState
+  if not st then return nil end
+  local now = LiveArp.clock()
+  local r = { live = st.live, pattern = st.pattern, clockMode = st.clockMode }
+  if arpPending then
+    r.pending = true
+    r.mode = arpPending.mode
+    r.remaining = math.max(0, arpPending.at - now)
+    local span = arpPending.at - arpPending.from
+    r.progress = (span > 0) and math.max(0, math.min(1, (now - arpPending.from) / span)) or 1
+  end
+  return r
+end
+
+-- called by the main window on every frame
+function LiveArp.tick()
+  if not LiveArp.host then return end
+  reaper.SetExtState(EXT_SECTION, "hostAlive", tostring(reaper.time_precise()), false)
+
+  local raw = reaper.GetExtState(EXT_SECTION, "liveRequests")
+  if type(raw) == "string" and raw ~= "" then
+    reaper.SetExtState(EXT_SECTION, "liveRequests", "", false)
+    for kind, payload in raw:gmatch("(%a+)=([^;]*);") do
+      if kind == "stop" then
+        -- the other script already silenced the notes
+        arpState, arpPending, LiveArp.sequence = nil, nil, nil
+      elseif kind == "chord" then
+        local list = decodeLiveNotes(payload)
+        if #list > 0 then LiveArp.trigger(list) end
+      end
+    end
+  end
+
+  if LiveArp.sequenceTick then LiveArp.sequenceTick() end
+
+  local st = arpState
+  if not st then arpPending = nil; return end
+  local now, clockMode = LiveArp.clock()
+
+  -- the clock jumped (transport started or stopped, loop, seek): start again from here
+  if clockMode ~= st.clockMode or now < st.lastQN - 1e-4 or now > st.lastQN + 8 then
+    local notes = st.notes
+    if arpPending then notes = arpPending.notes; arpPending = nil end
+    st = startChord(notes, now, clockMode, nil, nil, false)
+  end
+
+  if arpPending and now >= arpPending.at - 1e-6 then
+    local p = arpPending
+    arpPending = nil
+    st = startChord(p.notes, now, clockMode, st, p.at, false)
+  end
+
+  -- pattern, rate, live or hold bass changed while a chord sounds
+  if st.sig ~= settingsSignature() then
+    st = startChord(st.notes, now, clockMode, st, nil, st.live and clockMode == "transport")
+  end
+
+  if st.live then
+    local step = math.floor((now - st.gridQN) / st.stepQN + 1e-6)
+    if step > st.lastStep then fireStep(st, step) end
+  end
+  st.lastQN = now
+end
+
+function LiveArp.shutdown()
+  if not LiveArp.host then return end
+  arpState, arpPending, LiveArp.sequence = nil, nil, nil
+  rawStopNotes()
+  reaper.SetExtState(EXT_SECTION, "hostAlive", "0", false)
+end
+
 local function playScaleChord(noteList)
-  stopNotesFromPlaying()
+  if LiveArp.host then return LiveArp.trigger(noteList) end
+  if LiveArp.hostAlive() then return postLiveRequest("chord", encodeLiveNotes(noteList)) end
+  rawStopNotes()
   local hold = getDroneEnabled() and getDroneHold()
   local held = {}
   if hold then
@@ -2303,7 +2722,11 @@ function playOrInsertChord(i, t, actionDescription)
   if activeTake() ~= nil and notCurrentlyRecording() then
     startUndoBlock()
     if thereAreNotesSelected() then
-      result = changeSelectedNotesToScaleChords(i, t)
+      if getSelectionMode() == "reharm" then
+        result = reharmonizeSelection(i, t)
+      else
+        result = changeSelectedNotesToScaleChords(i, t)
+      end
     else
       result = buildChordVoicing(i, t)
       insertScaleChord(result.notes, false)
@@ -3196,4 +3619,371 @@ function explodeTakeToVoiceTracks()
   reaper.UpdateArrange()
   reaper.Undo_EndBlock("ChordMachineGun 2: explode item to voice tracks", -1)
   return true
+end
+
+------------------------------------------------------------------------------
+-- Wiki (v2.1): for every scale, the progressions used the most and the ones that
+-- sound the most striking. Chords are written as roman numerals measured from
+-- the major scale of the tonic (bVI = major chord a minor sixth above the tonic):
+--   upper case = major, lower case = minor, o = diminished, + = augmented,
+--   7 / maj7 / 6 / sus2 / sus4 / 5 as usual.
+-- { name, progression, "c" = most used | "b" = most beautiful, optional note }
+------------------------------------------------------------------------------
+
+WIKI = {
+  ["Major"] = {
+    about = "Bright, stable and open: the home of pop, folk and heroic themes. For film colour, borrow from the parallel minor (iv, bVI, bVII) or raise the fourth for a touch of Lydian.",
+    progressions = {
+      { "Axis (pop anthem)",          "I V vi IV",               "c" },
+      { "50s / doo-wop",              "I vi IV V",               "c" },
+      { "Sensitive (starts on vi)",   "vi IV I V",               "c" },
+      { "Jazz turnaround",            "ii7 V7 Imaj7 vi7",        "c" },
+      { "Canon",                      "I V vi iii IV I IV V",    "c" },
+      { "Royal road (J-pop, anime)",  "IVmaj7 V7 iii7 vi",       "b" },
+      { "Minor plagal (nostalgia)",   "I IV iv I",               "b" },
+      { "Triumphant return",          "bVI bVII I",              "b", "the 'level complete' cadence" },
+      { "Sense of wonder",            "I II IV I",               "b", "II is borrowed from Lydian" },
+      { "Bittersweet line",           "Imaj7 iii7 IVmaj7 iv6",   "b" },
+    },
+  },
+  ["Natural Minor"] = {
+    about = "Serious, melancholic, epic. The backbone of trailer music, rock ballads and most dark game scores. bVI and bVII give power; a major V or a chromatic mediant adds drama.",
+    progressions = {
+      { "Epic (trailer)",             "i bVI bIII bVII",         "c" },
+      { "Aeolian vamp (rock)",        "i bVII bVI bVII",         "c" },
+      { "Aeolian cadence",            "bVI bVII i",              "c" },
+      { "Minor ballad",               "i iv bVII bIII",          "c" },
+      { "Heroic rise",                "i bIII bVII iv",          "c" },
+      { "Andalusian cadence",         "i bVII bVI V",            "b", "V is borrowed from harmonic minor" },
+      { "Dark empire",                "i bvi i bVI",             "b", "bvi is a chromatic mediant" },
+      { "Dorian lift",                "i bIII bVII IV",          "b", "IV is borrowed from Dorian" },
+      { "Neapolitan drama",           "i bII V i",               "b" },
+      { "Hope at the end",            "bVI bIII bVII i",         "b" },
+    },
+  },
+  ["Harmonic Minor"] = {
+    about = "Minor with a leading tone: the major V pulls hard back to i. Classical drama, tango, neoclassical metal, gothic and vampire scores.",
+    progressions = {
+      { "Classical cadence",          "i iv V7 i",               "c" },
+      { "Andalusian cadence",         "i bVII bVI V",            "c", "bVII is borrowed from natural minor" },
+      { "Minor ii-V-i",               "iio V7 i",                "c" },
+      { "Tango",                      "i V7 i iv",               "c" },
+      { "Circle of fifths (baroque)", "i iv bVII bIII bVI iio V7 i", "b", "bVII and bIII are borrowed from natural minor" },
+      { "Lament",                     "i bVI iv V",              "b" },
+      { "Neapolitan",                 "i bII V7 i",              "b" },
+      { "Suspense",                   "i viio i V",              "b" },
+    },
+  },
+  ["Melodic Minor"] = {
+    about = "Minor with a major IV and V (jazz minor): smoother and more ambiguous than harmonic minor. Spy themes, film noir, sophisticated mystery.",
+    progressions = {
+      { "Bright minor cadence",       "i IV V i",                "c" },
+      { "Jazz minor ii-V-i",          "ii7 V7 i6",               "c" },
+      { "Minor with major IV",        "i IV i V",                "c" },
+      { "Spy line",                   "i bIII+ i6 IV",           "b" },
+      { "Noir",                       "i6 ii V7 i6",             "b" },
+      { "Rising steps",               "i ii bIII+ IV",           "b" },
+    },
+  },
+  ["Pentatonic"] = {
+    about = "Five notes and no semitone: nothing can sound wrong. Folk, pastoral scenes, Asian-flavoured themes, peaceful game villages. Suspended chords keep the harmony inside the scale.",
+    progressions = {
+      { "Two-chord sway",             "I vi",                    "c" },
+      { "Open pop",                   "I Vsus4 vi IIsus2",       "c" },
+      { "Folk circle",                "vi I IIsus2 I",           "c" },
+      { "Village theme",              "Isus2 vi7 Vsus4 I",       "b" },
+      { "Open fifths",                "I5 VI5 V5 I5",            "b" },
+      { "Floating",                   "IIsus2 I vi7 Vsus4",      "b" },
+    },
+  },
+  ["Dorian"] = {
+    about = "Minor with a bright sixth: the IV chord is major. Celtic and medieval adventure, funk, soul, hopeful-but-serious cues.",
+    progressions = {
+      { "Dorian vamp",                "i7 IV7",                  "c" },
+      { "Four-chord Dorian",          "i bIII bVII IV",          "c" },
+      { "Step vamp",                  "i ii bIII ii",            "c" },
+      { "Celtic",                     "i bVII i IV",             "c" },
+      { "Adventure",                  "i IV bVII i",             "b" },
+      { "Medieval",                   "i v IV i",                "b" },
+      { "Soulful",                    "i7 ii7 bIIImaj7 IV7",     "b" },
+    },
+  },
+  ["Mixolydian"] = {
+    about = "Major with a flat seventh: confident, earthy, never quite resolved. Classic rock, Celtic music, heroic adventure and pirate themes.",
+    progressions = {
+      { "Classic rock",               "I bVII IV I",             "c" },
+      { "Two-chord drive",            "I bVII",                  "c" },
+      { "Double plagal",              "bVII IV I",               "c" },
+      { "Rolling",                    "I IV bVII IV",            "c" },
+      { "Heroic adventure",           "I v bVII IV",             "b" },
+      { "Celtic dance",               "I bVII I IV",             "b" },
+      { "Open road",                  "I v IV I",                "b" },
+    },
+  },
+  ["Phrygian"] = {
+    about = "Minor with a flat second: dark, ancient, threatening. Metal, desert and Spanish colours, villains and dungeons. The bII chord is the signature.",
+    progressions = {
+      { "Phrygian vamp",              "i bII",                   "c" },
+      { "Flamenco descent",           "iv bIII bII i",           "c" },
+      { "Dark riff",                  "i bII bvii i",            "c" },
+      { "Desert",                     "i bII iv i",              "b" },
+      { "Menace",                     "i bVI bII i",             "b" },
+      { "Slow doom",                  "i bvii bVI bII",          "b" },
+    },
+  },
+  ["Lydian"] = {
+    about = "Major with a raised fourth: weightless, magical, full of wonder. Flying scenes, space, fantasy and childhood memories. The major II chord is the signature.",
+    progressions = {
+      { "Lydian vamp",                "I II",                    "c" },
+      { "Wonder",                     "I II I vii",              "c" },
+      { "Lydian cadence",             "I II V I",                "c" },
+      { "Flying",                     "I II iii II",             "b" },
+      { "Dream",                      "Imaj7 II vi II",          "b" },
+      { "Starlight",                  "Imaj7 vii7 Imaj7 II",     "b" },
+      { "Discovery",                  "vi II I",                 "b" },
+    },
+  },
+  ["Locrian"] = {
+    about = "The most unstable mode: the tonic chord is diminished and never rests. Use it for short tension cues, horror and chaos rather than for whole pieces.",
+    progressions = {
+      { "Unstable vamp",              "io bII",                  "c" },
+      { "Dark riff",                  "io bV bII io",            "c" },
+      { "Horror",                     "io biii bII io",          "b" },
+      { "Descent",                    "io bvii bVI bV",          "b" },
+    },
+  },
+  ["Lydian Dominant"] = {
+    about = "Lydian with a flat seventh (the acoustic scale): bright and mischievous at once. Cartoon and fantasy scores, quirky characters, jazz-fusion.",
+    progressions = {
+      { "Acoustic vamp",              "I7 II7",                  "c" },
+      { "Quirky",                     "I7 II I7 v",              "c" },
+      { "Fantasy shimmer",            "I II bVII+ I",            "b" },
+      { "Mischief",                   "I7 vi II I7",             "b" },
+      { "Curious",                    "I v II I",                "b" },
+    },
+  },
+  ["Mixolydian b6"] = {
+    about = "Major tonic with a minor iv and a bVII (the Hindu or Aeolian dominant scale): heroic and bittersweet at the same time. A Hollywood favourite for noble sacrifice and farewells.",
+    progressions = {
+      { "Noble",                      "I iv I",                  "c" },
+      { "Bittersweet hero",           "I bVII iv I",             "c" },
+      { "Farewell",                   "I v iv I",                "c" },
+      { "Epic sadness",               "I iv bVII I",             "b" },
+      { "Last stand",                 "bVII iv I",               "b" },
+      { "Glow",                       "I bVI+ iv I",             "b" },
+    },
+  },
+  ["Phrygian Dominant"] = {
+    about = "Phrygian with a major third: flamenco, Middle-Eastern and klezmer colours. Hot, dramatic, exotic. The pull from bII to a major I is everything.",
+    progressions = {
+      { "Flamenco vamp",              "I bII",                   "c" },
+      { "Andalusian resolve",         "iv bIII bII I",           "c", "bIII is borrowed from Phrygian" },
+      { "Caravan",                    "I bII bvii I",            "c" },
+      { "Hijaz",                      "I iv bII I",              "b" },
+      { "Dramatic",                   "I bvii bII I",            "b" },
+      { "Mirage",                     "I bII iv bII",            "b" },
+    },
+  },
+  ["Harmonic Major"] = {
+    about = "Major with a flat sixth: a major key that carries its own minor iv. Romantic, nostalgic, a little old-Hollywood.",
+    progressions = {
+      { "Minor plagal",               "I iv I V",                "c" },
+      { "Romantic cadence",           "I iv V I",                "c" },
+      { "ii-V-I with a shadow",       "iio V7 I",                "c" },
+      { "Tender",                     "I iii iv I",              "b" },
+      { "Bittersweet turnaround",     "I bVI+ iv V",             "b" },
+      { "Old Hollywood",              "Imaj7 iv6 Imaj7 V7",      "b" },
+    },
+  },
+  ["Double Harmonic"] = {
+    about = "Two augmented seconds (the Byzantine scale): intensely exotic and ceremonial. Ancient temples, deserts, snake charmers, dramatic ritual scenes.",
+    progressions = {
+      { "Byzantine vamp",             "I bII",                   "c" },
+      { "Ritual",                     "I bII iii bII",           "c" },
+      { "Temple",                     "I iv bII I",              "b" },
+      { "Procession",                 "bII I iv I",              "b" },
+      { "Sand storm",                 "I iii bII I",             "b" },
+    },
+  },
+  ["Hungarian Minor"] = {
+    about = "Harmonic minor with a raised fourth: fiery, tragic, gypsy and vampire colours. Two leading tones (to the fifth and to the tonic) give it its bite.",
+    progressions = {
+      { "Gypsy cadence",              "i bVI V i",               "c" },
+      { "Dance",                      "i V i bVI",               "c" },
+      { "Shadow step",                "i vii i",                 "b", "the minor chord a semitone below" },
+      { "Vampire",                    "i bVI vii V",             "b" },
+      { "Tragic",                     "i bIII+ bVI V",           "b" },
+    },
+  },
+  ["Dorian #4"] = {
+    about = "Dorian with a raised fourth (Ukrainian Dorian): klezmer, Balkan and Eastern-European folk. Minor tonic against a major II chord: mysterious and dancing.",
+    progressions = {
+      { "Klezmer vamp",               "i II",                    "c" },
+      { "Freylekh",                   "i II bIII II",            "c" },
+      { "Mystery",                    "i II v i",                "b" },
+      { "Wanderer",                   "i bIII II i",             "b" },
+      { "Old tale",                   "i v II i",                "b" },
+    },
+  },
+  ["Lydian Augmented"] = {
+    about = "Lydian with a raised fifth: the tonic chord is augmented, so nothing settles. Dream sequences, deep space, the uncanny and the supernatural.",
+    progressions = {
+      { "Unreal vamp",                "I+ II",                   "c" },
+      { "Drift",                      "I+ vi II I+",             "c" },
+      { "Dream sequence",             "I+ III vi II",            "b" },
+      { "Weightless",                 "vi II I+",                "b" },
+      { "Other world",                "I+ II III II",            "b" },
+    },
+  },
+  ["Whole Tone"] = {
+    about = "Six equal steps: no leading tone, no gravity, every chord is augmented. Flashbacks, dreams, underwater scenes, magic spells. Best used for short passages.",
+    progressions = {
+      { "Dream vamp",                 "I+ II+",                  "c" },
+      { "Rising mist",                "I+ II+ III+ II+",         "c" },
+      { "Flashback",                  "I+ bVII+ I+ II+",         "b" },
+      { "Spell",                      "I+ III+ II+ I+",          "b" },
+    },
+  },
+}
+WIKI["Ionian"] = WIKI["Major"]
+WIKI["Aeolian"] = WIKI["Natural Minor"]
+
+function getWiki(scaleType)
+  local s = scales[scaleType or getScaleType()]
+  return s and WIKI[s.name] or nil
+end
+
+local WIKI_ROMAN = { I = 1, II = 2, III = 3, IV = 4, V = 5, VI = 6, VII = 7 }
+local WIKI_SUFFIX = {
+  [""] = { "major", "minor" }, ["7"] = { "7", "min7" }, ["maj7"] = { "maj7", "maj7" },
+  ["6"] = { "maj6", "min6" }, ["o"] = { "dim", "dim" }, ["+"] = { "aug", "aug" },
+  ["sus2"] = { "sus2", "sus2" }, ["sus4"] = { "sus4", "sus4" }, ["5"] = { "power", "power" },
+}
+
+-- "bVI" → { roman = "bVI", degree = 6, offset = 8, code = "major", flat = true }
+function wikiParseRoman(token)
+  local acc, rom, suffix = token:match("^([b#]*)([IViv]+)(.*)$")
+  if not rom then return nil end
+  local degree = WIKI_ROMAN[rom:upper()]
+  local codes = WIKI_SUFFIX[suffix]
+  if not degree or not codes then return nil end
+  local offset = ({ 0, 2, 4, 5, 7, 9, 11 })[degree]
+  for c in acc:gmatch(".") do offset = offset + ((c == "b") and -1 or 1) end
+  local upper = (rom == rom:upper())
+  return { roman = token, degree = degree, offset = offset % 12, code = codes[upper and 1 or 2],
+    flat = acc:find("b", 1, true) ~= nil }
+end
+
+-- note name of a degree: one letter per degree, counted from the tonic's letter
+local function wikiRootName(spec, tonicName, tonicPC)
+  local LETTERS = { "C", "D", "E", "F", "G", "A", "B" }
+  local NATURAL = { C = 0, D = 2, E = 4, F = 5, G = 7, A = 9, B = 11 }
+  local pc = (tonicPC + spec.offset) % 12
+  local li = nil
+  for k, l in ipairs(LETTERS) do if l == tonicName:sub(1, 1) then li = k end end
+  if li then
+    local L = LETTERS[((li - 1 + spec.degree - 1) % 7) + 1]
+    local a = ((pc - NATURAL[L] + 6) % 12) - 6
+    if math.abs(a) <= 1 then return L .. ((a == 1) and "#" or ((a == -1) and "b" or "")) end
+  end
+  return spec.flat and flatNotes[pc + 1] or notes[pc + 1]
+end
+
+-- chords of a progression in the current key:
+-- { { roman, name, rootNote, chord, code, offset, outside }, ... }
+function wikiChords(progression)
+  local out = {}
+  local tonic = getScaleTonicNote()
+  local tonicName = getScaleNoteName(1) or notes[tonic]
+  for token in progression:gmatch("%S+") do
+    local spec = wikiParseRoman(token)
+    if spec then
+      spec.chord = chordByCode(spec.code)
+      spec.rootNote = tonic + spec.offset
+      spec.rootName = wikiRootName(spec, tonicName, (tonic - 1) % 12)
+      spec.name = spec.rootName .. spec.chord.display
+      spec.outside = chordIsOutsideMainScale(spec.rootNote, spec.chord)
+      out[#out + 1] = spec
+    end
+  end
+  return out
+end
+
+local function wikiContext(spec, label)
+  local ctx = {
+    isNeighbors = true, tonic = getScaleTonicNote(), pattern = scalePattern,
+    notes = { spec.rootNote }, chords = { { spec.chord } }, names = { spec.rootName },
+    headers = { spec.roman }, inScaleCounts = { 1 }, nameByPC = {},
+    label = spec.name,
+    describe = spec.roman .. ((label and label ~= "") and ("  ·  " .. label) or ""),
+  }
+  for d, note in ipairs(scaleNotes) do ctx.nameByPC[(note - 1) % 12] = getScaleNoteName(d) end
+  ctx.nameByPC[(spec.rootNote - 1) % 12] = spec.rootName
+  return ctx
+end
+
+-- plays one chord of a progression (insert = true: writes it like any other chord)
+function wikiPlay(spec, insert, label)
+  return withBorrowContext(wikiContext(spec, label), function()
+    if insert then return playOrInsertChord(1, 1, "wiki chord " .. spec.name) end
+    return previewChord(1, 1)
+  end)
+end
+
+-- writes the whole progression at the edit cursor, one chord after the other
+-- (chord length, pattern, colors and voice leading apply as usual)
+function wikiInsertProgression(specs, label)
+  if activeTake() == nil or not notCurrentlyRecording() then return false end
+  startUndoBlock()
+  local last = nil
+  for _, spec in ipairs(specs) do
+    last = withBorrowContext(wikiContext(spec, label), function()
+      local result = buildChordVoicing(1, 1)
+      insertScaleChord(result.notes, false)
+      commitReference(result)
+      addToHistory(result, true)
+      return result
+    end)
+  end
+  endUndoBlock("ChordMachineGun 2: progression (" .. tostring(label) .. ")")
+  if last then updateChordDisplay(last) end
+  return true
+end
+
+-- auditions a progression: one chord per bar, on the live clock (main window only).
+-- Calling it again with the same key stops it.
+function wikiAudition(specs, label, key)
+  if not LiveArp.host then return end
+  if LiveArp.sequence and LiveArp.sequence.key == key then
+    stopNotesFromPlaying()
+    return
+  end
+  stopNotesFromPlaying()
+  LiveArp.sequence = { specs = specs, label = label, key = key, index = 0, nextAt = nil }
+end
+
+function LiveArp.sequenceTick()
+  local seq = LiveArp.sequence
+  if not seq then return end
+  local now, clockMode = LiveArp.clock()
+  if seq.clockMode and seq.clockMode ~= clockMode then seq.nextAt = now end
+  seq.clockMode = clockMode
+  if seq.nextAt ~= nil and now < seq.nextAt - 1e-6 then return end
+  seq.index = seq.index + 1
+  local spec = seq.specs[seq.index]
+  if not spec then
+    stopNotesFromPlaying()
+    return
+  end
+  LiveArp.internal, LiveArp.forceNow = true, true
+  local ok, err = pcall(wikiPlay, spec, false, seq.label)
+  LiveArp.internal, LiveArp.forceNow = false, false
+  if not ok then LiveArp.sequence = nil; error(err, 0) end
+  local _, bar = LiveArp.barLength()
+  if clockMode == "transport" then
+    local _, _, e = reaper.TimeMap_QNToMeasures(0, now)
+    seq.nextAt = (e and e > now) and e or (now + bar)
+  else
+    seq.nextAt = now + bar
+  end
 end

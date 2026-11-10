@@ -11,6 +11,11 @@
     - Parallel-mode borrowing on the Ctrl row (modal interchange)
     - Film / game scales (Lydian Dominant, Mixolydian b6, Phrygian Dominant, Double Harmonic…)
     - Proper note spelling for every scale
+  New in 2.1:
+    - Live patterns: the preview plays the arpeggio / pattern in real time, in sync with the transport
+    - Quantized chord change: a new chord can wait for the next beat, bar or 2-bar line
+    - Reharmonize: selected notes keep their rhythm and move onto the new chord
+    - Wiki (F11): most used and most beautiful progressions of every scale, playable and insertable
 
   Mouse
     click               : play the chord
@@ -18,7 +23,8 @@
     right-click (empty) : dock / undock the window
     wheel over panel    : scroll the right panel
   Keys
-    1-7 play, Shift+1-7 insert, arrows select, Enter play, +/- octave,
+    1-7 play, Shift+1-7 insert, arrows select, Enter play, +/- octave, 0 stop,
+    F1-F8 colors, F9/F10 pattern, F11 wiki, F12 chord change (now / beat / bar / 2 bars),
     Ctrl+1-7 degrees of the chord's scale, Alt+1-7 PLR transformations
 ]]
 
@@ -26,6 +32,9 @@ local scriptPath = ({ reaper.get_action_context() })[2]:match("^(.*[/\\])")
 dofile(scriptPath .. "Todoroki_ChordMachineGun2_core.lua")
 
 updateScaleData()
+
+-- this window runs the live engine (patterns in real time, queued chord changes)
+LiveArp.host = true
 
 ------------------------------------------------------------------------------
 -- Theme
@@ -353,6 +362,10 @@ local ui = {
   pinApplied = false,
   lastTonic = getScaleTonicNote(),
   lastType = getScaleType(),
+  wiki = false,        -- wiki page shown instead of the chord grid
+  wikiScroll = 0,
+  wikiCache = nil,
+  wikiLast = nil,      -- last chord clicked in the wiki
 }
 
 local PAD, GAP = 16, 3
@@ -449,8 +462,9 @@ local function drawHeader(W, compact)
   fillRect(0, 0, W, HEADER_H, THEME.bg)
   local y, h = 14, 28
   local x = PAD
-  drawText("ChordMachineGun 2", x, y, 160, h, THEME.text, F_BOLD, 0)
-  x = x + 172
+  local titleW = compact and 62 or 172
+  drawText(compact and "CMG 2" or "ChordMachineGun 2", x, y, titleW - 12, h, THEME.text, F_BOLD, 0)
+  x = x + titleW
 
   -- tonique
   local tonic = getScaleTonicNote()
@@ -465,14 +479,21 @@ local function drawHeader(W, compact)
   -- scale
   local st = getScaleType()
   local scaleW = 150
-  if compact then scaleW = math.max(70, math.min(150, (W - PAD - 330 - 150) - x - 8)) end
+  if compact then scaleW = math.max(70, math.min(150, (W - PAD - 330 - 150) - x - 8 - 60)) end
   if button(x, y, scaleW, h, scales[st].name, { align = 0, caret = true }) then
     local entries = {}
     for i, s in ipairs(scales) do entries[i] = { label = s.name, value = i, checked = (i == st) } end
     local v = showMenu(entries)
     if v then setScaleTonicAndType(nil, v) end
   end
-  x = x + 162
+  x = x + scaleW + 6
+
+  -- wiki: progressions of the current scale
+  if button(x, y, 54, h, "Wiki", { font = F_SMALL, active = ui.wiki }) then
+    ui.wiki = not ui.wiki
+    ui.wikiScroll = 0
+  end
+  x = x + 66
 
   local rightW = 330
   if compact then rightW = rightW + 150 end
@@ -513,7 +534,19 @@ local function drawChordDisplay(x, y, w)
     for _, p in ipairs(getDronePitches()) do d[#d + 1] = getPitchName(p) end
     notesLine = notesLine .. "      drone  " .. table.concat(d, " ")
   end
-  drawText(notesLine, x, y + 40, w - 230, 18, THEME.muted, F_SMALL, 0)
+  -- chord waiting for the next beat / bar: badge + countdown line
+  local live = LiveArp.status()
+  local nx = x
+  if live and live.pending then
+    local label = "QUEUED  ·  " .. (({ beat = "NEXT BEAT", bar = "NEXT BAR", ["2bars"] = "2-BAR LINE" })[live.mode] or "")
+    local lw = measure(label, F_LABEL) + 14
+    fillRect(x, y + 41, lw, 16, THEME.accent)
+    drawText(label, x + 7, y + 41, lw - 14, 16, THEME.onAccent, F_LABEL, 0)
+    nx = x + lw + 10
+    fillRect(x, y + 60, w - 230, 2, THEME.line)
+    fillRect(x, y + 60, math.floor((w - 230) * live.progress), 2, THEME.accent)
+  end
+  drawText(notesLine, nx, y + 40, w - 230 - (nx - x), 18, THEME.muted, F_SMALL, 0)
 
   if ui.mod and ui.mod.ctx then
     local isCtrl = ui.mod.kind == "ctrl"
@@ -660,7 +693,7 @@ local function drawPerformanceStrip(x, y, w)
   local px, py = cx, y
   if cx + need > x + w then px, py = x, y + h + 6 end
 
-  drawText("INSERT", px, py, 50, h, THEME.muted, F_LABEL, 0)
+  drawText("PATTERN", px, py, 50, h, THEME.muted, F_LABEL, 0)
   px = px + 52
   local block = (getPattern() == "block")
   if button(px, py, 118, h, patternName(), { font = F_SMALL, align = 0, caret = true, active = not block }) then
@@ -692,7 +725,47 @@ local function drawPerformanceStrip(x, y, w)
     setPatternHoldBass(not hold)
   end
 
-  return py + h + 10
+  -- play row: live pattern, quantized chord change, what happens to selected notes
+  local ry = py + h + 6
+  drawText("PLAY", x, ry, 50, h, THEME.muted, F_LABEL, 0)
+  local qx = x + 52
+  local livePattern = getLivePattern()
+  if button(qx, ry, 96, h, "Live pattern", { font = F_SMALL, active = livePattern and not block,
+      fg = (block or not livePattern) and THEME.faint or nil }) then
+    setLivePattern(not livePattern)
+  end
+  qx = qx + 96 + GAP
+  local changeMode = getChangeMode()
+  local changeName = "Now"
+  for _, m in ipairs(CHANGE_MODES) do if m.id == changeMode then changeName = m.name end end
+  if button(qx, ry, 124, h, "Change: " .. changeName, { font = F_SMALL, align = 0, caret = true, active = changeMode ~= "now" }) then
+    local entries = {}
+    for k, m in ipairs(CHANGE_MODES) do
+      entries[k] = { label = m.name .. "   —   " .. m.hint, value = m.id, checked = (m.id == changeMode) }
+    end
+    local v = showMenu(entries)
+    if v then setChangeMode(v) end
+  end
+  qx = qx + 124 + GAP
+  local reharm = getSelectionMode() == "reharm"
+  if button(qx, ry, 168, h, reharm and "Selection: Reharmonize" or "Selection: Replace",
+      { font = F_SMALL, align = 0, caret = true, active = reharm }) then
+    local v = showMenu({
+      { label = "Replace   —   selected chords are replaced by the new chord", value = "replace", checked = not reharm },
+      { label = "Reharmonize   —   selected notes keep their rhythm and move onto the new chord", value = "reharm", checked = reharm },
+    })
+    if v then setSelectionMode(v) end
+  end
+  qx = qx + 168 + GAP
+  if button(qx, ry, 50, h, "Stop", { font = F_SMALL }) then stopAllNotesFromPlaying() end
+  qx = qx + 50 + 10
+  local status = LiveArp.status()
+  if status and x + w - qx > 90 then
+    drawText((status.live and "live" or "held") .. "  ·  " .. (status.clockMode == "transport" and "synced to transport" or "free clock"),
+      qx, ry, x + w - qx, h, status.live and THEME.accent or THEME.faint, F_SMALL, 2)
+  end
+
+  return ry + h + 10
 end
 
 
@@ -783,6 +856,141 @@ local function drawModifierRow(x, y, w)
   return y + MOD_ROW_H
 end
 
+
+------------------------------------------------------------------------------
+-- Wiki page (v2.1): the progressions of the current scale, in the current key
+------------------------------------------------------------------------------
+
+local function wrapText(s, maxW, font)
+  gfx.setfont(font or F_SMALL)
+  local lines, line = {}, ""
+  for word in s:gmatch("%S+") do
+    local try = (line == "") and word or (line .. " " .. word)
+    if line ~= "" and gfx.measurestr(try) > maxW then
+      lines[#lines + 1] = line
+      line = word
+    else
+      line = try
+    end
+  end
+  if line ~= "" then lines[#lines + 1] = line end
+  return lines
+end
+
+local function drawPlayIcon(x, y, w, h, hex, stop)
+  setColor(hex)
+  local cx, cy = math.floor(x + w / 2), math.floor(y + h / 2)
+  if stop then gfx.rect(cx - 4, cy - 4, 9, 9, 1)
+  else gfx.triangle(cx - 4, cy - 6, cx - 4, cy + 6, cx + 6, cy) end
+end
+
+local function wikiSpecs(progression)
+  local sig = getScaleTonicNote() .. "|" .. getScaleType()
+  if not ui.wikiCache or ui.wikiCache.sig ~= sig then ui.wikiCache = { sig = sig, items = {} } end
+  local specs = ui.wikiCache.items[progression]
+  if not specs then
+    specs = wikiChords(progression)
+    ui.wikiCache.items[progression] = specs
+  end
+  return specs
+end
+
+local function drawWikiRow(x, y, w, h, pr, key)
+  fillRect(x, y, w, h, THEME.surface)
+  local nameW = math.max(120, math.min(210, math.floor(w * 0.27)))
+  drawText(pr[1], x + 10, y + 4, nameW - 14, 20, THEME.text, F_BOLD, 0)
+  drawText(pr[4] or pr[2], x + 10, y + 23, nameW - 14, 16, THEME.muted, F_SMALL, 0)
+
+  local specs = wikiSpecs(pr[2])
+  local n = math.max(1, #specs)
+  local btnW = 30 + GAP + 58
+  local ax = x + nameW
+  local avail = w - nameW - btnW - 14
+  local chipW = math.max(24, math.min(88, math.floor((avail - (n - 1) * GAP) / n)))
+  local seq = LiveArp.sequence
+  for k, spec in ipairs(specs) do
+    local cx = ax + (k - 1) * (chipW + GAP)
+    local playingNow = seq ~= nil and seq.key == key and seq.index == k
+    local hov = hover(cx, y + 3, chipW, h - 6)
+    fillRect(cx, y + 3, chipW, h - 6, playingNow and THEME.accent or (hov and THEME.hover or THEME.surface2))
+    if ui.wikiLast == key .. ":" .. k and not playingNow then fillRect(cx, y + h - 5, chipW, 2, THEME.accent) end
+    drawText(spec.roman, cx + 2, y + 5, chipW - 4, 14, playingNow and THEME.onAccent or THEME.muted, F_LABEL, 1)
+    drawText(spec.name, cx + 2, y + 19, chipW - 4, 20,
+      playingNow and THEME.onAccent or (spec.outside and THEME.accent or THEME.text), F_BOLD, 1)
+    if clicked(cx, y + 3, chipW, h - 6) then
+      wikiPlay(spec, M.shift, pr[1])
+      ui.wikiLast = key .. ":" .. k
+    end
+  end
+
+  -- listen (one chord per bar) / write the whole progression
+  local bx = x + w - btnW - 6
+  local active = seq ~= nil and seq.key == key
+  local hov = hover(bx, y + 8, 30, h - 16)
+  fillRect(bx, y + 8, 30, h - 16, active and THEME.accent or (hov and THEME.hover or THEME.surface2))
+  drawPlayIcon(bx, y + 8, 30, h - 16, active and THEME.onAccent or (hov and THEME.text or THEME.soft), active)
+  if clicked(bx, y + 8, 30, h - 16) then wikiAudition(specs, pr[1], key) end
+  if button(bx + 30 + GAP, y + 8, 58, h - 16, "Insert", { font = F_SMALL }) then
+    if not wikiInsertProgression(specs, pr[1]) then
+      reaper.MB("Open a MIDI item in the MIDI editor first.", "ChordMachineGun 2", 0)
+      afterModal()
+    end
+  end
+end
+
+local function drawWiki(x, y, w, h)
+  local y0 = y
+  local st = getScaleType()
+  local page = getWiki(st)
+  local tonicName = getScaleNoteName(1) or notes[getScaleTonicNote()]
+  fillRect(x, y - 6, w, 2, THEME.accent)
+  drawText("WIKI  ·  " .. upperFR(tonicName .. " " .. scales[st].name), x, y, w - 80, 18, THEME.accent, F_LABEL, 0)
+  if button(x + w - 64, y - 2, 64, 22, "Close", { font = F_SMALL }) then ui.wiki = false end
+  y = y + 24
+  if not page then
+    drawText("No page for this scale yet.", x, y, w, 20, THEME.muted, F_SMALL, 0)
+    return
+  end
+  for _, line in ipairs(wrapText(page.about, w, F_SMALL)) do
+    drawText(line, x, y, w, 17, THEME.soft, F_SMALL, 0)
+    y = y + 17
+  end
+  y = y + 4
+  drawText("click: play  ·  Shift + click: insert  ·  triangle: listen, one chord per bar  ·  Insert: write the whole progression  ·  blue: outside the scale",
+    x, y, w, 16, THEME.faint, F_SMALL, 0)
+  y = y + 24
+
+  local top, bottom = y, y0 + h
+  local rowH, headH = 42, 24
+  local contentH = 2 * headH + #page.progressions * rowH
+  if hover(x, top, w, bottom - top) and M.wheel ~= 0 then
+    ui.wikiScroll = ui.wikiScroll + (M.wheel > 0 and rowH or -rowH)
+    M.wheel = 0
+  end
+  ui.wikiScroll = math.max(math.min(0, (bottom - top) - contentH), math.min(0, ui.wikiScroll))
+
+  clip.top, clip.bottom = top, bottom
+  local cy = top + ui.wikiScroll
+  local hidden = false
+  for _, sec in ipairs({ { "c", "MOST USED" }, { "b", "MOST BEAUTIFUL" } }) do
+    if cy >= top and cy + headH <= bottom then
+      drawText(sec[2], x, cy + 6, w, 16, THEME.muted, F_LABEL, 0)
+    end
+    cy = cy + headH
+    for index, pr in ipairs(page.progressions) do
+      if pr[3] == sec[1] then
+        if cy >= top and cy + rowH <= bottom then
+          drawWikiRow(x, cy, w, rowH - 2 * GAP, pr, st .. "#" .. index)
+        elseif cy + rowH > bottom then
+          hidden = true
+        end
+        cy = cy + rowH
+      end
+    end
+  end
+  clip.top, clip.bottom = 0, 1e9
+  if hidden then drawText("scroll for more  ↓", x, bottom - 16, w, 16, THEME.muted, F_SMALL, 2) end
+end
 
 ------------------------------------------------------------------------------
 -- Curseurs CC
@@ -1398,6 +1606,8 @@ local function handleInput(char)
   if char == 26168 then clearColors(); return end
   if char == 26169 then cyclePattern(-1); return end
   if char == 6697264 then cyclePattern(1); return end
+  if char == 6697265 then ui.wiki = not ui.wiki; ui.wikiScroll = 0; return end   -- F11
+  if char == 6697266 then cycleChangeMode(1); return end                        -- F12
 
   -- with Ctrl/Alt and the js extension: digits, arrows and Enter are read physically (see frame)
   if modKind and physicalKeysAvailable() then
@@ -1553,6 +1763,7 @@ local function frame()
   local char = gfx.getchar()
   if char == 27 and ui.ccLearn then stopLearn(); char = 0 end
   if char == -1 or char == 27 then
+    LiveArp.shutdown()
     saveWindowState()
     gfx.quit()
     return
@@ -1567,6 +1778,7 @@ local function frame()
   ui.frameNo = ui.frameNo + 1
   updateMouse()
   processIncomingCC()
+  LiveArp.tick()
   local physical = pollPhysicalKeys()
   handleInput(char)
   if physical and #physical > 0 then
@@ -1619,13 +1831,17 @@ local function frame()
     local gw = compact and (W - 2 * PAD) or (W - 3 * PAD - PANEL_W)
     local y = drawChordDisplay(PAD, contentY, gw)
     y = drawPerformanceStrip(PAD, y + 4, gw)
-    y = drawModifierRow(PAD, y, gw)
-    drawChordGrid(PAD, y, gw, H - y - footerH, nil)
+    if ui.wiki then
+      drawWiki(PAD, y + 8, gw, H - y - 8 - footerH)
+    else
+      y = drawModifierRow(PAD, y, gw)
+      drawChordGrid(PAD, y, gw, H - y - footerH, nil)
+    end
   end
 
   -- pied
   fillRect(0, H - footerH, W, footerH, THEME.bg)
-  drawText("click: play   ·   Shift + click: insert   ·   F1–F7: colors   ·   F9 / F10: pattern   ·   right-click: dock", PAD, H - footerH, W - 2 * PAD, footerH - 4, THEME.faint, F_SMALL, 0)
+  drawText("click: play   ·   Shift + click: insert   ·   0: stop   ·   F1–F7: colors   ·   F9 / F10: pattern   ·   F11: wiki   ·   F12: chord change   ·   right-click: dock", PAD, H - footerH, W - 2 * PAD, footerH - 4, THEME.faint, F_SMALL, 0)
 
   drawHeader(W, compact)
 
@@ -1636,5 +1852,8 @@ local function frame()
 end
 
 initWindow()
-reaper.atexit(saveWindowState)
+reaper.atexit(function()
+  LiveArp.shutdown()
+  saveWindowState()
+end)
 frame()

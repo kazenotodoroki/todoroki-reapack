@@ -11,6 +11,48 @@ REAPER runs the files straight from the repo folder, so any later change is live
 
 Recommended: the **js_ReaScriptAPI** extension (ReaPack), for Ctrl/Alt + digits and window pinning.
 
+## What is new in 2.1
+
+### Live patterns (arpeggios in real time)
+With **Live pattern** on (PLAY row, on by default), the preview plays the chosen pattern instead of a plain chord: click a chord or press 1-7 and the arpeggio runs until you play another chord or stop.
+
+- Pattern, rate and **Hold bass** come from the PATTERN row and can be changed while it plays. With **Block chord** the preview is a plain held chord, as before.
+- **Clock**: while the transport plays, the pattern follows the project (steps fall on the grid of the bar, tempo changes included). When it is stopped, a free clock at the project tempo starts on your first chord. The right end of the PLAY row shows `live · synced to transport` or `live · free clock`.
+- The drone and the held bass sound as long notes; off-beat notes are slightly softer; the velocity slider acts live.
+- **Stop**: the **Stop** button, key **0**, or middle click.
+- The engine runs in the main window. While it is open, chords triggered by actions and by the history window are played by it (same pattern, same queue). When it is closed, they play a plain chord.
+- It is a preview: timing follows REAPER's script refresh (about 30 times per second), so fast rates are slightly loose. Inserted notes are exact.
+
+### Chord change: Now / Beat / Bar / 2 bars
+The **Change** menu (PLAY row, or **F12**) decides when a new chord replaces the one that is sounding.
+
+- **Now**: at once (default).
+- **Beat / Bar / 2 bars**: the new chord is *queued* and starts on the next beat, at the end of the bar, or at the end of a 2-bar group. Example: Change = Bar, an arpeggio on I is running, you press **2**: the arpeggio finishes its bar, then moves to ii.
+- While a chord waits, a **QUEUED** badge and a countdown line appear under the chord name. Pressing another chord before the line replaces the queued one. If nothing is sounding, the chord starts immediately.
+- Bars follow the project time signature. With the transport stopped they are counted from the moment the first chord started; while it plays they are the real bars of the project.
+- It applies to a running live pattern, and to any chord (plain chords too) while the transport plays. A plain chord with the transport stopped changes immediately.
+- Only the sound waits: Shift (insert) still writes the chord at once.
+
+### Reharmonize selected notes
+**Selection** menu (PLAY row): what Shift+click / Shift+digit does when notes are selected in the MIDI editor.
+
+- **Replace** (default): each selected chord is replaced by the new chord, as before.
+- **Reharmonize**: the selected notes keep their position, length, velocity and channel, and each pitch moves to the closest note of the new chord. An arpeggio, a riff or a pad written on C becomes the same figure on F, Am, Ab…
+  - Notes that were different stay different and in the same order whenever the chord allows it.
+  - A bass note (below C3) follows the bass of the new chord.
+  - Colors apply (with **7** on, the 7th becomes available). Drone notes do not move. Unselected notes are untouched.
+  - Every selected note lands on a chord tone, so passing notes of a melody are pulled onto the chord: select the accompaniment, not the tune.
+
+### Wiki: progressions for every scale
+The **Wiki** button in the header (or **F11**) replaces the grid with a page about the current scale: what it sounds like, then two lists in the current key, **Most used** and **Most beautiful**.
+
+- Each progression shows its chords with their roman numeral. Blue = chord outside the scale (borrowed).
+- **Click** a chord to play it, **Shift+click** to insert it (colors, pattern, voice leading and channels apply as for any chord).
+- **Triangle**: listen to the whole progression, one chord per bar, with the current pattern. Click again, or play anything, to stop.
+- **Insert**: writes the whole progression at the edit cursor, one chord after the other (chord length = grid × Length).
+- Roman numerals are measured from the major scale of the tonic: `bVI` is the major chord a minor sixth above the tonic, lower case is minor, `o` diminished, `+` augmented.
+- All 21 scales have a page (Ionian shares Major's, Aeolian shares Natural Minor's). The lists are an editorial selection, not a complete catalogue.
+
 ## What is new in 2
 
 ### Colors
@@ -23,8 +65,8 @@ A row of chips under the chord name: **7 · 9 · 11 · 13 · sus2 · sus4 · no3
 - With voice leading on **auto** voices, the chord gets one voice per chord tone, so added colors are always heard. With a fixed voice count, the fifth and the root are dropped first.
 - In a custom position, `9`, `11` and `13` use the active colors.
 
-### Insert patterns
-The **INSERT** row decides how a chord is written into the MIDI item:
+### Patterns
+The **PATTERN** row decides how a chord is played and written into the MIDI item:
 
 - **Block chord**, **Arp up**, **Arp down**, **Arp up-down**, **Alberti** (low-high-mid-high), **Bass / chord**, **Pulse** (repeated chord).
 - **Rate**: 1/4, 1/8, 1/8T, 1/16, 1/16T.
@@ -33,7 +75,7 @@ The **INSERT** row decides how a chord is written into the MIDI item:
 - The drone is always written as one long note. Off-beat notes are slightly softer.
 - Keys: **F9 / F10** previous / next pattern.
 
-Limits: the preview (click, 1-7) always plays the plain chord, and replacing *selected* notes keeps the plain-chord behaviour. Inserting again at the same place replaces what was there.
+Replacing *selected* chords keeps the plain-chord behaviour. Inserting again at the same place replaces what was there.
 
 ### Parallel-mode borrowing (modal interchange)
 In the panel, **Degrees (Ctrl)** has a third option, **Parallel**: the Ctrl row then shows the chords of another mode on the *same tonic*. In C major with "C Natural Minor": Ctrl+6 = Ab, Ctrl+7 = Bb, Ctrl+4 = Fm. Choose the mode in the dropdown under the switch (any scale of the list).
@@ -45,7 +87,7 @@ Lydian Dominant, Mixolydian b6, Phrygian Dominant, Harmonic Major, Double Harmon
 Seven-note scales are spelled with one letter per degree (F# next to G, never Gb next to G), in the grid, the chord names and the voices.
 
 ### New actions
-`toggle color 7th / 9th / 11th / 13th / sus2 / sus4 / no 3rd`, `clear colors`, `next insert pattern`, `previous insert pattern`.
+`toggle color 7th / 9th / 11th / 13th / sus2 / sus4 / no 3rd`, `clear colors`, `next insert pattern`, `previous insert pattern`, `toggle live pattern`, `next chord change mode (now - beat - bar - 2 bars)`, `toggle reharmonize selected notes`.
 
 ---
 
@@ -128,7 +170,8 @@ Rules applied:
 - **+ / −**: octave.
 - **Shift+← →**: move the edit cursor by one grid step.
 - **1-7**: play the scale chords, **Shift+1-7**: insert them. **a-j / q-u / z-m**: single notes (as in ChordGun).
-- **0** or middle click: stop all notes (including the drone).
+- **0** or middle click: stop all notes (including the drone and the live pattern).
+- **F1-F8** colors, **F9 / F10** pattern, **F11** wiki, **F12** chord change mode.
 
 ## Ctrl and Alt: reliable keys
 With Ctrl or Alt held, REAPER does not always pass digits and arrows to the script. ChordMachineGun therefore reads the physical key state through the **js_ReaScriptAPI** extension. The numeric keypad works too.
