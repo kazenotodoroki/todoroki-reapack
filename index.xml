@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<index version="1" name="Todoroki" commit="b15442032e5bdaaa1798401f464e720579d37ca9">
+<index version="1" name="Todoroki" commit="6f02a14bb254d55756da51a282b7098528d9911d">
   <category name="FX">
     <reapack name="RefLab.jsfx" type="effect" desc="RefLab - Multi-track referencing (spectrum, LUFS, loudness match, loops, band solo)">
       <metadata>
@@ -138,7 +138,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Cr\u233 ?e des actions toggle (pour la toolbar) \u224 ? partir des param\u232 ?tres d'un plugin. Outil externe : \u224 ? lancer avec Python, en dehors de REAPER.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Creates toggle actions (for the toolbar) from the parameters of a plugin. External tool: run it with Python, outside REAPER.\par}
 }
 ]]></description>
       </metadata>
@@ -153,7 +153,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Cr\u233 ?e une librairie DecentSampler \u224 ? partir des samples export\u233 ?s de REAPER. Outil externe : \u224 ? lancer avec Python, en dehors de REAPER.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Creates a DecentSampler library from the samples exported from REAPER. External tool: run it with Python, outside REAPER.\par}
 }
 ]]></description>
       </metadata>
@@ -168,7 +168,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Renomme et range les samples export\u233 ?s de REAPER pour Kontakt. Outil externe : \u224 ? lancer avec Python, en dehors de REAPER.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Renames and sorts the samples exported from REAPER for Kontakt. External tool: run it with Python, outside REAPER.\par}
 }
 ]]></description>
       </metadata>
@@ -185,7 +185,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Liste les param\u232 ?tres d'un plugin et leurs index.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Lists the parameters of a plugin and their indexes.\par}
 }
 ]]></description>
       </metadata>
@@ -200,7 +200,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Cr\u233 ?e les r\u233 ?gions et une piste MIDI pour enregistrer des samples.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Creates the regions and a MIDI track to record samples.\par}
 }
 ]]></description>
       </metadata>
@@ -215,7 +215,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Supprime les r\u233 ?gions et marqueurs commen\u231 ?ant par "/".\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Deletes the regions and markers whose name starts with "/".\par}
 }
 ]]></description>
       </metadata>
@@ -230,7 +230,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Cr\u233 ?e une boucle sans coupure sur chaque sample.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Creates a seamless loop on each sample.\par}
 }
 ]]></description>
       </metadata>
@@ -245,7 +245,7 @@
 {\colortbl;\red255\green0\blue0;\red0\green0\blue255;}
 \widowctrl\hyphauto
 
-{\pard \ql \f0 \sa180 \li0 \fi0 Exporte toutes les r\u233 ?gions sauf celles commen\u231 ?ant par "#".\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Exports every region except those whose name starts with "#".\par}
 }
 ]]></description>
       </metadata>
@@ -261,16 +261,16 @@
 \widowctrl\hyphauto
 
 {\pard \ql \f0 \sa180 \li0 \fi0 \outlinelevel0 \b \fs36 Todoroki ZLEQ2 Curve Import\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Lit une courbe et la transforme en bandes pour {\b ZL Equalizer 2} (ZL Audio).\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Fichiers acceptes :\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b AutoEQ} : ParametricEQ.txt (filtres repris tels quels), GraphicEQ.txt, CSV AutoEQ (colonnes equalization / error_smoothed / raw + target)\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Open Sound Meter} : export CSV, TXT ou FRD d'une mesure (frequence, magnitude, phase, coherence)\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Tout CSV / TXT simple "frequence, dB" (REW, etc.)\sa180\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Pour une courbe (CSV, mesure), le script calcule les bandes (Peak + shelves) qui reproduisent la correction : nombre de bandes, plage de frequences, boost / cut / Q max, lissage, pente cible. Une mesure est inversee (correction = niveau moyen - mesure), ponderee par la coherence OSM.\par}
-{\pard \ql \f0 \sa180 \li0 \fi0 Sorties (au choix, combinables) :\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b A} : applique les bandes au ZL Equalizer 2 de la piste selectionnee (ou de la fenetre FX ZL au premier plan ; propose de l'ajouter s'il manque). Preamp -> Output Gain.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b C} : copie les bandes dans le presse-papiers au format ZL : clic droit dans ZL > Paste. Un fichier _ZLEQ2_bands.xml est aussi ecrit a cote du fichier source.\par}
-{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b M} : ecrit la courbe (mesure ou cible) comme cible EQ Match dans ZL Audio/ZL Equalizer 2/Match Presets (EQ Match > Target : Preset).\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Reads a curve and turns it into bands for {\b ZL Equalizer 2} (ZL Audio).\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Accepted files:\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b AutoEQ}: ParametricEQ.txt (filters taken as they are), GraphicEQ.txt, AutoEQ CSV (equalization / error_smoothed / raw + target columns)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b Open Sound Meter}: CSV, TXT or FRD export of a measurement (frequency, magnitude, phase, coherence)\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab Any simple "frequency, dB" CSV / TXT (REW, etc.)\sa180\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 For a curve (CSV, measurement), the script computes the bands (Peak + shelves) that reproduce the correction: number of bands, frequency range, max boost / cut / Q, smoothing, target slope. A measurement is inverted (correction = average level - measurement), weighted by the OSM coherence.\par}
+{\pard \ql \f0 \sa180 \li0 \fi0 Outputs (pick any, can be combined):\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b A}: applies the bands to the ZL Equalizer 2 of the selected track (or of the ZL FX window in front; offers to add it if missing). Preamp -> Output Gain.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b C}: copies the bands to the clipboard in ZL format: right-click in ZL > Paste. A _ZLEQ2_bands.xml file is also written next to the source file.\par}
+{\pard \ql \f0 \sa0 \li360 \fi-360 \bullet \tx360\tab {\b M}: writes the curve (measurement or target) as an EQ Match target in ZL Audio/ZL Equalizer 2/Match Presets (EQ Match > Target: Preset).\sa180\par}
 }
 ]]></description>
       </metadata>
