@@ -745,23 +745,12 @@ function setNotesThatArePlaying(list)
   setValue("notesThatArePlaying", table.concat(parts, ","))
 end
 
--- stops what the last chord left sounding (the held drone keeps going)
-local function rawStopNotes()
+function stopNotesFromPlaying()
   for _, n in ipairs(getNotesThatArePlaying()) do stopNoteFromPlaying(n.pitch, n.chan) end
   setNotesThatArePlaying({})
 end
 
--- live engine (see "Live engine" further down): running pattern, queued chord,
--- requests between scripts
-LiveArp = { host = false }
-
-function stopNotesFromPlaying()
-  if LiveArp.cancel then LiveArp.cancel() end
-  rawStopNotes()
-end
-
 function stopAllNotesFromPlaying()
-  if LiveArp.cancel then LiveArp.cancel() end
   for ch = 0, 15 do
     reaper.StuffMIDIMessage(0, 0xB0 + ch, 123, 0) -- All Notes Off
   end
@@ -1891,7 +1880,7 @@ function buildChordVoicing(scaleNoteIndex, chordTypeIndex, refInfo)
   -- register: the analysed chord's if external, otherwise the chosen octave
   local anchor = (refInfo and refInfo.external) and ref[1] or rootPitch
   local N = getVoiceCount()
-  local result = { root = root, chord = chord }
+  local result = { root = root, chord = chord, baseCode = scaleChords[scaleNoteIndex][chordTypeIndex].code }
 
   local V
   if getCustomPositionEnabled() then
@@ -1992,6 +1981,7 @@ local function voicingNotesText(result)
 end
 
 function updateChordDisplay(result)
+  if result.root and result.baseCode then setValue("lastChord", ((result.root - 1) % 12) .. ":" .. result.baseCode) end
   setChordText(result.borrowLabel and (result.name .. "   ·  " .. result.borrowLabel) or result.name)
   setChordNotesText(voicingNotesText(result))
   setLastVoices(result.voices)
@@ -2112,145 +2102,9 @@ function insertMidiNote(note, keepNotesSelected, selectedChord, noteIndex)
 end
 
 
-------------------------------------------------------------------------------
--- Insert patterns (v2): how a chord is written into the item
---   block: plain chord · up / down / updown: arpeggios · alberti: low-high-mid-high
---   basschord: bass then chord · pulse: repeated chord
--- The drone (and the bass, with "hold bass") is written as one long note.
--- In the main window the preview plays the same pattern live (see "Live engine").
-------------------------------------------------------------------------------
-
-PATTERNS = {
-  { id = "block",     name = "Block chord" },
-  { id = "up",        name = "Arp up" },
-  { id = "down",      name = "Arp down" },
-  { id = "updown",    name = "Arp up-down" },
-  { id = "alberti",   name = "Alberti" },
-  { id = "basschord", name = "Bass / chord" },
-  { id = "pulse",     name = "Pulse" },
-}
-
-RATES = {
-  { id = "4",   name = "1/4",   qn = 1 },
-  { id = "8",   name = "1/8",   qn = 1 / 2 },
-  { id = "8T",  name = "1/8T",  qn = 1 / 3 },
-  { id = "16",  name = "1/16",  qn = 1 / 4 },
-  { id = "16T", name = "1/16T", qn = 1 / 6 },
-}
-
-function getPattern() return getValue("pattern", "block") end
-function setPattern(a) setValue("pattern", a) end
-function getPatternRate() return getValue("patternRate", "8") end
-function setPatternRate(a) setValue("patternRate", a) end
-function getPatternHoldBass() return getBool("patternHoldBass", false) end
-function setPatternHoldBass(a) setBool("patternHoldBass", a) end
-
-function cyclePattern(d)
-  local cur = getPattern()
-  local idx = 1
-  for k, pt in ipairs(PATTERNS) do if pt.id == cur then idx = k end end
-  idx = ((idx - 1 + d) % #PATTERNS) + 1
-  setPattern(PATTERNS[idx].id)
-  return PATTERNS[idx]
-end
-
-local function rateQN()
-  local id = getPatternRate()
-  for _, r in ipairs(RATES) do if r.id == id then return r.qn end end
-  return 0.5
-end
-
--- order of note indexes (1 = lowest) for one cycle of an arpeggio over n notes
-local function patternCycle(pattern, n)
-  local seq = {}
-  if pattern == "down" then
-    for k = n, 1, -1 do seq[#seq + 1] = { k } end
-  elseif pattern == "updown" then
-    for k = 1, n do seq[#seq + 1] = { k } end
-    for k = n - 1, 2, -1 do seq[#seq + 1] = { k } end
-  elseif pattern == "alberti" then
-    if n <= 2 then
-      for k = 1, n do seq[#seq + 1] = { k } end
-    else
-      seq[#seq + 1] = { 1 }; seq[#seq + 1] = { n }
-      for k = 2, n - 1 do seq[#seq + 1] = { k }; seq[#seq + 1] = { n } end
-    end
-  elseif pattern == "basschord" then
-    local upper = {}
-    for k = 2, n do upper[#upper + 1] = k end
-    seq[#seq + 1] = { 1 }
-    seq[#seq + 1] = (#upper > 0) and upper or { 1 }
-  elseif pattern == "pulse" then
-    local all = {}
-    for k = 1, n do all[k] = k end
-    seq[#seq + 1] = all
-  else -- up
-    for k = 1, n do seq[#seq + 1] = { k } end
-  end
-  return seq
-end
-
--- long notes (drone, and the bass with "hold bass") and the notes the pattern moves through
-local function splitPatternNotes(noteList)
-  local long, moving = {}, {}
-  for _, n in ipairs(noteList) do
-    if n.drone or n.voice == 0 then long[#long + 1] = n else moving[#moving + 1] = n end
-  end
-  table.sort(moving, function(a, b) return a.pitch < b.pitch end)
-  if getPatternHoldBass() and #moving > 1 then
-    -- the bass voice (and its doublings) is held; the rest moves
-    local bassVoice = moving[1].voice
-    local rest = {}
-    for _, n in ipairs(moving) do
-      if n.voice == bassVoice then long[#long + 1] = n else rest[#rest + 1] = n end
-    end
-    if #rest > 0 then moving = rest end
-  end
-  return long, moving
-end
-
--- writes noteList as a pattern between the edit cursor and cursor + chord length
-function insertPatternNotes(noteList)
-  local take = activeTake()
-  local startPPQ = getCursorPositionPPQ()
-  local endPPQ = getMidiEndPositionPPQ()
-  local velocity = getCurrentVelocity()
-  local defaultChan = getCurrentNoteChannel()
-  local pattern = getPattern()
-
-  local long, moving = splitPatternNotes(noteList)
-
-  for _, n in ipairs(long) do
-    reaper.MIDI_InsertNote(take, false, false, startPPQ, endPPQ, n.chan or defaultChan, n.pitch, velocity, true)
-  end
-
-  local startQN = reaper.MIDI_GetProjQNFromPPQPos(take, startPPQ)
-  local step = rateQN()
-  local cycle = patternCycle(pattern, #moving)
-  local k = 0
-  while #moving > 0 do
-    local a = reaper.MIDI_GetPPQPosFromProjQN(take, startQN + k * step)
-    if a >= endPPQ - 1 then break end
-    local b = math.min(endPPQ, reaper.MIDI_GetPPQPosFromProjQN(take, startQN + (k + 1) * step))
-    local onBeat = math.abs((k * step) - math.floor(k * step + 0.5)) < 0.001
-    local vel = onBeat and velocity or math.max(1, math.floor(velocity * 0.8 + 0.5))
-    for _, idx in ipairs(cycle[(k % #cycle) + 1]) do
-      local n = moving[idx]
-      if n then reaper.MIDI_InsertNote(take, false, false, a, b, n.chan or defaultChan, n.pitch, vel, true) end
-    end
-    k = k + 1
-    if k > 4096 then break end
-  end
-  reaper.MIDI_Sort(take)
-end
-
 function insertScaleChord(noteList, keepNotesSelected, selectedChord)
   deleteExistingNotesInNextInsertionTimePeriod(keepNotesSelected, selectedChord)
-  if not keepNotesSelected and getPattern() ~= "block" then
-    insertPatternNotes(noteList)
-  else
-    for i, n in ipairs(noteList) do insertMidiNote(n, keepNotesSelected, selectedChord, i) end
-  end
+  for i, n in ipairs(noteList) do insertMidiNote(n, keepNotesSelected, selectedChord, i) end
   moveCursor(keepNotesSelected, selectedChord)
 end
 
@@ -2367,319 +2221,8 @@ function reharmonizeSelection(scaleNoteIndex, chordTypeIndex)
   return result
 end
 
-------------------------------------------------------------------------------
--- Live engine (v2.1): patterns played in real time + quantized chord changes
---   Runs inside the main window (LiveArp.host = true, ticked on every frame).
---   Clock: the project position while the transport plays (so the pattern is
---   in sync with the song), otherwise a free clock at the project tempo.
---   Other scripts (actions, history window) forward their chords to the window
---   while it is open; when it is closed they play a plain chord.
-------------------------------------------------------------------------------
-
-local EXT_SECTION = "ChordMachineGun2"
-
-function getLivePattern() return getBool("livePattern", true) end
-function setLivePattern(a) setBool("livePattern", a) end
-
--- when does a newly triggered chord replace the one that is sounding?
-CHANGE_MODES = {
-  { id = "now",   name = "Now",    hint = "a new chord replaces the current one at once" },
-  { id = "beat",  name = "Beat",   hint = "a new chord waits for the next beat" },
-  { id = "bar",   name = "Bar",    hint = "a new chord waits for the end of the bar" },
-  { id = "2bars", name = "2 bars", hint = "a new chord waits for the end of a 2-bar group" },
-}
-function getChangeMode()
-  local v = getValue("changeMode", "now")
-  for _, m in ipairs(CHANGE_MODES) do if m.id == v then return v end end
-  return "now"
-end
-function setChangeMode(a) setValue("changeMode", a) end
-function cycleChangeMode(d)
-  local cur, idx = getChangeMode(), 1
-  for k, m in ipairs(CHANGE_MODES) do if m.id == cur then idx = k end end
-  idx = ((idx - 1 + (d or 1)) % #CHANGE_MODES) + 1
-  setChangeMode(CHANGE_MODES[idx].id)
-  return CHANGE_MODES[idx]
-end
-
-local arpState = nil    -- the chord that is sounding (pattern or plain chord)
-local arpPending = nil  -- the chord waiting for the next beat / bar
-
-local function transportPlaying() return reaper.GetPlayState() & 1 == 1 end
-
--- position in quarter notes, and which clock it comes from
-function LiveArp.clock()
-  if transportPlaying() then
-    return reaper.TimeMap2_timeToQN(0, reaper.GetPlayPosition()), "transport"
-  end
-  local bpm = reaper.Master_GetTempo()
-  if not bpm or bpm <= 0 then bpm = 120 end
-  return reaper.time_precise() * bpm / 60, "free"
-end
-
--- length of a beat and of a bar, in quarter notes
-function LiveArp.barLength()
-  local t = transportPlaying() and reaper.GetPlayPosition() or reaper.GetCursorPosition()
-  local num, den = reaper.TimeMap_GetTimeSigAtTime(0, t)
-  if not num or num <= 0 or not den or den <= 0 then num, den = 4, 4 end
-  local beat = 4 / den
-  return beat, num * beat
-end
-
--- quarter-note position of the next beat / bar / 2-bar line after `now`
-local function nextBoundary(mode, now, clockMode, origin)
-  local beat, bar = LiveArp.barLength()
-  local eps = 1e-6
-  if clockMode == "transport" then
-    local m, s, e = reaper.TimeMap_QNToMeasures(0, now)
-    if not s or not e or e <= s then s = math.floor(now / bar) * bar; e = s + bar; m = math.floor(now / bar) end
-    if mode == "beat" then return math.min(e, s + (math.floor((now - s) / beat + eps) + 1) * beat) end
-    if mode == "bar" then return e end
-    -- 2 bars: groups are counted from the bar in which the first chord started
-    local startBar = (origin and origin.originBar) or m
-    if (m - startBar) % 2 == 1 then return e end
-    local _, s2, e2 = reaper.TimeMap_QNToMeasures(0, e + 0.01)
-    if not e2 or not s2 or e2 <= e then e2 = e + bar end
-    return e2
-  end
-  local len = (mode == "beat") and beat or ((mode == "bar") and bar or 2 * bar)
-  local o = (origin and origin.originQN) or now
-  return o + (math.floor((now - o) / len + eps) + 1) * len
-end
-
-local function soundKey(n) return n.pitch .. ":" .. (n.chan or getCurrentNoteChannel()) end
-
--- remembers what sounds, so that any script can stop it
-local function publishSounding(st)
-  local all = {}
-  for _, n in ipairs(st.longSounding) do all[#all + 1] = n end
-  for _, n in ipairs(st.sounding) do all[#all + 1] = n end
-  setNotesThatArePlaying(all)
-end
-
-local function settingsSignature()
-  return getPattern() .. "|" .. getPatternRate() .. "|" .. tostring(getLivePattern()) .. "|" .. tostring(getPatternHoldBass())
-end
-
-local function fireStep(st, step)
-  for _, n in ipairs(st.sounding) do stopNoteFromPlaying(n.pitch, n.chan) end
-  st.sounding = {}
-  local pos = step * st.stepQN
-  local onBeat = math.abs(pos - math.floor(pos + 0.5)) < 0.001
-  local vel = getCurrentVelocity()
-  if not onBeat then vel = math.max(1, math.floor(vel * 0.8 + 0.5)) end
-  local k = step - st.firstStep
-  for _, idx in ipairs(st.cycle[(k % #st.cycle) + 1]) do
-    local n = st.moving[idx]
-    if n then
-      reaper.StuffMIDIMessage(0, 0x90 + getCurrentNoteChannel(n.chan), n.pitch, vel)
-      st.sounding[#st.sounding + 1] = n
-    end
-  end
-  st.lastStep = step
-  publishSounding(st)
-end
-
--- starts noteList now. inherit: previous state (keeps the bar count going);
--- at: exact position of the beat / bar line the change was queued for;
--- deferFirst: stay on the step grid instead of striking a note at once
-local function startChord(noteList, now, clockMode, inherit, at, deferFirst)
-  rawStopNotes()
-  local hold = getDroneEnabled() and getDroneHold()
-  local held = {}
-  if hold then
-    for _, d in ipairs(getDroneNotes()) do held[soundKey(d)] = true end
-  end
-
-  local live = getLivePattern() and getPattern() ~= "block"
-  local long, moving = noteList, {}
-  if live then
-    long, moving = splitPatternNotes(noteList)
-    -- a moving note must never re-strike (and then cut) the held drone
-    local kept = {}
-    for _, n in ipairs(moving) do
-      if not held[soundKey(n)] then kept[#kept + 1] = n end
-    end
-    moving = kept
-    if #moving == 0 then live, long = false, noteList end
-  end
-
-  local st = {
-    notes = noteList, live = live, clockMode = clockMode, moving = moving,
-    sounding = {}, longSounding = {}, pattern = getPattern(), stepQN = rateQN(),
-    sig = settingsSignature(), lastQN = now,
-  }
-  for _, n in ipairs(long) do
-    local isDrone = n.drone or n.voice == 0
-    if not (hold and (isDrone or held[soundKey(n)])) then
-      playMidiNote(n.pitch, n.chan)
-      st.longSounding[#st.longSounding + 1] = n
-    end
-  end
-  if hold and #getDroneNotes() > 0 then startDrone() end
-
-  if inherit then
-    st.originQN, st.originBar = inherit.originQN, inherit.originBar
-  else
-    st.originQN = at or now
-    st.originBar = (clockMode == "transport") and reaper.TimeMap_QNToMeasures(0, now) or 0
-  end
-  if clockMode == "transport" then
-    local _, s = reaper.TimeMap_QNToMeasures(0, now)
-    st.gridQN = (s and s <= now) and s or 0
-  else
-    st.gridQN = at or now
-  end
-
-  arpState = st
-  if live then
-    st.cycle = patternCycle(st.pattern, #moving)
-    local cur = math.floor((now - st.gridQN) / st.stepQN + 1e-6)
-    if deferFirst then
-      st.firstStep, st.lastStep = cur + 1, cur
-    else
-      st.firstStep, st.lastStep = cur, cur - 1
-      fireStep(st, cur)
-    end
-  end
-  publishSounding(st)
-  return st
-end
-
--- a chord was triggered in the window (or forwarded by another script)
-function LiveArp.trigger(noteList)
-  if not LiveArp.internal then LiveArp.sequence = nil end
-  local now, clockMode = LiveArp.clock()
-  local mode = getChangeMode()
-  local st = arpState
-  -- something to wait for: a running pattern, or any chord while the song plays
-  local busy = st ~= nil and (st.live or clockMode == "transport")
-  if LiveArp.forceNow or mode == "now" or not busy then
-    arpPending = nil
-    local onGrid = st ~= nil and st.live and clockMode == "transport" and st.clockMode == "transport"
-    startChord(noteList, now, clockMode, nil, nil, onGrid)
-  else
-    arpPending = { notes = noteList, at = nextBoundary(mode, now, clockMode, st), from = now, mode = mode }
-  end
-end
-
-function LiveArp.hostAlive()
-  if LiveArp.host then return true end
-  local t = tonumber(reaper.GetExtState(EXT_SECTION, "hostAlive")) or 0
-  return t > 0 and math.abs(reaper.time_precise() - t) < 0.6
-end
-
-local function encodeLiveNotes(list)
-  local t = {}
-  for _, n in ipairs(list) do
-    t[#t + 1] = n.pitch .. ":" .. (n.chan or -1) .. ":" .. (n.voice or 0) .. ":" .. (n.drone and 1 or 0)
-  end
-  return table.concat(t, ",")
-end
-
-local function decodeLiveNotes(raw)
-  local t = {}
-  for p, c, v, d in (raw or ""):gmatch("(%-?%d+):(%-?%d+):(%-?%d+):(%d)") do
-    local chan = tonumber(c)
-    t[#t + 1] = { pitch = tonumber(p), chan = (chan >= 0) and chan or nil, voice = tonumber(v), drone = (d == "1") or nil }
-  end
-  return t
-end
-
--- other scripts → window
-local function postLiveRequest(kind, payload)
-  local cur = reaper.GetExtState(EXT_SECTION, "liveRequests")
-  if type(cur) ~= "string" then cur = "" end
-  reaper.SetExtState(EXT_SECTION, "liveRequests", cur .. kind .. "=" .. (payload or "") .. ";", false)
-end
-
--- forgets the running chord; the caller stops the notes
-function LiveArp.cancel()
-  if LiveArp.host then
-    arpState, arpPending = nil, nil
-    if not LiveArp.internal then LiveArp.sequence = nil end
-  elseif LiveArp.hostAlive() then
-    postLiveRequest("stop")
-  end
-end
-
--- nil when nothing runs; otherwise what the window shows
-function LiveArp.status()
-  local st = arpState
-  if not st then return nil end
-  local now = LiveArp.clock()
-  local r = { live = st.live, pattern = st.pattern, clockMode = st.clockMode }
-  if arpPending then
-    r.pending = true
-    r.mode = arpPending.mode
-    r.remaining = math.max(0, arpPending.at - now)
-    local span = arpPending.at - arpPending.from
-    r.progress = (span > 0) and math.max(0, math.min(1, (now - arpPending.from) / span)) or 1
-  end
-  return r
-end
-
--- called by the main window on every frame
-function LiveArp.tick()
-  if not LiveArp.host then return end
-  reaper.SetExtState(EXT_SECTION, "hostAlive", tostring(reaper.time_precise()), false)
-
-  local raw = reaper.GetExtState(EXT_SECTION, "liveRequests")
-  if type(raw) == "string" and raw ~= "" then
-    reaper.SetExtState(EXT_SECTION, "liveRequests", "", false)
-    for kind, payload in raw:gmatch("(%a+)=([^;]*);") do
-      if kind == "stop" then
-        -- the other script already silenced the notes
-        arpState, arpPending, LiveArp.sequence = nil, nil, nil
-      elseif kind == "chord" then
-        local list = decodeLiveNotes(payload)
-        if #list > 0 then LiveArp.trigger(list) end
-      end
-    end
-  end
-
-  if LiveArp.sequenceTick then LiveArp.sequenceTick() end
-
-  local st = arpState
-  if not st then arpPending = nil; return end
-  local now, clockMode = LiveArp.clock()
-
-  -- the clock jumped (transport started or stopped, loop, seek): start again from here
-  if clockMode ~= st.clockMode or now < st.lastQN - 1e-4 or now > st.lastQN + 8 then
-    local notes = st.notes
-    if arpPending then notes = arpPending.notes; arpPending = nil end
-    st = startChord(notes, now, clockMode, nil, nil, false)
-  end
-
-  if arpPending and now >= arpPending.at - 1e-6 then
-    local p = arpPending
-    arpPending = nil
-    st = startChord(p.notes, now, clockMode, st, p.at, false)
-  end
-
-  -- pattern, rate, live or hold bass changed while a chord sounds
-  if st.sig ~= settingsSignature() then
-    st = startChord(st.notes, now, clockMode, st, nil, st.live and clockMode == "transport")
-  end
-
-  if st.live then
-    local step = math.floor((now - st.gridQN) / st.stepQN + 1e-6)
-    if step > st.lastStep then fireStep(st, step) end
-  end
-  st.lastQN = now
-end
-
-function LiveArp.shutdown()
-  if not LiveArp.host then return end
-  arpState, arpPending, LiveArp.sequence = nil, nil, nil
-  rawStopNotes()
-  reaper.SetExtState(EXT_SECTION, "hostAlive", "0", false)
-end
-
 local function playScaleChord(noteList)
-  if LiveArp.host then return LiveArp.trigger(noteList) end
-  if LiveArp.hostAlive() then return postLiveRequest("chord", encodeLiveNotes(noteList)) end
-  rawStopNotes()
+  stopNotesFromPlaying()
   local hold = getDroneEnabled() and getDroneHold()
   local held = {}
   if hold then
@@ -3354,6 +2897,7 @@ function getHistory()
       name = f[1] or "?", label = f[2] or "",
       notes = decodeNotes(f[3]), upper = decodeInts(f[4]), voices = decodeInts(f[5]),
       inserted = (f[6] == "1"), raw = line,
+      pc = tonumber(f[7] or ""), code = (f[8] ~= "" and f[8]) or nil,
     }
   end
   return list
@@ -3369,7 +2913,7 @@ local function saveHistory(list)
     lines[#lines + 1] = table.concat({
       (e.name or ""):gsub("[\t\n]", " "), (e.label or ""):gsub("[\t\n]", " "),
       encodeNotes(e.notes), table.concat(e.upper or {}, " "), table.concat(e.voices or {}, " "),
-      e.inserted and "1" or "0" }, "\t")
+      e.inserted and "1" or "0", e.pc and tostring(e.pc) or "", e.code or "" }, "\t")
   end
   setValue("history", table.concat(lines, "\n"))
   setValue("historyRev", getHistoryRevision() + 1)
@@ -3381,6 +2925,7 @@ function addToHistory(result, inserted)
   local entry = {
     name = result.name, label = result.borrowLabel or "",
     notes = result.notes, upper = result.upper, voices = result.voices, inserted = inserted,
+    pc = result.root and ((result.root - 1) % 12) or nil, code = result.baseCode,
   }
   local last = list[#list]
   if last and last.name == entry.name and encodeNotes(last.notes) == encodeNotes(entry.notes) then
@@ -3438,6 +2983,7 @@ function playHistoryEntry(index, insert)
       setVoiceLeadingReference(e.upper, tagsFromPitches(e.upper))
       setValue("vlRefSeq", latestInputSeq())
     end
+    if e.pc and e.code then setValue("lastChord", e.pc .. ":" .. e.code) end
     reaper.Help_Set("History: " .. e.name .. "    " .. pitchesText(e.voices), false)
   end)
   historySuspended = false
@@ -3950,40 +3496,576 @@ function wikiInsertProgression(specs, label)
   return true
 end
 
--- auditions a progression: one chord per bar, on the live clock (main window only).
--- Calling it again with the same key stops it.
-function wikiAudition(specs, label, key)
-  if not LiveArp.host then return end
-  if LiveArp.sequence and LiveArp.sequence.key == key then
-    stopNotesFromPlaying()
-    return
+------------------------------------------------------------------------------
+-- Tools (v2.2): any chord outside the grid, scale detection, next-chord hints,
+-- modulation paths, substitutions (Ctrl+Alt) and the sketch pad
+------------------------------------------------------------------------------
+
+-- family of a chord: "M" major third, "m" minor third, "o" diminished, "+" augmented
+local function chordFamily(chord)
+  local p = chord.pattern
+  local function has(n) return p:sub(n + 1, n + 1) == '1' end
+  if has(4) then return has(8) and not has(7) and "+" or "M" end
+  if has(3) then return (has(6) and not has(7)) and "o" or "m" end
+  return "s"   -- no third: power chord, sus2, sus4
+end
+CHORD_FAMILY = chordFamily
+
+local FAMILY_CODE = { M = "major", m = "minor", o = "dim", ["+"] = "aug", s = "sus4" }
+
+-- name of a pitch class: the scale's spelling when it belongs to the scale
+function spellPC(pc, preferFlat)
+  for d, note in ipairs(scaleNotes) do
+    if (note - 1) % 12 == pc then return getScaleNoteName(d) end
   end
-  stopNotesFromPlaying()
-  LiveArp.sequence = { specs = specs, label = label, key = key, index = 0, nextAt = nil }
+  if preferFlat then return flatNotes[pc + 1] end
+  local usual = { [1] = "C#", [3] = "Eb", [6] = "F#", [8] = "Ab", [10] = "Bb" }
+  return usual[pc] or notes[pc + 1]
 end
 
-function LiveArp.sequenceTick()
-  local seq = LiveArp.sequence
-  if not seq then return end
-  local now, clockMode = LiveArp.clock()
-  if seq.clockMode and seq.clockMode ~= clockMode then seq.nextAt = now end
-  seq.clockMode = clockMode
-  if seq.nextAt ~= nil and now < seq.nextAt - 1e-6 then return end
-  seq.index = seq.index + 1
-  local spec = seq.specs[seq.index]
-  if not spec then
-    stopNotesFromPlaying()
-    return
+-- a chord described freely: pc 0-11, chord code, small label shown above it
+function makeChordSpec(pc, code, label, preferFlat)
+  local chord = chordByCode(code) or chords[1]
+  local tonic = getScaleTonicNote()
+  local rootNote = tonic + ((pc + 1 - tonic) % 12)
+  local rootName = spellPC(pc, preferFlat)
+  return {
+    roman = label or "", pc = pc, code = chord.code, chord = chord, rootNote = rootNote,
+    rootName = rootName, name = rootName .. chord.display,
+    outside = chordIsOutsideMainScale(rootNote, chord),
+  }
+end
+
+-- the last chord played or inserted (any source): { pc, code } or nil
+function getLastChord()
+  local pc, code = getValue("lastChord", ""):match("^(%d+):(.+)$")
+  if not pc or not chordByCode(code) then return nil end
+  return { pc = tonumber(pc), code = code }
+end
+
+------------------------------------------------------------------------------
+-- 1. Scale detection
+------------------------------------------------------------------------------
+
+-- prior: the usual scales win a tie (Ionian / Aeolian are the same as Major / Natural Minor)
+local SCALE_PRIOR = { [1] = 0.03, [2] = 0.03, [3] = 0.01, [4] = 0.01, [5] = 0.0, [8] = 0.01, [9] = 0.01,
+  [10] = 0.0, [11] = 0.0, [12] = -0.02 }
+
+-- w[pc] = weight (0-11); hints: bass / first / last pitch class
+function rankScales(w, hints)
+  hints = hints or {}
+  local total, maxw = 0, 0
+  for pc = 0, 11 do total = total + (w[pc] or 0); maxw = math.max(maxw, w[pc] or 0) end
+  if total <= 0 then return {} end
+  local results = {}
+  for st, s in ipairs(scales) do
+    if st ~= 6 and st ~= 7 then
+      for t = 0, 11 do
+        local inW, used, size, outside = 0, 0, 0, {}
+        for pc = 0, 11 do
+          local inScale = s.pattern:sub(((pc - t) % 12) + 1, ((pc - t) % 12) + 1) == '1'
+          local x = w[pc] or 0
+          if inScale then
+            size = size + 1
+            inW = inW + x
+            if x > 0 then used = used + 1 end
+          elseif x > 0 then
+            outside[#outside + 1] = pc
+          end
+        end
+        local fit = inW / total
+        local tw = (w[t] or 0) / maxw
+        local function inS(iv) return s.pattern:sub((iv % 12) + 1, (iv % 12) + 1) == '1' end
+        local third = inS(4) and 4 or 3
+        local triad = math.min(w[(t + third) % 12] or 0, w[(t + 7) % 12] or 0) / maxw
+        local score = fit * 1.0 + 0.12 * (used / size) + 0.10 * tw + 0.05 * triad
+          + ((hints.bass == t) and 0.06 or 0) + ((hints.last == t) and 0.05 or 0) + ((hints.first == t) and 0.02 or 0)
+          + (SCALE_PRIOR[st] or -0.01)
+        results[#results + 1] = { tonic = t + 1, scaleType = st, score = score, fit = fit, outside = outside }
+      end
+    end
   end
-  LiveArp.internal, LiveArp.forceNow = true, true
-  local ok, err = pcall(wikiPlay, spec, false, seq.label)
-  LiveArp.internal, LiveArp.forceNow = false, false
-  if not ok then LiveArp.sequence = nil; error(err, 0) end
-  local _, bar = LiveArp.barLength()
-  if clockMode == "transport" then
-    local _, _, e = reaper.TimeMap_QNToMeasures(0, now)
-    seq.nextAt = (e and e > now) and e or (now + bar)
-  else
-    seq.nextAt = now + bar
+  table.sort(results, function(a, b) return a.score > b.score end)
+  return results
+end
+
+-- reads the notes to analyse: selected notes, else the whole item, else the history
+function detectScale(maxResults)
+  local w, hints, count, source = {}, {}, 0, nil
+  local take = activeTake()
+  if take then
+    local list, anySelected = {}, false
+    local _, n = reaper.MIDI_CountEvts(take)
+    for k = 0, n - 1 do
+      local _, sel, muted, s, e, _, pitch = reaper.MIDI_GetNote(take, k)
+      if not muted and not isDronePitch(pitch) then
+        list[#list + 1] = { sel = sel, s = s, e = e, pitch = pitch }
+        if sel then anySelected = true end
+      end
+    end
+    local used = {}
+    for _, nt in ipairs(list) do if nt.sel or not anySelected then used[#used + 1] = nt end end
+    if #used > 0 then
+      source = anySelected and "selected notes" or "whole MIDI item"
+      local first, last, low = used[1], used[1], used[1]
+      for _, nt in ipairs(used) do
+        local pc = nt.pitch % 12
+        w[pc] = (w[pc] or 0) + math.max(1, (nt.e - nt.s) / 240)
+        if nt.s < first.s or (nt.s == first.s and nt.pitch < first.pitch) then first = nt end
+        if nt.s > last.s or (nt.s == last.s and nt.pitch < last.pitch) then last = nt end
+        if nt.pitch < low.pitch then low = nt end
+      end
+      hints = { bass = low.pitch % 12, first = first.pitch % 12, last = last.pitch % 12 }
+      count = #used
+    end
   end
+  if not source then
+    local hist = getHistory()
+    local start = math.max(1, #hist - 23)
+    for k = start, #hist do
+      local e = hist[k]
+      for _, p in ipairs(e.voices) do w[p % 12] = (w[p % 12] or 0) + 1 end
+      if e.voices[1] then
+        local b = e.voices[1] % 12
+        w[b] = (w[b] or 0) + 1
+        hints.last = b
+        if k == start then hints.first = b end
+      end
+      count = count + 1
+    end
+    if count > 0 then source = "last chords played" end
+  end
+  if not source then return { source = nil, count = 0, results = {} } end
+  local ranked = rankScales(w, hints)
+  local out = {}
+  for k = 1, math.min(maxResults or 8, #ranked) do out[k] = ranked[k] end
+  return { source = source, count = count, results = out, weights = w }
+end
+
+------------------------------------------------------------------------------
+-- 2. Next-chord hints, learned from the progressions of the wiki
+------------------------------------------------------------------------------
+
+local transitionCache = {}
+
+local function addTransitions(t, page, weight)
+  if not page then return end
+  for _, pr in ipairs(page.progressions) do
+    local list = {}
+    for token in pr[2]:gmatch("%S+") do
+      local spec = wikiParseRoman(token)
+      if spec then list[#list + 1] = spec.offset .. chordFamily(chordByCode(spec.code)) end
+    end
+    for k = 1, #list do
+      local a, b = list[k], list[k + 1]
+      local wk = weight
+      if not b then b = list[1]; wk = weight * 0.5 end  -- progressions loop
+      if a ~= b then
+        t[a] = t[a] or {}
+        t[a][b] = (t[a][b] or 0) + wk
+      end
+    end
+  end
+end
+
+local function transitionsFor(st)
+  if transitionCache[st] then return transitionCache[st] end
+  local t = {}
+  addTransitions(t, getWiki(st), 3)
+  local pattern = scales[st].pattern
+  local majorish = pattern:sub(5, 5) == '1'
+  addTransitions(t, WIKI[majorish and "Major" or "Natural Minor"], 1)
+  transitionCache[st] = t
+  return t
+end
+
+function getHintsEnabled() return getBool("nextHints", true) end
+function setHintsEnabled(a) setBool("nextHints", a) end
+
+-- grid cells worth trying after the last chord: { ["i:t"] = rank (1 = best) }
+function suggestNextCells(maxCount)
+  local last = getLastChord()
+  if not last then return {} end
+  local tonic = getScaleTonicNote()
+  local fromKey = ((last.pc - (tonic - 1)) % 12) .. chordFamily(chordByCode(last.code))
+  local t = transitionsFor(getScaleType())
+  local nexts = t[fromKey]
+  if not nexts then
+    -- same root, any family
+    local offset = (last.pc - (tonic - 1)) % 12
+    for key, list in pairs(t) do
+      if tonumber(key:match("^(%d+)")) == offset then nexts = list; break end
+    end
+  end
+  if not nexts then return {} end
+  local scored = {}
+  for i, note in ipairs(scaleNotes) do
+    local offset = (note - tonic) % 12
+    local types = scaleChords[i] or {}
+    local best = nil
+    for tIdx, chord in ipairs(types) do
+      local key = offset .. chordFamily(chord)
+      local s = nexts[key]
+      if s and not (((note - 1) % 12) == last.pc and chordFamily(chord) == chordFamily(chordByCode(last.code))) then
+        -- prefer the type already chosen in that column, then the plain triad
+        local pref = (tIdx == getSelectedChordType(i)) and 0.2 or ((tIdx == 1) and 0.1 or 0)
+        if not best or s + pref > best.s then best = { i = i, t = tIdx, s = s + pref } end
+      end
+    end
+    if best then scored[#scored + 1] = best end
+  end
+  table.sort(scored, function(a, b) return a.s > b.s end)
+  local out = {}
+  for k = 1, math.min(maxCount or 3, #scored) do out[scored[k].i .. ":" .. scored[k].t] = k end
+  return out
+end
+
+------------------------------------------------------------------------------
+-- 3. Modulation paths
+------------------------------------------------------------------------------
+
+-- triads of a key: { [degree] = { pc, q } }
+local function keyTriads(tonic, st)
+  local pattern = scales[st].pattern
+  local list = {}
+  local t0 = (tonic - 1) % 12
+  local function inK(pc) local iv = (pc - t0) % 12; return pattern:sub(iv + 1, iv + 1) == '1' end
+  for iv = 0, 11 do
+    if pattern:sub(iv + 1, iv + 1) == '1' then
+      local pc = (t0 + iv) % 12
+      local q = nil
+      if inK(pc + 4) and inK(pc + 7) then q = "M"
+      elseif inK(pc + 3) and inK(pc + 7) then q = "m"
+      elseif inK(pc + 3) and inK(pc + 6) then q = "o"
+      elseif inK(pc + 4) and inK(pc + 8) then q = "+" end
+      list[#list + 1] = { pc = pc, q = q, offset = iv }
+    end
+  end
+  return list
+end
+
+local ROMAN_UP = { "I", "II", "III", "IV", "V", "VI", "VII" }
+local function romanFor(offset, q, degree)
+  local base = ({ [0] = "I", [1] = "bII", [2] = "II", [3] = "bIII", [4] = "III", [5] = "IV", [6] = "bV",
+    [7] = "V", [8] = "bVI", [9] = "VI", [10] = "bVII", [11] = "VII" })[offset % 12]
+  if degree and ROMAN_UP[degree] and #(scaleNotes) == 7 then
+    -- keep the letter of the degree when the key has one
+  end
+  if q == "m" or q == "o" then base = base:lower() end
+  if q == "o" then base = base .. "o" elseif q == "+" then base = base .. "+" end
+  return base
+end
+
+local function familyCode(q) return FAMILY_CODE[q or "M"] or "major" end
+
+-- shortest chain of P / L / R moves between two triads (major / minor only)
+local function plrPath(fromPC, fromQ, toPC, toQ, maxDepth)
+  if (fromQ ~= "M" and fromQ ~= "m") or (toQ ~= "M" and toQ ~= "m") then return nil end
+  local key = function(pc, q) return pc .. q end
+  local queue = { { pc = fromPC, q = fromQ, path = {} } }
+  local seen = { [key(fromPC, fromQ)] = true }
+  local head = 1
+  while queue[head] do
+    local node = queue[head]; head = head + 1
+    if node.pc == toPC and node.q == toQ then return node.path end
+    if #node.path < (maxDepth or 4) then
+      for _, op in ipairs({ "P", "L", "R" }) do
+        local pc, q = plrApply(node.pc, node.q, op)
+        local k = key(pc, q)
+        if not seen[k] then
+          seen[k] = true
+          local path = {}
+          for _, s in ipairs(node.path) do path[#path + 1] = s end
+          path[#path + 1] = { op = op, pc = pc, q = q }
+          queue[#queue + 1] = { pc = pc, q = q, path = path }
+        end
+      end
+    end
+  end
+  return nil
+end
+
+function keyLabel(tonic, st)
+  local pc = (tonic - 1) % 12
+  local minor = scales[st].pattern:sub(4, 4) == '1' and scales[st].pattern:sub(5, 5) ~= '1'
+  local black = minor and { [1] = "C#", [3] = "Eb", [6] = "F#", [8] = "G#", [10] = "Bb" }
+    or { [1] = "Db", [3] = "Eb", [6] = "F#", [8] = "Ab", [10] = "Bb" }
+  return (black[pc] or notes[pc + 1]) .. " " .. scales[st].name
+end
+
+-- the usual targets, relative to the current key
+function modulationTargets()
+  local tonic, st = getScaleTonicNote(), getScaleType()
+  local majorish = scales[st].pattern:sub(5, 5) == '1'
+  local function at(semis) return ((tonic - 1 + semis) % 12) + 1 end
+  local same = majorish and 1 or 2
+  return {
+    { label = "Dominant",     tonic = at(7), scaleType = same },
+    { label = "Subdominant",  tonic = at(5), scaleType = same },
+    { label = "Relative",     tonic = majorish and at(9) or at(3), scaleType = majorish and 2 or 1 },
+    { label = "Parallel",     tonic = tonic, scaleType = majorish and 2 or 1 },
+    { label = "Up a step",    tonic = at(2), scaleType = same },
+    { label = "Up ½ step",    tonic = at(1), scaleType = same },
+    { label = "Mediant ↑",    tonic = at(4), scaleType = same },
+    { label = "Mediant ↓",    tonic = at(8), scaleType = same },
+  }
+end
+
+-- paths from the current key to (targetTonic, targetType):
+-- { { title, note, specs = { spec, ... } }, ... }
+function modulationPaths(targetTonic, targetType)
+  local tonic, st = getScaleTonicNote(), getScaleType()
+  local old, new = keyTriads(tonic, st), keyTriads(targetTonic, targetType)
+  if #old == 0 or #new == 0 then return {} end
+  local t0, n0 = (tonic - 1) % 12, (targetTonic - 1) % 12
+  local I_old, I_new = old[1], new[1]
+  local newMajor = scales[targetType].pattern:sub(5, 5) == '1'
+  local preferFlat = (n0 == 5 or n0 == 10 or n0 == 3 or n0 == 8 or n0 == 1) or (not newMajor and (n0 == 0 or n0 == 7 or n0 == 2))
+  local tl = keyLabel(targetTonic, targetType)
+  local function spec(pc, code, label) return makeChordSpec(pc, code, label, preferFlat) end
+  local function oldLabel(tr) return romanFor((tr.pc - t0) % 12, tr.q) end
+  local function newLabel(tr) return romanFor((tr.pc - n0) % 12, tr.q) end
+  local start = spec(I_old.pc, familyCode(I_old.q), oldLabel(I_old))
+  local V7 = spec((n0 + 7) % 12, "7", "V7")
+  local arrive = spec(I_new.pc, familyCode(I_new.q), newLabel(I_new))
+  local paths = {}
+  local function add(title, note, list) paths[#paths + 1] = { title = title, note = note, specs = list } end
+
+  if t0 == n0 and I_old.q == I_new.q and st == targetType then return {} end
+
+  -- pivot chords: chords that belong to both keys (best: a predominant of the new key)
+  local pivots = {}
+  for _, a in ipairs(old) do
+    for _, b in ipairs(new) do
+      if a.q and a.pc == b.pc and a.q == b.q and a.pc ~= I_old.pc and b.pc ~= I_new.pc and a.q ~= "+" then
+        local nOff = (b.pc - n0) % 12
+        local s = ({ [2] = 3, [5] = 3, [9] = 2, [8] = 2, [4] = 1, [3] = 1 })[nOff] or 0
+        if a.q == "o" then s = s - 2 end
+        pivots[#pivots + 1] = { tr = a, s = s }
+      end
+    end
+  end
+  table.sort(pivots, function(a, b) return a.s > b.s end)
+  for k = 1, math.min(2, #pivots) do
+    local p = pivots[k].tr
+    add("Pivot chord", oldLabel(p) .. " in the old key = " .. newLabel(p) .. " in " .. tl,
+      { start, spec(p.pc, familyCode(p.q), oldLabel(p) .. " = " .. newLabel(p)), V7, arrive })
+  end
+
+  -- cadence in the new key (works for any target)
+  local iiQ = newMajor and "m" or "o"
+  local ii = spec((n0 + 2) % 12, newMajor and "min7" or "dim", newMajor and "ii7" or "iio")
+  add("ii – V – I", "the classic approach: the new key's own cadence", { start, ii, V7, arrive })
+  add("Dominant", "straight to the dominant of the new key", { start, V7, arrive })
+
+  -- backdoor: minor iv and bVII7 of the new key (major targets)
+  if newMajor then add("Backdoor", "minor iv then bVII7: a soft, cinematic arrival",
+    { start, spec((n0 + 5) % 12, "minor", "iv"), spec((n0 + 10) % 12, "7", "bVII7"), arrive }) end
+
+  -- neo-riemannian chain
+  local chain = plrPath(I_old.pc, I_old.q, I_new.pc, I_new.q, 4)
+  if chain and #chain >= 1 then
+    local list, ops = { start }, {}
+    for k, step in ipairs(chain) do
+      ops[#ops + 1] = step.op
+      local label = step.op
+      if k == #chain then label = step.op .. " = " .. newLabel(I_new) end
+      list[#list + 1] = spec(step.pc, familyCode(step.q), label)
+    end
+    local common = (#chain <= 2) and "  ·  common tones all the way" or ""
+    add("Neo-Riemannian", "P / L / R moves: " .. table.concat(ops, " ") .. common, list)
+  end
+
+  -- chromatic mediant: direct move when the two tonic chords share a note
+  local iv = (n0 - t0) % 12
+  local newTonicIsForeign = chordIsOutsideMainScale(tonic + iv, chordByCode(familyCode(I_new.q)))
+  if (iv == 3 or iv == 4 or iv == 8 or iv == 9) and I_old.q and I_new.q and newTonicIsForeign then
+    add("Chromatic mediant", "direct move, a third apart: the film-score shift",
+      { start, arrive, spec((n0 + 5) % 12, familyCode((new[4] and new[4].q) or "M"), newLabel(new[4] or I_new)), arrive })
+  end
+  return paths
+end
+
+------------------------------------------------------------------------------
+-- 4. Substitutions of the selected chord (Ctrl+Alt, AltGr on many keyboards)
+------------------------------------------------------------------------------
+
+SUBS = {
+  { key = "R",      name = "relative" },
+  { key = "P",      name = "parallel" },
+  { key = "V7/",    name = "sec. dominant" },
+  { key = "subV7/", name = "tritone sub" },
+  { key = "viio/",  name = "leading dim." },
+  { key = "M3",     name = "chrom. mediant" },
+  { key = "bVII7/", name = "backdoor" },
+}
+
+function getSubsContext()
+  local i = getSelectedScaleNote()
+  if not scaleNotes[i] then return nil end
+  local base = scaleChords[i][getSelectedChordType(i)] or scaleChords[i][1]
+  local r = (scaleNotes[i] - 1) % 12
+  local q = chordFamily(base)
+  local target = spellPC(r) .. (FAMILY_CODE[q] == "minor" and "m" or (q == "o" and "dim" or (q == "+" and "aug" or "")))
+  local defs = {
+    (q == "m") and { (r + 3) % 12, "major" } or (q == "o" and { (r + 8) % 12, "7" } or { (r + 9) % 12, "minor" }),
+    { r, (q == "m" or q == "o") and "major" or "minor" },
+    { (r + 7) % 12, "7" },
+    { (r + 1) % 12, "7" },
+    { (r + 11) % 12, "dim" },
+    { (r + 4) % 12, (q == "m") and "minor" or "major" },
+    { (r + 10) % 12, "7" },
+  }
+  local mainTonic = getScaleTonicNote()
+  local ctx = {
+    isNeighbors = true, tonic = mainTonic, pattern = scalePattern,
+    notes = {}, chords = {}, inScaleCounts = {}, headers = {}, names = {}, nameByPC = {},
+    info = {}, label = target,
+  }
+  for d, note in ipairs(scaleNotes) do ctx.nameByPC[(note - 1) % 12] = getScaleNoteName(d) end
+  for k, def in ipairs(defs) do
+    local chord = chordByCode(def[2])
+    local rootNote = mainTonic + ((def[1] + 1 - mainTonic) % 12)
+    local name = (k == 5) and (function()
+      for d, note in ipairs(scaleNotes) do if (note - 1) % 12 == def[1] then return getScaleNoteName(d) end end
+      return notes[def[1] + 1]   -- leading tone: spelled with a sharp
+    end)() or spellPC(def[1], def[2] == "7" and k ~= 3)
+    ctx.notes[k] = rootNote
+    ctx.chords[k] = { chord }
+    ctx.inScaleCounts[k] = 1
+    ctx.names[k] = name
+    ctx.headers[k] = name .. chord.display
+    local sub = SUBS[k]
+    local short = sub.key:find("/$") and (sub.key .. target) or sub.key
+    ctx.info[k] = { short = short, name = sub.name, outside = chordIsOutsideMainScale(rootNote, chord) }
+  end
+  return ctx
+end
+
+function subsAction(k, insert)
+  local ctx = getSubsContext()
+  if not ctx or not ctx.notes[k] then return nil end
+  local info = ctx.info[k]
+  ctx.describe = info.short .. "  ·  " .. info.name .. " of " .. ctx.label
+  return withBorrowContext(ctx, function()
+    if insert then return playOrInsertChord(k, 1, "substitution " .. info.short .. " (" .. ctx.headers[k] .. ")") end
+    return previewChord(k, 1)
+  end)
+end
+
+------------------------------------------------------------------------------
+-- 5. Sketch pad: 7 slots (A-G) of chords to compare, play and insert
+------------------------------------------------------------------------------
+
+SKETCH_SLOTS = 7
+SKETCH_LETTERS = { "A", "B", "C", "D", "E", "F", "G" }
+
+-- slot: { { pc, code, label }, ... }
+function getSketch()
+  local list = {}
+  local raw = getValue("sketch", "")
+  local k = 0
+  for line in (raw .. "\n"):gmatch("([^\n]*)\n") do
+    k = k + 1
+    if k > SKETCH_SLOTS then break end
+    local slot = {}
+    for pc, code, label in line:gmatch("(%d+):([%w]+):([^;]*);") do
+      if chordByCode(code) then slot[#slot + 1] = { pc = tonumber(pc), code = code, label = label } end
+    end
+    list[k] = slot
+  end
+  for s = 1, SKETCH_SLOTS do list[s] = list[s] or {} end
+  return list
+end
+
+local function saveSketch(list)
+  local lines = {}
+  for s = 1, SKETCH_SLOTS do
+    local parts = {}
+    for _, c in ipairs(list[s] or {}) do
+      parts[#parts + 1] = c.pc .. ":" .. c.code .. ":" .. (c.label or ""):gsub("[;:\n]", " ") .. ";"
+    end
+    lines[s] = table.concat(parts)
+  end
+  setValue("sketch", table.concat(lines, "\n"))
+end
+
+function getSketchSlot() return math.max(1, math.min(SKETCH_SLOTS, tonumber(getValue("sketchSlot", 1)) or 1)) end
+function setSketchSlot(s) setValue("sketchSlot", s) end
+
+local SKETCH_MAX = 16
+
+function sketchAdd(slot, items)
+  local list = getSketch()
+  slot = slot or getSketchSlot()
+  for _, c in ipairs(items) do
+    if #list[slot] >= SKETCH_MAX then break end
+    local pc = c.pc or (c.rootNote and ((c.rootNote - 1) % 12))
+    local code = c.code or (c.chord and c.chord.code)
+    if pc and code then
+      list[slot][#list[slot] + 1] = { pc = pc, code = code, label = c.label or c.roman or "" }
+    end
+  end
+  saveSketch(list)
+end
+
+function sketchAddLast(slot)
+  local last = getLastChord()
+  if not last then return false end
+  sketchAdd(slot, { last })
+  return true
+end
+
+-- the last n chords of the history (consecutive repeats removed)
+function sketchFromHistory(slot, n)
+  local hist = getHistory()
+  local items = {}
+  for k = #hist, 1, -1 do
+    local e = hist[k]
+    if e.pc and e.code and chordByCode(e.code) then
+      local prev = items[1]
+      if not (prev and prev.pc == e.pc and prev.code == e.code) then
+        table.insert(items, 1, { pc = e.pc, code = e.code })
+        if #items >= n then break end
+      end
+    end
+  end
+  if #items == 0 then return false end
+  local list = getSketch()
+  slot = slot or getSketchSlot()
+  list[slot] = {}
+  saveSketch(list)
+  sketchAdd(slot, items)
+  return true
+end
+
+function sketchRemove(slot, k)
+  local list = getSketch()
+  table.remove(list[slot], k)
+  saveSketch(list)
+end
+
+function sketchMove(slot, k, d)
+  local list = getSketch()
+  local s = list[slot]
+  local j = k + d
+  if s[k] and s[j] then s[k], s[j] = s[j], s[k]; saveSketch(list) end
+end
+
+function sketchClear(slot)
+  local list = getSketch()
+  list[slot] = {}
+  saveSketch(list)
+end
+
+function sketchSpecs(slot)
+  local out = {}
+  local tonic = getScaleTonicNote()
+  for _, c in ipairs(getSketch()[slot] or {}) do
+    local chord = chordByCode(c.code)
+    local label = c.label
+    if not label or label == "" then label = romanFor((c.pc - (tonic - 1)) % 12, chordFamily(chord)) end
+    out[#out + 1] = makeChordSpec(c.pc, c.code, label)
+  end
+  return out
 end

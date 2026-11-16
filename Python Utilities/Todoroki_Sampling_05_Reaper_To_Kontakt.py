@@ -2,12 +2,12 @@
 # @author Todoroki
 # @version 1.0
 # @changelog
-#   Première version
+#   First version
 # @provides
 #   [nomain] .
 # @about
-#   Renomme et range les samples exportés de REAPER pour Kontakt.
-#   Outil externe : à lancer avec Python, en dehors de REAPER.
+#   Renames and sorts the samples exported from REAPER for Kontakt.
+#   External tool: run it with Python, outside REAPER.
 
 import os
 import shutil

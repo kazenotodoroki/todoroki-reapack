@@ -11,47 +11,99 @@ REAPER runs the files straight from the repo folder, so any later change is live
 
 Recommended: the **js_ReaScriptAPI** extension (ReaPack), for Ctrl/Alt + digits and window pinning.
 
+## What is new in 2.2
+
+### Shortcuts at a glance
+| Keys | What it does |
+|---|---|
+| **Space** held + **1…7** | toggle the colors 7 · 9 · 11 · 13 · sus2 · sus4 · no3 (the row above the grid shows them) |
+| **Space** + **0** | clear the colors |
+| **Ctrl** held (Cmd on macOS) | degrees of the selected chord's scale (as before) |
+| **Alt** held (Option) | neo-Riemannian PLR row (as before) |
+| **Ctrl+Alt** held (**AltGr** on Swiss / French / German keyboards, Cmd+Option on macOS) | substitutions of the selected chord |
+| **Tab** / **Shift+Tab** | next / previous tools page: Progressions → Detect → Modulation → Sketch → back to the grid |
+| **Esc** | back to the grid when a page is open (otherwise closes the window, as before) |
+
+On keyboards that have them, **F1…F7** (colors), **F8** (clear), **F9** (Detect), **F10** (Modulation), **F11** (Progressions) and **F12** (Sketch) still work.
+
+### Tools page
+The **Tools** button in the header (or **Tab**) replaces the grid with four tabs.
+
+#### Progressions
+The former Wiki: for the current scale, what it sounds like, then the **Most used** and **Most beautiful** progressions in the current key.
+- Each chord shows its roman numeral. Blue = outside the scale (borrowed).
+- **Click** a chord to play it, **Shift+click** to insert it (colors, voice leading and channels apply as for any chord).
+- **Insert** writes the whole progression at the edit cursor. **+ Sketch** copies it into the selected sketch slot.
+- Roman numerals are measured from the major scale of the tonic: `bVI` is the major chord a minor sixth above the tonic, lower case is minor, `o` diminished, `+` augmented. All 21 scales have a page; the lists are an editorial selection.
+
+#### Detect
+Finds the scale of what you wrote.
+- It analyses the **selected notes** in the MIDI editor, otherwise the **whole item**, otherwise the **last chords played**. Drone notes are ignored. Long notes weigh more; the lowest note, the first and the last note help to find the tonic.
+- The list shows the 10 best matches with the share of notes that fit and the notes that fall outside. **Click** a result to make it the current scale.
+- Several scales can fit 100% when some notes are missing (a tune without F or F# fits both A minor and A Dorian): the order then follows the tonic clues and how common the scale is.
+- Action: `detect scale (apply best match)`.
+
+#### Modulation
+Ways to move from the current key to another one.
+- Choose the target with the two menus, or with the quick buttons: **Dominant**, **Subdominant**, **Relative**, **Parallel**, **Up a step**, **Up ½ step**, **Mediant ↑**, **Mediant ↓**.
+- Each path starts on your tonic chord and lands on the new tonic:
+  - **Pivot chord**: a chord that belongs to both keys (preferably ii, IV or vi of the new key), then V7 → I.
+  - **ii – V – I**: the new key's own cadence.
+  - **Dominant**: straight to V7 of the new key.
+  - **Backdoor** (major targets): minor iv then bVII7, a soft, cinematic arrival.
+  - **Neo-Riemannian**: the shortest chain of P / L / R moves between the two tonic chords.
+  - **Chromatic mediant** (targets a third away, outside the scale): direct move, the film-score shift.
+- **Click** a chord to play it, **Shift+click** to insert it, **Insert** writes the whole path, **+ Sketch** keeps it.
+- **Switch to that key** makes the target the current scale, so you can carry on there.
+
+#### Sketch
+Seven slots (**A…G**) to keep progressions side by side, saved in the project.
+- **Click a letter** to select the slot; **+ Sketch** buttons on the other tabs add to the selected slot.
+- **+ Last** adds the chord you just played (from the grid, Ctrl, Alt, substitutions, history…).
+- **History** replaces the slot with the last 4 or 8 chords played.
+- **Click** a chord to play it, **Shift+click** to insert it, **right-click** to move it left / right or remove it.
+- **Insert** writes the slot at the edit cursor, **×** clears it.
+- Chords are stored as real chords (Am, Bb7…), so they stay the same when you change the scale.
+
+### Next-chord hints
+After every chord you play, small marks appear in the top-right corner of the grid cells that usually come next: **3 marks** = the most likely, then 2, then 1.
+- The hints are learned from the progressions of the Progressions tab for the current scale (plus the general major or minor ones), so they follow the style of the scale.
+- They can point to a chord outside the scale when the progressions use it (Fm after F in C major: the minor plagal).
+- Turn them on / off with **next-chord hints**, to the right of the line above the grid, or with the action `toggle next-chord hints`.
+
+### Substitutions (Ctrl+Alt)
+Hold **Ctrl+Alt** (or **AltGr**): the row above the grid shows seven chords built around the selected chord. In C major with Am selected:
+
+| Key | Substitution | Am → | |
+|---|---|---|---|
+| 1 | **R** relative | C | same notes, other colour |
+| 2 | **P** parallel | A | major ↔ minor |
+| 3 | **V7/** secondary dominant | E7 | leads into Am |
+| 4 | **subV7/** tritone substitute | Bb7 | leads into Am by a half step |
+| 5 | **viio/** leading-tone diminished | G#dim | leads into Am |
+| 6 | **M3** chromatic mediant | C#m | a third up, same quality: the film shift |
+| 7 | **bVII7/** backdoor dominant | G7 | soft approach to Am |
+
+- **Ctrl+Alt+1…7** plays, add **Shift** to insert. Click a cell works too.
+- The grid selection does not move, so you can try all seven around the same chord.
+- Actions: `substitution 1 - R - relative` … `substitution 7 - bVII7 - backdoor dominant`.
+
+### New actions
+`substitution 1…7`, `detect scale (apply best match)`, `toggle next-chord hints`.
+
 ## What is new in 2.1
 
-### Live patterns (arpeggios in real time)
-With **Live pattern** on (PLAY row, on by default), the preview plays the chosen pattern instead of a plain chord: click a chord or press 1-7 and the arpeggio runs until you play another chord or stop.
-
-- Pattern, rate and **Hold bass** come from the PATTERN row and can be changed while it plays. With **Block chord** the preview is a plain held chord, as before.
-- **Clock**: while the transport plays, the pattern follows the project (steps fall on the grid of the bar, tempo changes included). When it is stopped, a free clock at the project tempo starts on your first chord. The right end of the PLAY row shows `live · synced to transport` or `live · free clock`.
-- The drone and the held bass sound as long notes; off-beat notes are slightly softer; the velocity slider acts live.
-- **Stop**: the **Stop** button, key **0**, or middle click.
-- The engine runs in the main window. While it is open, chords triggered by actions and by the history window are played by it (same pattern, same queue). When it is closed, they play a plain chord.
-- It is a preview: timing follows REAPER's script refresh (about 30 times per second), so fast rates are slightly loose. Inserted notes are exact.
-
-### Chord change: Now / Beat / Bar / 2 bars
-The **Change** menu (PLAY row, or **F12**) decides when a new chord replaces the one that is sounding.
-
-- **Now**: at once (default).
-- **Beat / Bar / 2 bars**: the new chord is *queued* and starts on the next beat, at the end of the bar, or at the end of a 2-bar group. Example: Change = Bar, an arpeggio on I is running, you press **2**: the arpeggio finishes its bar, then moves to ii.
-- While a chord waits, a **QUEUED** badge and a countdown line appear under the chord name. Pressing another chord before the line replaces the queued one. If nothing is sounding, the chord starts immediately.
-- Bars follow the project time signature. With the transport stopped they are counted from the moment the first chord started; while it plays they are the real bars of the project.
-- It applies to a running live pattern, and to any chord (plain chords too) while the transport plays. A plain chord with the transport stopped changes immediately.
-- Only the sound waits: Shift (insert) still writes the chord at once.
-
 ### Reharmonize selected notes
-**Selection** menu (PLAY row): what Shift+click / Shift+digit does when notes are selected in the MIDI editor.
+**Selection** menu (INSERT row): what Shift+click / Shift+digit does when notes are selected in the MIDI editor.
 
 - **Replace** (default): each selected chord is replaced by the new chord, as before.
-- **Reharmonize**: the selected notes keep their position, length, velocity and channel, and each pitch moves to the closest note of the new chord. An arpeggio, a riff or a pad written on C becomes the same figure on F, Am, Ab…
+- **Reharmonize**: the selected notes keep their position, length, velocity and channel, and each pitch moves to the closest note of the new chord. A riff, a figure or a pad written on C becomes the same figure on F, Am, Ab…
   - Notes that were different stay different and in the same order whenever the chord allows it.
   - A bass note (below C3) follows the bass of the new chord.
   - Colors apply (with **7** on, the 7th becomes available). Drone notes do not move. Unselected notes are untouched.
   - Every selected note lands on a chord tone, so passing notes of a melody are pulled onto the chord: select the accompaniment, not the tune.
 
-### Wiki: progressions for every scale
-The **Wiki** button in the header (or **F11**) replaces the grid with a page about the current scale: what it sounds like, then two lists in the current key, **Most used** and **Most beautiful**.
-
-- Each progression shows its chords with their roman numeral. Blue = chord outside the scale (borrowed).
-- **Click** a chord to play it, **Shift+click** to insert it (colors, pattern, voice leading and channels apply as for any chord).
-- **Triangle**: listen to the whole progression, one chord per bar, with the current pattern. Click again, or play anything, to stop.
-- **Insert**: writes the whole progression at the edit cursor, one chord after the other (chord length = grid × Length).
-- Roman numerals are measured from the major scale of the tonic: `bVI` is the major chord a minor sixth above the tonic, lower case is minor, `o` diminished, `+` augmented.
-- All 21 scales have a page (Ionian shares Major's, Aeolian shares Natural Minor's). The lists are an editorial selection, not a complete catalogue.
+The **Wiki** became the **Progressions** tab of the Tools page (see 2.2).
 
 ## What is new in 2
 
@@ -61,21 +113,12 @@ A row of chips under the chord name: **7 · 9 · 11 · 13 · sus2 · sus4 · no3
 - **7, 9, 11, 13** stack scale thirds on top of the chord.
 - **sus2, sus4, no3** replace or remove the third (only one at a time). `no3` gives open fifths.
 - Harsh clashes are softened for you: a b9 becomes a 9, and an 11 over a major third becomes a #11 (the Lydian sound).
-- Keys: **F1…F7** toggle the seven colors, **F8** clears them. The **×** chip clears them too.
+- Keys: hold **Space** and press **1…7** to toggle the seven colors, **Space+0** clears them (F1…F8 also work).
 - With voice leading on **auto** voices, the chord gets one voice per chord tone, so added colors are always heard. With a fixed voice count, the fifth and the root are dropped first.
 - In a custom position, `9`, `11` and `13` use the active colors.
 
-### Patterns
-The **PATTERN** row decides how a chord is played and written into the MIDI item:
-
-- **Block chord**, **Arp up**, **Arp down**, **Arp up-down**, **Alberti** (low-high-mid-high), **Bass / chord**, **Pulse** (repeated chord).
-- **Rate**: 1/4, 1/8, 1/8T, 1/16, 1/16T.
-- **Length ×N**: the chord lasts N grid units (also for block chords). Example: grid 1/4, Length ×4, Arp up 1/8 = one bar of eighth-note arpeggio.
-- **Hold bass**: the bass voice is one long note while the other voices move.
-- The drone is always written as one long note. Off-beat notes are slightly softer.
-- Keys: **F9 / F10** previous / next pattern.
-
-Replacing *selected* chords keeps the plain-chord behaviour. Inserting again at the same place replaces what was there.
+### Chord length
+**Length ×N** (INSERT row): an inserted chord lasts N grid units. Example: grid 1/4, Length ×4 = one bar. Inserting again at the same place replaces what was there.
 
 ### Parallel-mode borrowing (modal interchange)
 In the panel, **Degrees (Ctrl)** has a third option, **Parallel**: the Ctrl row then shows the chords of another mode on the *same tonic*. In C major with "C Natural Minor": Ctrl+6 = Ab, Ctrl+7 = Bb, Ctrl+4 = Fm. Choose the mode in the dropdown under the switch (any scale of the list).
@@ -87,7 +130,7 @@ Lydian Dominant, Mixolydian b6, Phrygian Dominant, Harmonic Major, Double Harmon
 Seven-note scales are spelled with one letter per degree (F# next to G, never Gb next to G), in the grid, the chord names and the voices.
 
 ### New actions
-`toggle color 7th / 9th / 11th / 13th / sus2 / sus4 / no 3rd`, `clear colors`, `next insert pattern`, `previous insert pattern`, `toggle live pattern`, `next chord change mode (now - beat - bar - 2 bars)`, `toggle reharmonize selected notes`.
+`toggle color 7th / 9th / 11th / 13th / sus2 / sus4 / no 3rd`, `clear colors`, `toggle reharmonize selected notes`.
 
 ---
 
@@ -170,8 +213,9 @@ Rules applied:
 - **+ / −**: octave.
 - **Shift+← →**: move the edit cursor by one grid step.
 - **1-7**: play the scale chords, **Shift+1-7**: insert them. **a-j / q-u / z-m**: single notes (as in ChordGun).
-- **0** or middle click: stop all notes (including the drone and the live pattern).
-- **F1-F8** colors, **F9 / F10** pattern, **F11** wiki, **F12** chord change mode.
+- **0** or middle click: stop all notes (including the drone).
+- **Space+1…7** colors, **Space+0** clear colors, **Tab** tools pages, **Esc** back to the grid.
+- **Ctrl+Alt** (AltGr) **+1…7**: substitutions.
 
 ## Ctrl and Alt: reliable keys
 With Ctrl or Alt held, REAPER does not always pass digits and arrows to the script. ChordMachineGun therefore reads the physical key state through the **js_ReaScriptAPI** extension. The numeric keypad works too.

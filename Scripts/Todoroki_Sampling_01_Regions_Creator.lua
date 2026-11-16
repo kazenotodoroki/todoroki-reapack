@@ -2,9 +2,9 @@
 -- @author Todoroki
 -- @version 1.0
 -- @changelog
---   Première version
+--   First version
 -- @about
---   Crée les régions et une piste MIDI pour enregistrer des samples.
+--   Creates the regions and a MIDI track to record samples.
 
 -- Initialize local variables with default values
 local roundRobinsNumber = 1

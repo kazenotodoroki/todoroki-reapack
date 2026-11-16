@@ -2,9 +2,9 @@
 -- @author Todoroki
 -- @version 1.0
 -- @changelog
---   Première version
+--   First version
 -- @about
---   Exporte toutes les régions sauf celles commençant par "#".
+--   Exports every region except those whose name starts with "#".
 
 local track_count = reaper.CountTracks(0)
 local track_names = {}

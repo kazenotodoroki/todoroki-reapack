@@ -2,12 +2,12 @@
 # @author Todoroki
 # @version 1.0
 # @changelog
-#   Première version
+#   First version
 # @provides
 #   [nomain] .
 # @about
-#   Crée une librairie DecentSampler à partir des samples exportés de REAPER.
-#   Outil externe : à lancer avec Python, en dehors de REAPER.
+#   Creates a DecentSampler library from the samples exported from REAPER.
+#   External tool: run it with Python, outside REAPER.
 
 import os
 from tkinter import filedialog

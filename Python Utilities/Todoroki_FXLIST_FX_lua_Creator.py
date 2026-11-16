@@ -2,12 +2,12 @@
 # @author Todoroki
 # @version 1.2
 # @changelog
-#   Première version
+#   First version
 # @provides
 #   [nomain] .
 # @about
-#   Crée des actions toggle (pour la toolbar) à partir des paramètres d'un plugin.
-#   Outil externe : à lancer avec Python, en dehors de REAPER.
+#   Creates toggle actions (for the toolbar) from the parameters of a plugin.
+#   External tool: run it with Python, outside REAPER.
 
 def parse_params_from_input(input_text):
     """Parse the pasted input into a list of (index, name) tuples."""

@@ -2,29 +2,29 @@
 -- @author Todoroki
 -- @version 1.0
 -- @changelog
---   Premiere version
+--   First version
 -- @about
 --   # Todoroki ZLEQ2 Curve Import
 --
---   Lit une courbe et la transforme en bandes pour **ZL Equalizer 2** (ZL Audio).
+--   Reads a curve and turns it into bands for **ZL Equalizer 2** (ZL Audio).
 --
---   Fichiers acceptes :
---   - **AutoEQ** : ParametricEQ.txt (filtres repris tels quels), GraphicEQ.txt, CSV AutoEQ
---     (colonnes equalization / error_smoothed / raw + target)
---   - **Open Sound Meter** : export CSV, TXT ou FRD d'une mesure (frequence, magnitude, phase, coherence)
---   - Tout CSV / TXT simple "frequence, dB" (REW, etc.)
+--   Accepted files:
+--   - **AutoEQ**: ParametricEQ.txt (filters taken as they are), GraphicEQ.txt, AutoEQ CSV
+--     (equalization / error_smoothed / raw + target columns)
+--   - **Open Sound Meter**: CSV, TXT or FRD export of a measurement (frequency, magnitude, phase, coherence)
+--   - Any simple "frequency, dB" CSV / TXT (REW, etc.)
 --
---   Pour une courbe (CSV, mesure), le script calcule les bandes (Peak + shelves) qui reproduisent
---   la correction : nombre de bandes, plage de frequences, boost / cut / Q max, lissage, pente cible.
---   Une mesure est inversee (correction = niveau moyen - mesure), ponderee par la coherence OSM.
+--   For a curve (CSV, measurement), the script computes the bands (Peak + shelves) that reproduce
+--   the correction: number of bands, frequency range, max boost / cut / Q, smoothing, target slope.
+--   A measurement is inverted (correction = average level - measurement), weighted by the OSM coherence.
 --
---   Sorties (au choix, combinables) :
---   - **A** : applique les bandes au ZL Equalizer 2 de la piste selectionnee (ou de la fenetre FX
---     ZL au premier plan ; propose de l'ajouter s'il manque). Preamp -> Output Gain.
---   - **C** : copie les bandes dans le presse-papiers au format ZL : clic droit dans ZL > Paste.
---     Un fichier _ZLEQ2_bands.xml est aussi ecrit a cote du fichier source.
---   - **M** : ecrit la courbe (mesure ou cible) comme cible EQ Match dans
---     ZL Audio/ZL Equalizer 2/Match Presets (EQ Match > Target : Preset).
+--   Outputs (pick any, can be combined):
+--   - **A**: applies the bands to the ZL Equalizer 2 of the selected track (or of the ZL FX window
+--     in front; offers to add it if missing). Preamp -> Output Gain.
+--   - **C**: copies the bands to the clipboard in ZL format: right-click in ZL > Paste.
+--     A _ZLEQ2_bands.xml file is also written next to the source file.
+--   - **M**: writes the curve (measurement or target) as an EQ Match target in
+--     ZL Audio/ZL Equalizer 2/Match Presets (EQ Match > Target: Preset).
 
 local r = reaper
 local TITLE = "Todoroki ZLEQ2 Curve Import"

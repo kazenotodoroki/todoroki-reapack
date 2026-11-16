@@ -1,8 +1,7 @@
 -- @noindex
--- ChordMachineGun 2 — toggle live pattern
+-- ChordMachineGun 2 — substitution 1 - R - relative
 local path = ({ reaper.get_action_context() })[2]:match("^(.*[/\\])")
 dofile(path .. "Todoroki_ChordMachineGun2_core.lua")
 
-setLivePattern(not getLivePattern())
-reaper.Help_Set("ChordMachineGun 2: live pattern " .. (getLivePattern() and "on" or "off"), false)
+subsAction(1, false)
 reaper.defer(emptyFunctionToPreventAutomaticCreationOfUndoPoint)

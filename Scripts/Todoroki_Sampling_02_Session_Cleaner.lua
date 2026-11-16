@@ -2,9 +2,9 @@
 -- @author Todoroki
 -- @version 1.0
 -- @changelog
---   Première version
+--   First version
 -- @about
---   Supprime les régions et marqueurs commençant par "/".
+--   Deletes the regions and markers whose name starts with "/".
 
 -- Split items function
 local function splitItemsAtPosition(position, track)

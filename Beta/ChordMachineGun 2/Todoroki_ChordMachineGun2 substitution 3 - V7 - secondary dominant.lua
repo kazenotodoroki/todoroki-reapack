@@ -1,8 +1,7 @@
 -- @noindex
--- ChordMachineGun 2 — next insert pattern
+-- ChordMachineGun 2 — substitution 3 - V7 - secondary dominant
 local path = ({ reaper.get_action_context() })[2]:match("^(.*[/\\])")
 dofile(path .. "Todoroki_ChordMachineGun2_core.lua")
 
-local pt = cyclePattern(1)
-reaper.Help_Set("ChordMachineGun 2: insert pattern = " .. pt.name, false)
+subsAction(3, false)
 reaper.defer(emptyFunctionToPreventAutomaticCreationOfUndoPoint)

@@ -2,9 +2,9 @@
 -- @author Todoroki
 -- @version 1.0
 -- @changelog
---   Première version
+--   First version
 -- @about
---   Crée une boucle sans coupure sur chaque sample.
+--   Creates a seamless loop on each sample.
 
 -- Get the length of the time selection
 start_time, end_time = reaper.GetSet_LoopTimeRange2(0, false, false, 0, 0, false)

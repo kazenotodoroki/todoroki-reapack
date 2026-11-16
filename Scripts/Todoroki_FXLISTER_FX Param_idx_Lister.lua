@@ -2,9 +2,9 @@
 -- @author Todoroki
 -- @version 1.0
 -- @changelog
---   Première version
+--   First version
 -- @about
---   Liste les paramètres d'un plugin et leurs index.
+--   Lists the parameters of a plugin and their indexes.
 
 -- Function to get user input for track number and part of plugin name
 function GetUserInput()
